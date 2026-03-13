@@ -10,7 +10,7 @@ COPY ui/ .
 # Ensure public dir exists (required by COPY --from in runner stage)
 RUN mkdir -p public
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NEXT_PUBLIC_API_URL=http://api:8080
+ENV INTERNAL_API_URL=http://api:8080
 RUN npm run build
 
 FROM node:20-alpine AS runner
