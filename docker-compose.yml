@@ -1,0 +1,129 @@
+version: "3.9"
+
+services:
+  # ============================================
+  # PostgreSQL Database
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: darca-postgres
+    environment:
+      POSTGRES_DB: darca
+      POSTGRES_USER: darca
+      POSTGRES_PASSWORD: darca
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U darca"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================
+  # Valkey (Redis-compatible) - Message Broker
+  # ============================================
+  valkey:
+    image: valkey/valkey:7-alpine
+    container_name: darca-valkey
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================
+  # D-ARCA API (FastAPI)
+  # ============================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: darca-api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://darca:darca@postgres:5432/darca
+      REDIS_URL: redis://valkey:6379/0
+      CELERY_BROKER_URL: redis://valkey:6379/0
+      CELERY_RESULT_BACKEND: redis://valkey:6379/1
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-use-openssl-rand-hex-32}
+      CORS_ORIGINS: '["http://localhost:3000","http://ui:3000"]'
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    volumes:
+      - api_data:/app/data
+    restart: unless-stopped
+
+  # ============================================
+  # Celery Worker (Background Scan Tasks)
+  # ============================================
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: darca-worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://darca:darca@postgres:5432/darca
+      REDIS_URL: redis://valkey:6379/0
+      CELERY_BROKER_URL: redis://valkey:6379/0
+      CELERY_RESULT_BACKEND: redis://valkey:6379/1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================
+  # Celery Beat (Scheduled Tasks)
+  # ============================================
+  worker-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: darca-worker-beat
+    command: ["celery", "-A", "api.celery_app", "beat", "--loglevel=info"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://darca:darca@postgres:5432/darca
+      REDIS_URL: redis://valkey:6379/0
+      CELERY_BROKER_URL: redis://valkey:6379/0
+      CELERY_RESULT_BACKEND: redis://valkey:6379/1
+    depends_on:
+      valkey:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================
+  # D-ARCA UI (Next.js)
+  # ============================================
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    container_name: darca-ui
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  valkey_data:
+    driver: local
+  api_data:
+    driver: local

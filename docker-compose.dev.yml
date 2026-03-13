@@ -1,0 +1,79 @@
+version: "3.9"
+
+# Development compose - mounts source code for hot-reload
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: darca-postgres-dev
+    environment:
+      POSTGRES_DB: darca
+      POSTGRES_USER: darca
+      POSTGRES_PASSWORD: darca
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U darca"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  valkey:
+    image: valkey/valkey:7-alpine
+    container_name: darca-valkey-dev
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: darca-api-dev
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://darca:darca@postgres:5432/darca
+      REDIS_URL: redis://valkey:6379/0
+      CELERY_BROKER_URL: redis://valkey:6379/0
+      CELERY_RESULT_BACKEND: redis://valkey:6379/1
+      SECRET_KEY: dev-secret-key-not-for-production
+      CORS_ORIGINS: '["http://localhost:3000"]'
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./api:/app/api
+      - ./scanner:/app/scanner
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: darca-worker-dev
+    environment:
+      DATABASE_URL: postgresql+asyncpg://darca:darca@postgres:5432/darca
+      REDIS_URL: redis://valkey:6379/0
+      CELERY_BROKER_URL: redis://valkey:6379/0
+      CELERY_RESULT_BACKEND: redis://valkey:6379/1
+    volumes:
+      - ./api:/app/api
+      - ./scanner:/app/scanner
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+volumes:
+  postgres_dev_data:
+    driver: local

@@ -1,0 +1,59 @@
+# D-ARCA Backend Dependencies
+# FastAPI & Web
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+gunicorn==22.0.0
+python-multipart==0.0.9
+
+# Database
+sqlalchemy[asyncio]==2.0.30
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# Task Queue
+celery==5.4.0
+redis==5.0.4
+
+# Auth & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+pydantic[email]==2.7.0
+pydantic-settings==2.3.0
+
+# HTTP Client
+httpx==0.27.0
+
+# AWS SDK
+boto3==1.34.100
+botocore==1.34.100
+
+# Azure SDK
+azure-identity==1.16.0
+azure-mgmt-authorization==4.0.0
+azure-mgmt-storage==21.1.0
+azure-mgmt-network==25.3.0
+azure-mgmt-compute==31.0.0
+azure-mgmt-sql==3.0.1
+azure-mgmt-keyvault==10.3.0
+azure-mgmt-monitor==6.0.2
+azure-mgmt-web==7.2.0
+
+# GCP SDK
+google-cloud-storage==2.16.0
+google-cloud-compute==1.18.0
+google-cloud-resource-manager==1.12.0
+google-cloud-kms==2.21.0
+google-cloud-container==2.43.0
+google-cloud-logging==3.10.0
+google-api-python-client==2.127.0
+google-auth==2.29.0
+
+# Kubernetes
+kubernetes==29.0.0
+
+# Snowflake
+snowflake-connector-python==3.8.0
+
+# Utilities
+pyyaml==6.0.1
