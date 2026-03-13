@@ -1,0 +1,17 @@
+.git
+.gitignore
+*.md
+__pycache__
+*.pyc
+.pytest_cache
+.venv
+venv
+env
+node_modules
+.next
+.env
+.env.local
+_data
+coverage
+htmlcov
+.DS_Store
