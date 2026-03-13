@@ -1,12 +1,12 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+/**
+ * D-ARCA API Client.
+ *
+ * All requests go to the same origin (e.g. http://localhost:3000/api/...).
+ * Next.js rewrites proxy them to the backend API server, so the browser
+ * never needs to reach port 8080 directly — no CORS, no cross-origin issues.
+ */
 
 class ApiClient {
-  private baseUrl: string
-
-  constructor() {
-    this.baseUrl = API_URL
-  }
-
   private getToken(): string | null {
     if (typeof window === 'undefined') return null
     try {
@@ -27,7 +27,8 @@ class ApiClient {
     body?: unknown,
     options?: { params?: Record<string, string> }
   ): Promise<T> {
-    const url = new URL(`${this.baseUrl}${path}`)
+    // path already starts with /api/v1/...
+    const url = new URL(path, window.location.origin)
     if (options?.params) {
       Object.entries(options.params).forEach(([key, val]) => {
         if (val) url.searchParams.set(key, val)
