@@ -37,6 +37,7 @@ async def create_scan(
     scan = Scan(
         user_id=current_user.id,
         provider_id=data.provider_id,
+        connection_id=data.connection_id,
         scan_type=data.scan_type,
         status="pending",
     )

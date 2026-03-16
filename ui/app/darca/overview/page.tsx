@@ -12,15 +12,23 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
   GlobeAltIcon,
+  MapIcon,
 } from '@heroicons/react/24/outline'
 
 export default function OverviewPage() {
   const [data, setData] = useState<any>(null)
+  const [attackSummary, setAttackSummary] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.getDashboardOverview()
-      .then(setData)
+    Promise.all([
+      api.getDashboardOverview(),
+      api.getAttackPathsSummary().catch(() => null),
+    ])
+      .then(([dashData, atkData]) => {
+        setData(dashData)
+        setAttackSummary(atkData)
+      })
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
@@ -47,7 +55,7 @@ export default function OverviewPage() {
       <Header title="Overview" subtitle="Security posture at a glance" />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
         <StatCard
           title="Cloud Providers"
           value={data?.total_cloud_providers || 0}
@@ -69,6 +77,16 @@ export default function OverviewPage() {
           icon={<ExclamationTriangleIcon className="w-6 h-6" />}
         />
         <StatCard
+          title="Attack Paths"
+          value={attackSummary?.total_paths ?? 0}
+          icon={<MapIcon className="w-6 h-6" />}
+          valueColor={
+            (attackSummary?.total_paths ?? 0) > 0
+              ? 'text-severity-high'
+              : 'text-status-pass'
+          }
+        />
+        <StatCard
           title="Pass Rate"
           value={formatPercent(data?.pass_rate || 0)}
           icon={<CheckCircleIcon className="w-6 h-6" />}
@@ -81,6 +99,36 @@ export default function OverviewPage() {
           }
         />
       </div>
+
+      {/* Security Posture Score */}
+      {data && (
+        <div className="card mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-brand-navy">Security Posture Score</h3>
+              <p className="text-sm text-brand-gray-400 mt-1">Based on overall pass rate and finding severity distribution</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className={`text-5xl font-bold ${
+                (data.pass_rate || 0) >= 80 ? 'text-status-pass' :
+                (data.pass_rate || 0) >= 50 ? 'text-amber-500' : 'text-status-fail'
+              }`}>
+                {Math.round(data.pass_rate || 0)}
+              </div>
+              <div className="text-sm text-brand-gray-400">/ 100</div>
+            </div>
+          </div>
+          <div className="mt-4 w-full bg-brand-gray-100 rounded-full h-3">
+            <div
+              className={`h-3 rounded-full transition-all ${
+                (data.pass_rate || 0) >= 80 ? 'bg-status-pass' :
+                (data.pass_rate || 0) >= 50 ? 'bg-amber-500' : 'bg-status-fail'
+              }`}
+              style={{ width: `${Math.max(data.pass_rate || 0, 2)}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Severity Breakdown */}
@@ -138,6 +186,28 @@ export default function OverviewPage() {
           )}
         </div>
       </div>
+
+      {/* Attack Paths Summary */}
+      {attackSummary && (attackSummary.total_paths > 0) && (
+        <div className="card mb-8">
+          <h3 className="text-lg font-semibold text-brand-navy mb-4">Attack Paths by Severity</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {['critical', 'high', 'medium', 'low'].map((sev) => {
+              const count = attackSummary.by_severity?.[sev] || 0
+              return (
+                <div key={sev} className="text-center p-4 rounded-lg bg-brand-gray-50">
+                  <p className={`text-3xl font-bold ${
+                    sev === 'critical' ? 'text-severity-critical' :
+                    sev === 'high' ? 'text-severity-high' :
+                    sev === 'medium' ? 'text-severity-medium' : 'text-severity-low'
+                  }`}>{count}</p>
+                  <p className="text-xs text-brand-gray-400 uppercase font-semibold mt-1">{sev}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Recent Scans */}
       <div className="card">

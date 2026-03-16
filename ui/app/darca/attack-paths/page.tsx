@@ -378,6 +378,7 @@ export default function AttackPathsPage() {
   const [graphData, setGraphData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
+  const [analyzeResult, setAnalyzeResult] = useState<{ message: string; paths_discovered: number } | null>(null)
   const [filters, setFilters] = useState({ severity: '', category: '' })
 
   const loadData = async () => {
@@ -403,10 +404,15 @@ export default function AttackPathsPage() {
 
   const handleAnalyze = async () => {
     setAnalyzing(true)
+    setAnalyzeResult(null)
     try {
-      await api.analyzeAttackPaths()
+      const result = await api.analyzeAttackPaths()
+      setAnalyzeResult(result)
       await loadData()
-    } catch (err) {
+      // Auto-dismiss after 8 seconds
+      setTimeout(() => setAnalyzeResult(null), 8000)
+    } catch (err: any) {
+      setAnalyzeResult({ message: err.message || 'Analysis failed', paths_discovered: 0 })
       console.error(err)
     } finally {
       setAnalyzing(false)
@@ -442,6 +448,28 @@ export default function AttackPathsPage() {
           {analyzing ? 'Analyzing...' : 'Run Analysis'}
         </button>
       </div>
+
+      {/* Analysis Result Toast */}
+      {analyzeResult && (
+        <div className={cn(
+          'mb-4 px-4 py-3 rounded-lg flex items-center justify-between text-sm',
+          analyzeResult.paths_discovered > 0
+            ? 'bg-brand-green/10 text-brand-green border border-brand-green/20'
+            : 'bg-amber-50 text-amber-700 border border-amber-200'
+        )}>
+          <div className="flex items-center gap-2">
+            {analyzeResult.paths_discovered > 0 ? (
+              <MapIcon className="w-5 h-5" />
+            ) : (
+              <ExclamationTriangleIcon className="w-5 h-5" />
+            )}
+            <span>{analyzeResult.message}</span>
+          </div>
+          <button onClick={() => setAnalyzeResult(null)} className="p-1 hover:opacity-70">
+            <XMarkIcon className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Summary Stats */}
       {summary && (

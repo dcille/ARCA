@@ -25,6 +25,7 @@ const navigation = [
   { name: 'Scans', href: '/darca/scans', icon: ShieldCheckIcon },
   { name: 'Cloud Providers', href: '/darca/providers', icon: CloudIcon },
   { name: 'SaaS Security', href: '/darca/saas-security', icon: GlobeAltIcon },
+  { name: 'Settings', href: '/darca/settings', icon: Cog6ToothIcon },
 ]
 
 export default function Sidebar() {

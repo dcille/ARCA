@@ -122,61 +122,138 @@ def _make_id() -> str:
 # ── Attack path scenario definitions ──────────────────────────────────
 
 SCENARIO_TEMPLATES = [
-    # ── External Exposure → Compute → Data ─────────────────────────
+    # ── AWS: External Exposure → Compute → Data ───────────────────
     {
-        "match_services": {"EC2", "S3"},
-        "match_checks": ["ec2_security_group", "s3_bucket_public"],
+        "match_services": {"ec2", "s3"},
+        "match_checks": ["ec2_security_group", "s3_bucket_public", "ec2_ebs", "ec2_imds"],
         "category": "data_exfiltration",
         "builder": "_build_exposure_to_data_path",
     },
-    # ── IAM Privilege Escalation ───────────────────────────────────
+    # ── AWS: IAM Privilege Escalation ─────────────────────────────
     {
-        "match_services": {"IAM"},
-        "match_checks": ["iam_policy_admin", "iam_user_policy", "iam_role_admin", "iam_inline_policy"],
+        "match_services": {"iam"},
+        "match_checks": ["iam_policy_admin", "iam_user_policy", "iam_role_admin",
+                          "iam_inline_policy", "iam_root_mfa", "iam_user_mfa",
+                          "iam_access_key", "iam_password_policy"],
         "category": "privilege_escalation",
         "builder": "_build_iam_escalation_path",
     },
-    # ── Credential Exposure → Lateral Movement ─────────────────────
+    # ── AWS: Credential Exposure → Lateral Movement ───────────────
     {
-        "match_services": {"SecretsManager", "SSM", "Lambda"},
-        "match_checks": ["secretsmanager_rotation", "ssm_parameter", "lambda_env"],
+        "match_services": {"secretsmanager", "ssm", "lambda"},
+        "match_checks": ["secretsmanager_rotation", "ssm_parameter", "lambda_env",
+                          "lambda_runtime", "lambda_vpc"],
         "category": "lateral_movement",
         "builder": "_build_credential_lateral_path",
     },
-    # ── Network Exposure Chain ─────────────────────────────────────
+    # ── AWS: Network Exposure Chain ───────────────────────────────
     {
-        "match_services": {"VPC", "EC2", "RDS"},
-        "match_checks": ["vpc_flow_logs", "ec2_security_group", "rds_public"],
+        "match_services": {"vpc", "ec2", "rds"},
+        "match_checks": ["vpc_flow_logs", "ec2_security_group", "rds_public",
+                          "rds_encryption", "rds_multi_az"],
         "category": "exposure",
         "builder": "_build_network_exposure_path",
     },
-    # ── Encryption Gap Chain ───────────────────────────────────────
+    # ── AWS: Encryption Gap Chain ─────────────────────────────────
     {
-        "match_services": {"S3", "RDS", "EBS", "KMS"},
-        "match_checks": ["s3_encryption", "rds_encryption", "ebs_encryption", "kms_rotation"],
+        "match_services": {"s3", "rds", "ebs", "kms", "dynamodb", "efs", "elasticache"},
+        "match_checks": ["s3_encryption", "rds_encryption", "ebs_encryption", "kms_rotation",
+                          "dynamodb_table_encrypted", "efs_encryption", "elasticache_encryption"],
         "category": "data_exfiltration",
         "builder": "_build_encryption_gap_path",
     },
-    # ── Logging Blindspot → Undetected Access ──────────────────────
+    # ── AWS: Logging Blindspot → Undetected Access ────────────────
     {
-        "match_services": {"CloudTrail", "CloudWatch", "GuardDuty", "Config"},
-        "match_checks": ["cloudtrail_enabled", "guardduty_enabled", "config_enabled"],
+        "match_services": {"cloudtrail", "cloudwatch", "guardduty", "config"},
+        "match_checks": ["cloudtrail_enabled", "guardduty_enabled", "config_enabled",
+                          "cloudtrail_multiregion", "cloudwatch_log_group"],
         "category": "detection_evasion",
         "builder": "_build_logging_blindspot_path",
     },
-    # ── Lambda/ECS Compute Escalation ──────────────────────────────
+    # ── AWS: Lambda/ECS Compute Escalation ────────────────────────
     {
-        "match_services": {"Lambda", "ECS", "IAM"},
-        "match_checks": ["lambda_", "ecs_"],
+        "match_services": {"lambda", "ecs", "eks"},
+        "match_checks": ["lambda_", "ecs_", "eks_"],
         "category": "privilege_escalation",
         "builder": "_build_compute_escalation_path",
     },
-    # ── Azure/GCP Equivalent Paths ─────────────────────────────────
+    # ── Azure: Identity → KeyVault → Data ─────────────────────────
     {
-        "match_services": {"Identity", "Storage", "Network", "Compute"},
-        "match_checks": ["identity_", "storage_", "network_"],
+        "match_services": {"identity", "keyvault", "database", "storage"},
+        "match_checks": ["azure_iam", "azure_keyvault", "azure_storage", "azure_sql"],
+        "category": "data_exfiltration",
+        "builder": "_build_azure_exposure_path",
+    },
+    # ── Azure: Network Exposure ───────────────────────────────────
+    {
+        "match_services": {"network", "appservice", "compute", "database"},
+        "match_checks": ["azure_network", "azure_nsg", "azure_appservice",
+                          "azure_vm", "azure_sql"],
         "category": "exposure",
-        "builder": "_build_multi_cloud_path",
+        "builder": "_build_azure_network_path",
+    },
+    # ── GCP: IAM & Compute Exposure ───────────────────────────────
+    {
+        "match_services": {"iam", "compute", "storage", "sql"},
+        "match_checks": ["gcp_iam", "gcp_compute", "gcp_storage", "gcp_sql"],
+        "category": "exposure",
+        "builder": "_build_gcp_exposure_path",
+    },
+    # ── GCP: Network & Firewall Exposure ──────────────────────────
+    {
+        "match_services": {"networking", "compute", "gke", "sql"},
+        "match_checks": ["gcp_firewall", "gcp_gke", "gcp_sql_no_public"],
+        "category": "exposure",
+        "builder": "_build_gcp_network_path",
+    },
+    # ── Kubernetes: RBAC & Pod Security ───────────────────────────
+    {
+        "match_services": {"pods", "rbac", "namespaces"},
+        "match_checks": ["k8s_pod", "k8s_rbac", "k8s_namespace"],
+        "category": "privilege_escalation",
+        "builder": "_build_k8s_escalation_path",
+    },
+    # ── Kubernetes: Network & Container Exposure ──────────────────
+    {
+        "match_services": {"pods", "network", "namespaces"},
+        "match_checks": ["k8s_pod_privileged", "k8s_pod_run_as_non_root",
+                          "k8s_namespace_network_policy"],
+        "category": "lateral_movement",
+        "builder": "_build_k8s_lateral_path",
+    },
+    # ── OCI: IAM & Storage Exposure ───────────────────────────────
+    {
+        "match_services": {"iam", "objectstorage", "networking", "storage", "vault"},
+        "match_checks": ["oci_iam", "oci_objectstorage", "oci_network", "oci_storage",
+                          "oci_vault"],
+        "category": "exposure",
+        "builder": "_build_oci_exposure_path",
+    },
+    # ── OCI: Compute & Database ───────────────────────────────────
+    {
+        "match_services": {"compute", "database", "mysql", "kubernetesengine",
+                           "functions", "containerinstances"},
+        "match_checks": ["oci_compute", "oci_db", "oci_mysql", "oci_oke",
+                          "oci_functions", "oci_container"],
+        "category": "data_exfiltration",
+        "builder": "_build_oci_compute_data_path",
+    },
+    # ── Cross-provider: Monitoring Blind Spots ────────────────────
+    {
+        "match_services": {"monitor", "logging", "cloudguard", "cloudtrail",
+                           "cloudwatch", "guardduty", "config"},
+        "match_checks": ["azure_monitor", "gcp_logging", "oci_cloudguard", "oci_logging",
+                          "cloudtrail_", "guardduty_", "config_"],
+        "category": "detection_evasion",
+        "builder": "_build_monitoring_blindspot_path",
+    },
+    # ── Cross-provider: Encryption Gaps ───────────────────────────
+    {
+        "match_services": {"kms", "keyvault", "vault", "storage", "s3", "objectstorage",
+                           "database", "rds", "sql", "mysql"},
+        "match_checks": ["encrypt", "kms", "ssl", "tls", "cmk"],
+        "category": "data_exfiltration",
+        "builder": "_build_encryption_gap_path",
     },
 ]
 
@@ -253,18 +330,23 @@ class AttackPathAnalyzer:
         self._build_service_edges(by_service)
 
     def _classify_node_type(self, service: str) -> NodeType:
-        identity_services = {"IAM", "Identity", "AAD", "RBAC"}
-        network_services = {"VPC", "Network", "SecurityGroup", "Subnet", "Networking"}
-        data_services = {"S3", "RDS", "DynamoDB", "Storage", "CloudSQL", "EFS", "Elasticsearch"}
-        compute_services = {"EC2", "Lambda", "ECS", "Compute", "GKE", "EKS"}
+        svc = service.lower()
+        identity_services = {"iam", "identity", "aad", "rbac"}
+        network_services = {"vpc", "network", "securitygroup", "subnet", "networking",
+                            "vcn", "loadbalancer"}
+        data_services = {"s3", "rds", "dynamodb", "storage", "cloudsql", "efs", "elasticsearch",
+                         "database", "objectstorage", "blockstorage", "mysql", "sql",
+                         "filestorage", "elasticache", "containerregistry"}
+        compute_services = {"ec2", "lambda", "ecs", "compute", "gke", "eks", "oke", "functions",
+                            "appservice", "containerinstances", "kubernetesengine", "pods"}
 
-        if service in identity_services:
+        if svc in identity_services:
             return NodeType.IDENTITY
-        if service in network_services:
+        if svc in network_services:
             return NodeType.NETWORK
-        if service in data_services:
+        if svc in data_services:
             return NodeType.DATA_STORE
-        if service in compute_services:
+        if svc in compute_services:
             return NodeType.RESOURCE
         return NodeType.SERVICE
 
@@ -287,7 +369,7 @@ class AttackPathAnalyzer:
                 ))
 
         # IAM → other resources (permission relationships)
-        iam_nodes = [n for n in resource_nodes.values() if n.service in ("IAM", "Identity")]
+        iam_nodes = [n for n in resource_nodes.values() if n.service.lower() in ("iam", "identity")]
         compute_nodes = [n for n in resource_nodes.values()
                          if n.node_type == NodeType.RESOURCE]
         data_nodes = [n for n in resource_nodes.values()
@@ -342,7 +424,7 @@ class AttackPathAnalyzer:
 
         # Credential stores → Lateral movement
         cred_nodes = [n for n in resource_nodes.values()
-                      if n.service in ("SecretsManager", "SSM", "KMS")]
+                      if n.service.lower() in ("secretsmanager", "ssm", "kms", "keyvault", "vault")]
         for cred in cred_nodes:
             for compute in compute_nodes:
                 self.graph.add_edge(GraphEdge(
@@ -358,16 +440,19 @@ class AttackPathAnalyzer:
         if not failed:
             return
 
+        # Normalize service names to lowercase for case-insensitive matching
         services = {f["service"] for f in failed}
+        services_lower = {s.lower() for s in services}
         check_ids = {f["check_id"] for f in failed}
 
         for template in SCENARIO_TEMPLATES:
-            matched_services = services & template["match_services"]
+            template_services_lower = {s.lower() for s in template["match_services"]}
+            matched_services = services_lower & template_services_lower
             matched_checks = [
                 cid for cid in check_ids
-                if any(mc in cid for mc in template["match_checks"])
+                if any(mc.lower() in cid.lower() for mc in template["match_checks"])
             ]
-            if matched_services or matched_checks:
+            if matched_services and matched_checks:
                 builder = getattr(self, template["builder"], None)
                 if builder:
                     path = builder(failed, matched_services, matched_checks)
@@ -387,7 +472,7 @@ class AttackPathAnalyzer:
         exposed_findings = [f for f in findings
                             if any(k in f["check_id"] for k in ["public", "security_group", "ingress"])]
         data_findings = [f for f in findings
-                         if f["service"] in ("S3", "RDS", "DynamoDB", "EFS", "Elasticsearch")]
+                         if f["service"].lower() in ("s3", "rds", "dynamodb", "efs", "elasticsearch")]
 
         if not exposed_findings or not data_findings:
             return None
@@ -438,8 +523,9 @@ class AttackPathAnalyzer:
 
     def _build_iam_escalation_path(self, findings, services, checks) -> Optional[AttackPath]:
         """IAM misconfiguration → privilege escalation path."""
-        iam_findings = [f for f in findings if f["service"] == "IAM"
-                        and any(k in f["check_id"] for k in ["admin", "policy", "inline", "role"])]
+        iam_findings = [f for f in findings if f["service"].lower() == "iam"
+                        and any(k in f["check_id"] for k in ["admin", "policy", "inline", "role",
+                                                              "mfa", "access_key", "password"])]
         if not iam_findings:
             return None
 
@@ -497,7 +583,7 @@ class AttackPathAnalyzer:
     def _build_credential_lateral_path(self, findings, services, checks) -> Optional[AttackPath]:
         """Credential exposure → lateral movement path."""
         cred_findings = [f for f in findings
-                         if f["service"] in ("SecretsManager", "SSM", "Lambda")
+                         if f["service"].lower() in ("secretsmanager", "ssm", "lambda")
                          and f.get("status") == "FAIL"]
         if not cred_findings:
             return None
@@ -550,7 +636,7 @@ class AttackPathAnalyzer:
     def _build_network_exposure_path(self, findings, services, checks) -> Optional[AttackPath]:
         """Network misconfiguration → database exposure path."""
         net_findings = [f for f in findings
-                        if f["service"] in ("VPC", "EC2", "RDS")
+                        if f["service"].lower() in ("vpc", "ec2", "rds")
                         and f.get("status") == "FAIL"]
         if not net_findings:
             return None
@@ -560,8 +646,8 @@ class AttackPathAnalyzer:
                              label="Internet", service="external")
         nodes.append(internet)
 
-        net_layer = [f for f in net_findings if f["service"] in ("VPC", "EC2")]
-        db_layer = [f for f in net_findings if f["service"] == "RDS"]
+        net_layer = [f for f in net_findings if f["service"].lower() in ("vpc", "ec2")]
+        db_layer = [f for f in net_findings if f["service"].lower() == "rds"]
 
         for f in net_layer[:2]:
             n = GraphNode(id=f"net-{_make_id()}", node_type=NodeType.NETWORK,
@@ -660,7 +746,7 @@ class AttackPathAnalyzer:
     def _build_logging_blindspot_path(self, findings, services, checks) -> Optional[AttackPath]:
         """Missing logging → undetected access path."""
         log_findings = [f for f in findings
-                        if f["service"] in ("CloudTrail", "CloudWatch", "GuardDuty", "Config")
+                        if f["service"].lower() in ("cloudtrail", "cloudwatch", "guardduty", "config")
                         and f.get("status") == "FAIL"]
         if not log_findings:
             return None
@@ -713,7 +799,7 @@ class AttackPathAnalyzer:
     def _build_compute_escalation_path(self, findings, services, checks) -> Optional[AttackPath]:
         """Lambda/ECS misconfiguration → privilege escalation."""
         compute_findings = [f for f in findings
-                            if f["service"] in ("Lambda", "ECS")
+                            if f["service"].lower() in ("lambda", "ecs", "eks")
                             and f.get("status") == "FAIL"]
         if not compute_findings:
             return None
@@ -764,12 +850,9 @@ class AttackPathAnalyzer:
         )
 
     def _build_multi_cloud_path(self, findings, services, checks) -> Optional[AttackPath]:
-        """Multi-cloud (Azure/GCP) exposure path."""
-        multi_findings = [f for f in findings
-                          if f["service"] in ("Identity", "Storage", "Network", "Compute",
-                                              "KeyVault", "Monitor", "AppService",
-                                              "CloudSQL", "GKE", "Logging")
-                          and f.get("status") == "FAIL"]
+        """Multi-cloud (Azure/GCP/OCI) exposure path."""
+        # Accept any failed finding - this is a catch-all for cross-cloud scenarios
+        multi_findings = [f for f in findings if f.get("status") == "FAIL"]
         if not multi_findings:
             return None
 
@@ -810,6 +893,525 @@ class AttackPathAnalyzer:
                 "Implement network segmentation and private endpoints",
                 "Enable cloud-native security monitoring",
                 "Apply identity-based access controls with MFA",
+            ],
+        )
+
+    def _build_azure_exposure_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Azure: Identity misconfiguration → KeyVault/Storage/Database exposure."""
+        azure_findings = [f for f in findings
+                          if f["service"].lower() in ("identity", "keyvault", "database", "storage")
+                          and f.get("status") == "FAIL"]
+        if len(azure_findings) < 2:
+            return None
+
+        nodes, edges, affected = [], [], []
+        attacker = GraphNode(id="az-attacker", node_type=NodeType.IDENTITY,
+                             label="Compromised Azure Identity", service="identity")
+        nodes.append(attacker)
+
+        prev_id = attacker.id
+        for f in azure_findings[:5]:
+            n = GraphNode(id=f"az-{_make_id()}", node_type=self._classify_node_type(f["service"]),
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edge_type = EdgeType.HAS_ACCESS if n.node_type == NodeType.DATA_STORE else EdgeType.CAN_ESCALATE
+            edges.append(GraphEdge(prev_id, n.id, edge_type, "exploits misconfiguration"))
+            prev_id = n.id
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        return AttackPath(
+            id=_make_id(),
+            title="Azure Identity to Data Exposure Chain",
+            description="Misconfigured Azure identity and access controls create a path from "
+                        "compromised credentials to sensitive data in storage, databases, or Key Vault.",
+            severity=self._max_severity([f["severity"] for f in azure_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Compromised Azure Identity",
+            target="Sensitive Data Stores",
+            category="data_exfiltration",
+            techniques=["Initial Access: Valid Accounts",
+                         "Credential Access: Unsecured Credentials in Key Vault",
+                         "Collection: Data from Cloud Storage"],
+            affected_resources=affected,
+            remediation=[
+                "Enforce MFA for all Azure AD users",
+                "Apply RBAC with least-privilege across subscriptions",
+                "Enable Key Vault soft-delete and purge protection",
+                "Enable encryption with customer-managed keys on storage accounts",
+                "Enable Azure Defender for real-time threat detection",
+            ],
+        )
+
+    def _build_azure_network_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Azure: Network exposure → App Service / Compute / Database."""
+        net_findings = [f for f in findings
+                        if f["service"].lower() in ("network", "appservice", "compute", "database")
+                        and f.get("status") == "FAIL"]
+        if len(net_findings) < 2:
+            return None
+
+        nodes, edges, affected = [], [], []
+        internet = GraphNode(id="az-internet", node_type=NodeType.INTERNET,
+                             label="Internet", service="external")
+        nodes.append(internet)
+
+        net_layer = [f for f in net_findings if f["service"].lower() in ("network", "appservice")]
+        data_layer = [f for f in net_findings if f["service"].lower() in ("compute", "database")]
+
+        for f in net_layer[:3]:
+            n = GraphNode(id=f"az-net-{_make_id()}", node_type=self._classify_node_type(f["service"]),
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(internet.id, n.id, EdgeType.EXPOSES, "publicly accessible"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        for f in data_layer[:3]:
+            n = GraphNode(id=f"az-data-{_make_id()}", node_type=self._classify_node_type(f["service"]),
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            for prev in nodes[1:]:
+                if prev.node_type in (NodeType.NETWORK, NodeType.RESOURCE) and prev.id != n.id:
+                    edges.append(GraphEdge(prev.id, n.id, EdgeType.ROUTES_TO, "reaches backend"))
+                    break
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        if len(nodes) < 3:
+            return None
+
+        return AttackPath(
+            id=_make_id(),
+            title="Azure Network Exposure to Backend Services",
+            description="Misconfigured NSGs and publicly exposed App Services allow internet "
+                        "traffic to reach compute instances and databases.",
+            severity=self._max_severity([f["severity"] for f in net_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Internet",
+            target="Backend Compute & Databases",
+            category="exposure",
+            techniques=["Initial Access: Exploit Public-Facing Application",
+                         "Discovery: Cloud Service Dashboard"],
+            affected_resources=affected,
+            remediation=[
+                "Restrict NSG inbound rules to required IPs and ports",
+                "Disable public access on Azure SQL databases",
+                "Use Azure Private Link for service connectivity",
+                "Enable App Service access restrictions",
+                "Deploy Azure WAF on public-facing endpoints",
+            ],
+        )
+
+    def _build_monitoring_blindspot_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Azure/GCP/OCI: Missing monitoring and logging."""
+        monitor_findings = [f for f in findings
+                            if f["service"].lower() in ("monitor", "logging", "cloudguard",
+                                                        "cloudtrail", "cloudwatch", "guardduty", "config")
+                            and f.get("status") == "FAIL"]
+        if not monitor_findings:
+            return None
+
+        nodes, edges, affected = [], [], []
+        attacker = GraphNode(id="stealth-actor", node_type=NodeType.IDENTITY,
+                             label="Threat Actor", service="external")
+        nodes.append(attacker)
+
+        for f in monitor_findings[:4]:
+            n = GraphNode(id=f"monitor-{_make_id()}", node_type=NodeType.SERVICE,
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(attacker.id, n.id, EdgeType.LATERAL_MOVE,
+                                   "undetected due to disabled monitoring"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        target = GraphNode(id=f"unmonitored-env-{_make_id()}", node_type=NodeType.RESOURCE,
+                           label="Unmonitored Environment", service="multi-service")
+        nodes.append(target)
+        for n in nodes[1:-1]:
+            edges.append(GraphEdge(n.id, target.id, EdgeType.LATERAL_MOVE,
+                                   "blind spot enables undetected access"))
+
+        return AttackPath(
+            id=_make_id(),
+            title="Monitoring Blind Spots Enable Undetected Activity",
+            description="Disabled or misconfigured monitoring and logging creates blind spots "
+                        "where attacker activity goes undetected across the cloud environment.",
+            severity=self._max_severity([f["severity"] for f in monitor_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Threat Actor",
+            target="Unmonitored Environment",
+            category="detection_evasion",
+            techniques=["Defense Evasion: Impair Defenses",
+                         "Defense Evasion: Disable Cloud Logs"],
+            affected_resources=affected,
+            remediation=[
+                "Enable activity logging across all cloud services",
+                "Configure security monitoring and alerting",
+                "Enable cloud-native threat detection services",
+                "Set up centralized log collection and SIEM integration",
+            ],
+        )
+
+    def _build_gcp_exposure_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """GCP: IAM/Compute/Storage/SQL exposure chain."""
+        gcp_findings = [f for f in findings
+                        if f["service"].lower() in ("iam", "compute", "storage", "sql")
+                        and f.get("status") == "FAIL"]
+        if len(gcp_findings) < 2:
+            return None
+
+        nodes, edges, affected = [], [], []
+        attacker = GraphNode(id="gcp-attacker", node_type=NodeType.IDENTITY,
+                             label="Compromised GCP Identity", service="iam")
+        nodes.append(attacker)
+
+        prev_id = attacker.id
+        for f in gcp_findings[:5]:
+            n = GraphNode(id=f"gcp-{_make_id()}", node_type=self._classify_node_type(f["service"]),
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edge_type = EdgeType.HAS_ACCESS if n.node_type == NodeType.DATA_STORE else EdgeType.CAN_ESCALATE
+            edges.append(GraphEdge(prev_id, n.id, edge_type, "exploits misconfiguration"))
+            prev_id = n.id
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        return AttackPath(
+            id=_make_id(),
+            title="GCP Identity to Data Exposure Chain",
+            description="Misconfigured GCP IAM bindings and public resource access create a path "
+                        "from compromised credentials to sensitive data in Cloud Storage and Cloud SQL.",
+            severity=self._max_severity([f["severity"] for f in gcp_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Compromised GCP Identity",
+            target="Sensitive Data Stores",
+            category="exposure",
+            techniques=["Initial Access: Valid Accounts (Cloud)",
+                         "Collection: Data from Cloud Storage",
+                         "Privilege Escalation: IAM Policy Misconfiguration"],
+            affected_resources=affected,
+            remediation=[
+                "Remove public IAM bindings (allUsers/allAuthenticatedUsers)",
+                "Enforce uniform bucket-level access on Cloud Storage",
+                "Disable public IPs on Cloud SQL instances",
+                "Enable OS Login on Compute Engine instances",
+                "Implement VPC Service Controls for data exfiltration protection",
+            ],
+        )
+
+    def _build_gcp_network_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """GCP: Firewall/networking → GKE/SQL exposure."""
+        net_findings = [f for f in findings
+                        if f["service"].lower() in ("networking", "compute", "gke", "sql")
+                        and f.get("status") == "FAIL"]
+        if len(net_findings) < 2:
+            return None
+
+        nodes, edges, affected = [], [], []
+        internet = GraphNode(id="gcp-internet", node_type=NodeType.INTERNET,
+                             label="Internet", service="external")
+        nodes.append(internet)
+
+        net_layer = [f for f in net_findings if f["service"].lower() in ("networking", "compute")]
+        backend_layer = [f for f in net_findings if f["service"].lower() in ("gke", "sql")]
+
+        for f in net_layer[:3]:
+            n = GraphNode(id=f"gcp-net-{_make_id()}", node_type=self._classify_node_type(f["service"]),
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(internet.id, n.id, EdgeType.EXPOSES, "open firewall rule"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        for f in backend_layer[:3]:
+            n = GraphNode(id=f"gcp-back-{_make_id()}", node_type=self._classify_node_type(f["service"]),
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            for prev in nodes[1:]:
+                if prev.node_type in (NodeType.NETWORK, NodeType.RESOURCE) and prev.id != n.id:
+                    edges.append(GraphEdge(prev.id, n.id, EdgeType.ROUTES_TO, "reaches backend"))
+                    break
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        if len(nodes) < 3:
+            return None
+
+        return AttackPath(
+            id=_make_id(),
+            title="GCP Network Exposure to Backend Services",
+            description="Open firewall rules and public compute instances expose GKE clusters "
+                        "and Cloud SQL databases to internet-originating attacks.",
+            severity=self._max_severity([f["severity"] for f in net_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Internet",
+            target="GKE Clusters & Cloud SQL",
+            category="exposure",
+            techniques=["Initial Access: Exploit Public-Facing Application",
+                         "Discovery: Cloud Infrastructure Discovery"],
+            affected_resources=affected,
+            remediation=[
+                "Restrict firewall rules to specific source IP ranges",
+                "Use private GKE clusters with authorized networks",
+                "Disable public IP on Cloud SQL instances",
+                "Enable GKE network policies for pod-level segmentation",
+                "Remove external IPs from Compute Engine instances",
+            ],
+        )
+
+    def _build_k8s_escalation_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Kubernetes: RBAC & Pod security → privilege escalation."""
+        k8s_findings = [f for f in findings
+                        if f["service"].lower() in ("pods", "rbac", "namespaces")
+                        and f.get("status") == "FAIL"]
+        if not k8s_findings:
+            return None
+
+        nodes, edges, affected = [], [], []
+        attacker = GraphNode(id="k8s-attacker", node_type=NodeType.IDENTITY,
+                             label="Compromised Pod / Service Account", service="pods")
+        nodes.append(attacker)
+
+        rbac_findings = [f for f in k8s_findings if f["service"].lower() == "rbac"]
+        pod_findings = [f for f in k8s_findings if f["service"].lower() == "pods"]
+
+        for f in pod_findings[:3]:
+            n = GraphNode(id=f"k8s-pod-{_make_id()}", node_type=NodeType.RESOURCE,
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(attacker.id, n.id, EdgeType.CAN_ESCALATE,
+                                   "exploits insecure pod config"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        for f in rbac_findings[:2]:
+            n = GraphNode(id=f"k8s-rbac-{_make_id()}", node_type=NodeType.IDENTITY,
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            src = nodes[-2].id if len(nodes) > 2 else attacker.id
+            edges.append(GraphEdge(src, n.id, EdgeType.CAN_ESCALATE,
+                                   "RBAC wildcard escalation"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        cluster_admin = GraphNode(id=f"k8s-admin-{_make_id()}", node_type=NodeType.IDENTITY,
+                                  label="Cluster Admin Access", service="rbac",
+                                  severity="critical")
+        nodes.append(cluster_admin)
+        edges.append(GraphEdge(nodes[-2].id, cluster_admin.id, EdgeType.CAN_ESCALATE,
+                               "gains cluster-admin"))
+
+        return AttackPath(
+            id=_make_id(),
+            title="Kubernetes Privilege Escalation Chain",
+            description="Privileged pods and overly permissive RBAC roles create a path from "
+                        "a compromised container to cluster-admin privileges.",
+            severity=self._max_severity([f["severity"] for f in k8s_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Compromised Pod",
+            target="Cluster Admin Access",
+            category="privilege_escalation",
+            techniques=["Privilege Escalation: Privileged Container",
+                         "Privilege Escalation: Cluster-Admin Binding",
+                         "Execution: Container Escape"],
+            affected_resources=affected,
+            remediation=[
+                "Disable privileged mode on all pods",
+                "Enforce runAsNonRoot in pod security standards",
+                "Remove wildcard RBAC permissions from cluster roles",
+                "Set read-only root filesystem on containers",
+                "Enforce resource limits on all pods",
+            ],
+        )
+
+    def _build_k8s_lateral_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Kubernetes: Missing network policies → lateral movement."""
+        k8s_findings = [f for f in findings
+                        if f["service"].lower() in ("pods", "network", "namespaces")
+                        and f.get("status") == "FAIL"]
+        if not k8s_findings:
+            return None
+
+        nodes, edges, affected = [], [], []
+        compromised = GraphNode(id="k8s-compromised", node_type=NodeType.RESOURCE,
+                                label="Compromised Container", service="pods")
+        nodes.append(compromised)
+
+        for f in k8s_findings[:4]:
+            n = GraphNode(id=f"k8s-lat-{_make_id()}", node_type=self._classify_node_type(f["service"]),
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(compromised.id, n.id, EdgeType.LATERAL_MOVE,
+                                   "no network policy restriction"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        target = GraphNode(id=f"k8s-sensitive-{_make_id()}", node_type=NodeType.DATA_STORE,
+                           label="Sensitive Workloads & Secrets", service="namespaces")
+        nodes.append(target)
+        for n in nodes[1:-1]:
+            edges.append(GraphEdge(n.id, target.id, EdgeType.LATERAL_MOVE,
+                                   "unrestricted lateral access"))
+
+        return AttackPath(
+            id=_make_id(),
+            title="Kubernetes Lateral Movement via Missing Network Policies",
+            description="Absent network policies and pods in the default namespace allow "
+                        "unrestricted lateral movement between workloads.",
+            severity=self._max_severity([f["severity"] for f in k8s_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Compromised Container",
+            target="Sensitive Workloads",
+            category="lateral_movement",
+            techniques=["Lateral Movement: Container-to-Container",
+                         "Discovery: Kubernetes API Enumeration"],
+            affected_resources=affected,
+            remediation=[
+                "Apply network policies to all namespaces",
+                "Move workloads out of the default namespace",
+                "Implement pod-to-pod encryption with service mesh",
+                "Use namespace-level resource quotas and limits",
+            ],
+        )
+
+    def _build_oci_exposure_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """OCI: IAM/Networking/Storage exposure chain."""
+        oci_findings = [f for f in findings
+                        if f["service"].lower() in ("iam", "objectstorage", "networking",
+                                                     "storage", "vault", "loadbalancer")
+                        and f.get("status") == "FAIL"]
+        if len(oci_findings) < 2:
+            return None
+
+        nodes, edges, affected = [], [], []
+        attacker = GraphNode(id="oci-attacker", node_type=NodeType.IDENTITY,
+                             label="Compromised OCI Identity", service="IAM")
+        nodes.append(attacker)
+
+        prev_id = attacker.id
+        for f in oci_findings[:5]:
+            n = GraphNode(id=f"oci-{_make_id()}", node_type=self._classify_node_type(f["service"]),
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edge_type = EdgeType.HAS_ACCESS if n.node_type == NodeType.DATA_STORE else EdgeType.CAN_ESCALATE
+            edges.append(GraphEdge(prev_id, n.id, edge_type, "exploits misconfiguration"))
+            prev_id = n.id
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        return AttackPath(
+            id=_make_id(),
+            title="OCI Identity to Resource Exposure Chain",
+            description="Misconfigured OCI IAM policies and unrestricted network security groups "
+                        "create a path from compromised credentials to object storage and vault secrets.",
+            severity=self._max_severity([f["severity"] for f in oci_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Compromised OCI Identity",
+            target="Object Storage & Vault",
+            category="exposure",
+            techniques=["Initial Access: Valid Accounts (Cloud)",
+                         "Collection: Data from Cloud Storage",
+                         "Credential Access: Unsecured Vault Credentials"],
+            affected_resources=affected,
+            remediation=[
+                "Enforce MFA for all OCI users",
+                "Remove wildcard IAM policies",
+                "Enable API key rotation for IAM users",
+                "Block public access on Object Storage buckets",
+                "Restrict VCN security list ingress to required ports",
+                "Enable Vault key rotation",
+            ],
+        )
+
+    def _build_oci_compute_data_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """OCI: Compute/Database/Container exposure chain."""
+        oci_findings = [f for f in findings
+                        if f["service"].lower() in ("compute", "database", "mysql",
+                                                     "kubernetesengine", "functions",
+                                                     "containerinstances", "filestorage")
+                        and f.get("status") == "FAIL"]
+        if len(oci_findings) < 2:
+            return None
+
+        nodes, edges, affected = [], [], []
+        internet = GraphNode(id="oci-internet", node_type=NodeType.INTERNET,
+                             label="Internet", service="external")
+        nodes.append(internet)
+
+        compute_layer = [f for f in oci_findings
+                         if f["service"].lower() in ("compute", "kubernetesengine",
+                                                      "functions", "containerinstances")]
+        data_layer = [f for f in oci_findings
+                      if f["service"].lower() in ("database", "mysql", "filestorage")]
+
+        for f in compute_layer[:3]:
+            n = GraphNode(id=f"oci-comp-{_make_id()}", node_type=self._classify_node_type(f["service"]),
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(internet.id, n.id, EdgeType.EXPOSES,
+                                   "publicly exposed compute"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        for f in data_layer[:3]:
+            n = GraphNode(id=f"oci-data-{_make_id()}", node_type=self._classify_node_type(f["service"]),
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            for prev in nodes[1:]:
+                if prev.node_type == NodeType.RESOURCE and prev.id != n.id:
+                    edges.append(GraphEdge(prev.id, n.id, EdgeType.HAS_ACCESS,
+                                           "accesses database"))
+                    break
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        if len(nodes) < 3:
+            return None
+
+        return AttackPath(
+            id=_make_id(),
+            title="OCI Compute to Database Exposure",
+            description="Misconfigured OCI compute instances, OKE clusters, or serverless functions "
+                        "expose a path to reach databases and file storage services.",
+            severity=self._max_severity([f["severity"] for f in oci_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Internet",
+            target="OCI Databases & File Storage",
+            category="data_exfiltration",
+            techniques=["Initial Access: Exploit Public-Facing Application",
+                         "Collection: Data from Cloud Database"],
+            affected_resources=affected,
+            remediation=[
+                "Enable secure boot and IMDSv2 on compute instances",
+                "Use private endpoints for OKE clusters",
+                "Assign NSGs to Functions applications",
+                "Enable backup and deletion protection on MySQL databases",
+                "Enable CMK encryption on databases and file storage",
+                "Use private endpoints for Autonomous Databases",
             ],
         )
 
