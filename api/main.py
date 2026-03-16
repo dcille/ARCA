@@ -6,7 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.config import settings
 from api.database import engine, Base
-from api.routers import auth, providers, scans, findings, compliance, saas, dashboard, attack_paths, reports, inventory
+from api.routers import (
+    auth, providers, scans, findings, compliance, saas, dashboard,
+    attack_paths, reports, inventory, schedules, notifications,
+)
 
 
 @asynccontextmanager
@@ -42,6 +45,8 @@ app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboar
 app.include_router(attack_paths.router, prefix="/api/v1/attack-paths", tags=["Attack Paths"])
 app.include_router(reports.router, prefix="/api/v1/reports", tags=["Reports"])
 app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["Inventory"])
+app.include_router(schedules.router, prefix="/api/v1/schedules", tags=["Schedules"])
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
 
 
 @app.get("/api/v1/health")

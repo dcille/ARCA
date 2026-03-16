@@ -236,6 +236,41 @@ class ApiClient {
     window.URL.revokeObjectURL(downloadUrl)
   }
 
+  // Schedules
+  async getSchedules() {
+    return this.request<any[]>('GET', '/api/v1/schedules')
+  }
+
+  async createSchedule(data: any) {
+    return this.request<any>('POST', '/api/v1/schedules', data)
+  }
+
+  async updateSchedule(id: string, data: any) {
+    return this.request<any>('PUT', `/api/v1/schedules/${id}`, data)
+  }
+
+  async deleteSchedule(id: string) {
+    return this.request<void>('DELETE', `/api/v1/schedules/${id}`)
+  }
+
+  // Notifications
+  async getNotifications(unreadOnly?: boolean) {
+    const params = unreadOnly ? { unread_only: 'true' } : undefined
+    return this.request<any[]>('GET', '/api/v1/notifications', undefined, { params })
+  }
+
+  async getNotificationCount() {
+    return this.request<{ unread_count: number }>('GET', '/api/v1/notifications/count')
+  }
+
+  async markNotificationRead(id: string) {
+    return this.request<any>('PUT', `/api/v1/notifications/${id}/read`)
+  }
+
+  async markAllNotificationsRead() {
+    return this.request<any>('PUT', '/api/v1/notifications/read-all')
+  }
+
   // Inventory
   async getInventoryResources(params?: Record<string, string>) {
     return this.request<any[]>('GET', '/api/v1/inventory/resources', undefined, { params })
