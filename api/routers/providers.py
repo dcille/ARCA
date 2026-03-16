@@ -12,7 +12,7 @@ from api.services.auth_service import get_current_user, encrypt_credentials
 router = APIRouter()
 
 
-@router.get("/", response_model=list[ProviderResponse])
+@router.get("", response_model=list[ProviderResponse])
 async def list_providers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -23,7 +23,7 @@ async def list_providers(
     return [ProviderResponse.model_validate(p) for p in result.scalars().all()]
 
 
-@router.post("/", response_model=ProviderResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ProviderResponse, status_code=status.HTTP_201_CREATED)
 async def create_provider(
     data: ProviderCreate,
     db: AsyncSession = Depends(get_db),

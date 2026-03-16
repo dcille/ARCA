@@ -87,11 +87,11 @@ class ApiClient {
 
   // Providers
   async getProviders() {
-    return this.request<any[]>('GET', '/api/v1/providers/')
+    return this.request<any[]>('GET', '/api/v1/providers')
   }
 
   async createProvider(data: any) {
-    return this.request<any>('POST', '/api/v1/providers/', data)
+    return this.request<any>('POST', '/api/v1/providers', data)
   }
 
   async deleteProvider(id: string) {
@@ -101,11 +101,11 @@ class ApiClient {
   // Scans
   async getScans(scanType?: string) {
     const params = scanType ? { scan_type: scanType } : undefined
-    return this.request<any[]>('GET', '/api/v1/scans/', undefined, { params })
+    return this.request<any[]>('GET', '/api/v1/scans', undefined, { params })
   }
 
   async createScan(data: any) {
-    return this.request<any>('POST', '/api/v1/scans/', data)
+    return this.request<any>('POST', '/api/v1/scans', data)
   }
 
   async getScan(id: string) {
@@ -114,7 +114,7 @@ class ApiClient {
 
   // Findings
   async getFindings(params?: Record<string, string>) {
-    return this.request<any[]>('GET', '/api/v1/findings/', undefined, { params })
+    return this.request<any[]>('GET', '/api/v1/findings', undefined, { params })
   }
 
   async getFindingsStats(params?: Record<string, string>) {
@@ -168,7 +168,7 @@ class ApiClient {
   }
 
   async getAttackPaths(params?: Record<string, string>) {
-    return this.request<any[]>('GET', '/api/v1/attack-paths/', undefined, { params })
+    return this.request<any[]>('GET', '/api/v1/attack-paths', undefined, { params })
   }
 
   async getAttackPathsSummary() {

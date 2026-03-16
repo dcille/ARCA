@@ -14,7 +14,7 @@ from api.services.auth_service import get_current_user
 router = APIRouter()
 
 
-@router.get("/", response_model=list[FindingResponse])
+@router.get("", response_model=list[FindingResponse])
 async def list_findings(
     scan_id: Optional[str] = None,
     severity: Optional[str] = None,

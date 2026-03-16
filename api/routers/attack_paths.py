@@ -177,7 +177,7 @@ async def analyze_attack_paths(
     }
 
 
-@router.get("/", response_model=list[AttackPathResponse])
+@router.get("", response_model=list[AttackPathResponse])
 async def list_attack_paths(
     severity: Optional[str] = None,
     category: Optional[str] = None,
