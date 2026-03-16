@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import Header from '@/components/layout/Header'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
@@ -17,26 +17,53 @@ export default function ScansPage() {
   const [scanType, setScanType] = useState('cloud')
   const [selectedProvider, setSelectedProvider] = useState('')
   const [selectedConnection, setSelectedConnection] = useState('')
+  const [filterType, setFilterType] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const loadData = async () => {
-    setLoading(true)
+  const hasActiveScans = useCallback(
+    (scanList: any[]) => scanList.some((s) => s.status === 'pending' || s.status === 'running'),
+    []
+  )
+
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
+      const params: Record<string, string> = {}
+      if (filterType) params.scan_type = filterType
       const [s, p, c] = await Promise.all([
-        api.getScans(),
+        api.getScans(filterType || undefined),
         api.getProviders(),
         api.getSaaSConnections(),
       ])
-      setScans(s)
+      let filtered = s
+      if (filterStatus) {
+        filtered = s.filter((scan: any) => scan.status === filterStatus)
+      }
+      setScans(filtered)
       setProviders(p)
       setConnections(c)
+
+      // Start or stop polling based on active scans
+      if (hasActiveScans(s) && !pollRef.current) {
+        pollRef.current = setInterval(() => loadData(true), 5000)
+      } else if (!hasActiveScans(s) && pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
     } catch (err) {
       console.error(err)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    loadData()
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
+  }, [filterType, filterStatus])
 
   const handleCreateScan = async () => {
     try {
@@ -72,7 +99,17 @@ export default function ScansPage() {
     {
       key: 'status',
       header: 'Status',
-      render: (item: any) => <Badge type="status" value={item.status} />,
+      render: (item: any) => (
+        <div className="flex items-center gap-2">
+          <Badge type="status" value={item.status} />
+          {(item.status === 'pending' || item.status === 'running') && (
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-green opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-brand-green" />
+            </span>
+          )}
+        </div>
+      ),
     },
     {
       key: 'progress',
@@ -81,7 +118,9 @@ export default function ScansPage() {
         <div className="flex items-center gap-2">
           <div className="w-24 bg-brand-gray-100 rounded-full h-2">
             <div
-              className="bg-brand-green h-2 rounded-full transition-all"
+              className={`h-2 rounded-full transition-all duration-500 ${
+                item.status === 'failed' ? 'bg-status-fail' : 'bg-brand-green'
+              }`}
               style={{ width: `${item.progress}%` }}
             />
           </div>
@@ -119,6 +158,41 @@ export default function ScansPage() {
           </button>
         }
       />
+
+      {/* Filters */}
+      <div className="flex gap-4 mb-6">
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
+          className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+        >
+          <option value="">All Types</option>
+          <option value="cloud">Cloud</option>
+          <option value="saas">SaaS</option>
+        </select>
+
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+        >
+          <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="running">Running</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+        </select>
+
+        {hasActiveScans(scans) && (
+          <span className="flex items-center gap-2 text-xs text-brand-gray-400">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-green opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-green" />
+            </span>
+            Auto-refreshing
+          </span>
+        )}
+      </div>
 
       <DataTable
         columns={columns}
