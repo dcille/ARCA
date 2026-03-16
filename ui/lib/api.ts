@@ -161,6 +161,23 @@ class ApiClient {
     const params = providerType ? { provider_type: providerType } : undefined
     return this.request<any>('GET', '/api/v1/saas/findings/stats', undefined, { params })
   }
+  // Attack Paths
+  async analyzeAttackPaths(scanId?: string) {
+    const params = scanId ? { scan_id: scanId } : undefined
+    return this.request<any>('POST', '/api/v1/attack-paths/analyze', undefined, { params })
+  }
+
+  async getAttackPaths(params?: Record<string, string>) {
+    return this.request<any[]>('GET', '/api/v1/attack-paths/', undefined, { params })
+  }
+
+  async getAttackPathsSummary() {
+    return this.request<any>('GET', '/api/v1/attack-paths/summary')
+  }
+
+  async getAttackPath(id: string) {
+    return this.request<any>('GET', `/api/v1/attack-paths/${id}`)
+  }
 }
 
 export const api = new ApiClient()

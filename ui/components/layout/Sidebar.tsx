@@ -13,11 +13,13 @@ import {
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
   GlobeAltIcon,
+  MapIcon,
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/auth'
 
 const navigation = [
   { name: 'Overview', href: '/darca/overview', icon: HomeIcon },
+  { name: 'Attack Paths', href: '/darca/attack-paths', icon: MapIcon },
   { name: 'Findings', href: '/darca/findings', icon: MagnifyingGlassIcon },
   { name: 'Compliance', href: '/darca/compliance', icon: DocumentChartBarIcon },
   { name: 'Scans', href: '/darca/scans', icon: ShieldCheckIcon },
