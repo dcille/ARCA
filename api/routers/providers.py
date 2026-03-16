@@ -29,7 +29,7 @@ async def create_provider(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if data.provider_type not in ("aws", "azure", "gcp", "kubernetes"):
+    if data.provider_type not in ("aws", "azure", "gcp", "kubernetes", "oci"):
         raise HTTPException(status_code=400, detail="Invalid provider type")
 
     provider = Provider(

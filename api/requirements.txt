@@ -48,6 +48,9 @@ google-cloud-logging>=3.10.0,<4.0
 google-api-python-client>=2.100.0,<3.0
 google-auth>=2.29.0,<3.0
 
+# OCI SDK
+oci>=2.128.0,<3.0
+
 # Kubernetes
 kubernetes>=29.0.0,<31.0
 

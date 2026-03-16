@@ -12,6 +12,7 @@ const PROVIDER_TYPES = [
   { id: 'aws', name: 'Amazon Web Services', color: 'bg-[#FF9900]' },
   { id: 'azure', name: 'Microsoft Azure', color: 'bg-[#0078D4]' },
   { id: 'gcp', name: 'Google Cloud Platform', color: 'bg-[#4285F4]' },
+  { id: 'oci', name: 'Oracle Cloud Infrastructure', color: 'bg-[#C74634]' },
   { id: 'kubernetes', name: 'Kubernetes', color: 'bg-[#326CE5]' },
 ]
 
@@ -31,6 +32,10 @@ export default function ProvidersPage() {
     client_secret: '',
     project_id: '',
     service_account_key: '',
+    tenancy_ocid: '',
+    user_ocid: '',
+    fingerprint: '',
+    private_key: '',
     kubeconfig: '',
     region: '',
   })
@@ -71,6 +76,14 @@ export default function ProvidersPage() {
           credentials = {
             project_id: form.project_id,
             service_account_key: form.service_account_key,
+          }
+          break
+        case 'oci':
+          credentials = {
+            tenancy_ocid: form.tenancy_ocid,
+            user_ocid: form.user_ocid,
+            fingerprint: form.fingerprint,
+            private_key: form.private_key,
           }
           break
         case 'kubernetes':
@@ -235,6 +248,31 @@ export default function ProvidersPage() {
                   <div>
                     <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Service Account Key (JSON)</label>
                     <textarea value={form.service_account_key} onChange={(e) => setForm({ ...form, service_account_key: e.target.value })} rows={4} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm font-mono" placeholder='{"type": "service_account", ...}' />
+                  </div>
+                </>
+              )}
+
+              {form.provider_type === 'oci' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Tenancy OCID</label>
+                    <input type="text" value={form.tenancy_ocid} onChange={(e) => setForm({ ...form, tenancy_ocid: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="ocid1.tenancy.oc1.." />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">User OCID</label>
+                    <input type="text" value={form.user_ocid} onChange={(e) => setForm({ ...form, user_ocid: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="ocid1.user.oc1.." />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">API Key Fingerprint</label>
+                    <input type="text" value={form.fingerprint} onChange={(e) => setForm({ ...form, fingerprint: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="aa:bb:cc:..." />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Private Key (PEM)</label>
+                    <textarea value={form.private_key} onChange={(e) => setForm({ ...form, private_key: e.target.value })} rows={4} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm font-mono" placeholder="-----BEGIN RSA PRIVATE KEY-----" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Region</label>
+                    <input type="text" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} placeholder="us-ashburn-1" className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
                   </div>
                 </>
               )}
