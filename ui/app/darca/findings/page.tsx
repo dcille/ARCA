@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { Fragment, useEffect, useState, useMemo } from 'react'
 import Header from '@/components/layout/Header'
 import Badge from '@/components/ui/Badge'
 import { api } from '@/lib/api'
@@ -11,6 +11,7 @@ const PROVIDER_LABELS: Record<string, { label: string; color: string }> = {
   azure: { label: 'Azure', color: 'bg-blue-100 text-blue-800' },
   gcp: { label: 'GCP', color: 'bg-red-100 text-red-800' },
   kubernetes: { label: 'K8s', color: 'bg-purple-100 text-purple-800' },
+  oci: { label: 'OCI', color: 'bg-orange-100 text-orange-800' },
 }
 
 function ProviderBadge({ provider }: { provider?: string | null }) {
@@ -159,6 +160,7 @@ function ExpandedRow({ item }: { item: any }) {
 
 export default function FindingsPage() {
   const [findings, setFindings] = useState<any[]>([])
+  const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({ severity: '', status: '', service: '' })
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
@@ -182,8 +184,12 @@ export default function FindingsPage() {
       if (filters.severity) params.severity = filters.severity
       if (filters.status) params.status = filters.status
       if (filters.service) params.service = filters.service
-      const data = await api.getFindings(params)
+      const [data, statsData] = await Promise.all([
+        api.getFindings(params),
+        api.getFindingsStats(),
+      ])
       setFindings(data)
+      setStats(statsData)
     } catch (err) {
       console.error(err)
     } finally {
@@ -230,6 +236,33 @@ export default function FindingsPage() {
           className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
         />
       </div>
+
+      {/* Stats Summary */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
+          <div className="bg-white rounded-lg border border-brand-gray-200 px-4 py-3">
+            <p className="text-xs text-brand-gray-400 uppercase font-semibold">Total</p>
+            <p className="text-2xl font-bold text-brand-navy">{stats.total}</p>
+          </div>
+          <div className="bg-white rounded-lg border border-brand-gray-200 px-4 py-3">
+            <p className="text-xs text-brand-gray-400 uppercase font-semibold">Pass Rate</p>
+            <p className={`text-2xl font-bold ${
+              stats.pass_rate >= 80 ? 'text-status-pass' :
+              stats.pass_rate >= 50 ? 'text-amber-500' : 'text-status-fail'
+            }`}>{stats.pass_rate}%</p>
+          </div>
+          {['critical', 'high', 'medium', 'low'].map((sev) => (
+            <div key={sev} className="bg-white rounded-lg border border-brand-gray-200 px-4 py-3">
+              <p className="text-xs text-brand-gray-400 uppercase font-semibold">{sev}</p>
+              <p className={`text-2xl font-bold ${
+                sev === 'critical' ? 'text-severity-critical' :
+                sev === 'high' ? 'text-severity-high' :
+                sev === 'medium' ? 'text-severity-medium' : 'text-severity-low'
+              }`}>{stats.severity_breakdown?.[sev] || 0}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Findings Table */}
       {loading ? (
@@ -285,9 +318,8 @@ export default function FindingsPage() {
                   findings.map((item) => {
                     const isExpanded = expandedRows.has(item.id)
                     return (
-                      <>
+                      <Fragment key={item.id}>
                         <tr
-                          key={item.id}
                           onClick={() => toggleRow(item.id)}
                           className="hover:bg-brand-gray-50 transition-colors cursor-pointer select-none"
                         >
@@ -319,8 +351,8 @@ export default function FindingsPage() {
                             <span className="text-brand-gray-400">{formatDate(item.created_at)}</span>
                           </td>
                         </tr>
-                        {isExpanded && <ExpandedRow key={`${item.id}-detail`} item={item} />}
-                      </>
+                        {isExpanded && <ExpandedRow item={item} />}
+                      </Fragment>
                     )
                   })
                 )}
