@@ -1,5 +1,3 @@
-version: "3.9"
-
 # Development compose - mounts source code for hot-reload
 
 services:
