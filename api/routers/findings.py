@@ -8,6 +8,7 @@ from api.database import get_db
 from api.models.user import User
 from api.models.finding import Finding
 from api.models.scan import Scan
+from api.models.provider import Provider
 from api.schemas.finding import FindingResponse
 from api.services.auth_service import get_current_user
 
@@ -27,8 +28,9 @@ async def list_findings(
     current_user: User = Depends(get_current_user),
 ):
     query = (
-        select(Finding)
+        select(Finding, Provider.provider_type)
         .join(Scan, Finding.scan_id == Scan.id)
+        .outerjoin(Provider, Finding.provider_id == Provider.id)
         .where(Scan.user_id == current_user.id)
     )
     if scan_id:
@@ -44,7 +46,14 @@ async def list_findings(
 
     query = query.order_by(Finding.created_at.desc()).offset(offset).limit(limit)
     result = await db.execute(query)
-    return [FindingResponse.model_validate(f) for f in result.scalars().all()]
+    findings = []
+    for row in result.all():
+        finding = row[0]
+        provider_type = row[1]
+        resp = FindingResponse.model_validate(finding)
+        resp.provider_type = provider_type
+        findings.append(resp)
+    return findings
 
 
 @router.get("/stats")

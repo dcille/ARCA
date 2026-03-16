@@ -18,6 +18,8 @@ class FindingResponse(BaseModel):
     status_extended: Optional[str]
     remediation: Optional[str]
     remediation_url: Optional[str]
+    compliance_frameworks: Optional[str] = None
+    provider_type: Optional[str] = None
     created_at: datetime
 
     class Config:
