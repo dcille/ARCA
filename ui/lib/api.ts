@@ -271,6 +271,27 @@ class ApiClient {
     return this.request<any>('PUT', '/api/v1/notifications/read-all')
   }
 
+  // Integrations
+  async getIntegrations() {
+    return this.request<any[]>('GET', '/api/v1/integrations')
+  }
+
+  async createIntegration(data: any) {
+    return this.request<any>('POST', '/api/v1/integrations', data)
+  }
+
+  async updateIntegration(id: string, data: any) {
+    return this.request<any>('PUT', `/api/v1/integrations/${id}`, data)
+  }
+
+  async deleteIntegration(id: string) {
+    return this.request<void>('DELETE', `/api/v1/integrations/${id}`)
+  }
+
+  async testIntegration(id: string) {
+    return this.request<{ success: boolean; message: string }>('POST', `/api/v1/integrations/${id}/test`)
+  }
+
   // Inventory
   async getInventoryResources(params?: Record<string, string>) {
     return this.request<any[]>('GET', '/api/v1/inventory/resources', undefined, { params })

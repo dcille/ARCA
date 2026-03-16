@@ -18,6 +18,7 @@ import {
   DocumentArrowDownIcon,
   CubeIcon,
   BellIcon,
+  BoltIcon,
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/auth'
 import { api } from '@/lib/api'
@@ -32,6 +33,7 @@ const navigation = [
   { name: 'Cloud Providers', href: '/darca/providers', icon: CloudIcon },
   { name: 'SaaS Security', href: '/darca/saas-security', icon: GlobeAltIcon },
   { name: 'Reports', href: '/darca/reports', icon: DocumentArrowDownIcon },
+  { name: 'Integrations', href: '/darca/integrations', icon: BoltIcon },
   { name: 'Settings', href: '/darca/settings', icon: Cog6ToothIcon },
 ]
 
