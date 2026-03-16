@@ -12,7 +12,7 @@ from api.services.auth_service import get_current_user
 router = APIRouter()
 
 
-@router.get("/", response_model=list[ScanResponse])
+@router.get("", response_model=list[ScanResponse])
 async def list_scans(
     scan_type: str = None,
     db: AsyncSession = Depends(get_db),
@@ -26,7 +26,7 @@ async def list_scans(
     return [ScanResponse.model_validate(s) for s in result.scalars().all()]
 
 
-@router.post("/", response_model=ScanResponse, status_code=201)
+@router.post("", response_model=ScanResponse, status_code=201)
 async def create_scan(
     data: ScanCreate,
     db: AsyncSession = Depends(get_db),
