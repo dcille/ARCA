@@ -14,6 +14,8 @@ import {
   ArrowRightOnRectangleIcon,
   GlobeAltIcon,
   MapIcon,
+  DocumentArrowDownIcon,
+  CubeIcon,
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/auth'
 
@@ -22,9 +24,11 @@ const navigation = [
   { name: 'Attack Paths', href: '/darca/attack-paths', icon: MapIcon },
   { name: 'Findings', href: '/darca/findings', icon: MagnifyingGlassIcon },
   { name: 'Compliance', href: '/darca/compliance', icon: DocumentChartBarIcon },
+  { name: 'Inventory', href: '/darca/inventory', icon: CubeIcon },
   { name: 'Scans', href: '/darca/scans', icon: ShieldCheckIcon },
   { name: 'Cloud Providers', href: '/darca/providers', icon: CloudIcon },
   { name: 'SaaS Security', href: '/darca/saas-security', icon: GlobeAltIcon },
+  { name: 'Reports', href: '/darca/reports', icon: DocumentArrowDownIcon },
   { name: 'Settings', href: '/darca/settings', icon: Cog6ToothIcon },
 ]
 

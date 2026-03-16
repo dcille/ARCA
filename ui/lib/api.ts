@@ -178,6 +178,67 @@ class ApiClient {
   async getAttackPath(id: string) {
     return this.request<any>('GET', `/api/v1/attack-paths/${id}`)
   }
+  // Reports
+  async downloadReport(type: 'executive' | 'technical', params?: Record<string, string>) {
+    const url = new URL(`/api/v1/reports/${type}`, window.location.origin)
+    if (params) {
+      Object.entries(params).forEach(([key, val]) => {
+        if (val) url.searchParams.set(key, val)
+      })
+    }
+    const token = this.getToken()
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    const response = await fetch(url.toString(), { headers })
+    if (!response.ok) throw new Error(`Report generation failed: ${response.status}`)
+
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || `ARCA_${type}_report.pdf`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(downloadUrl)
+  }
+
+  async exportFindings(format: 'csv' | 'json', params?: Record<string, string>) {
+    const url = new URL('/api/v1/reports/export/findings', window.location.origin)
+    url.searchParams.set('format', format)
+    if (params) {
+      Object.entries(params).forEach(([key, val]) => {
+        if (val) url.searchParams.set(key, val)
+      })
+    }
+    const token = this.getToken()
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    const response = await fetch(url.toString(), { headers })
+    if (!response.ok) throw new Error(`Export failed: ${response.status}`)
+
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    const ext = format === 'json' ? 'json' : 'csv'
+    a.download = `ARCA_Findings.${ext}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(downloadUrl)
+  }
+
+  // Inventory
+  async getInventoryResources(params?: Record<string, string>) {
+    return this.request<any[]>('GET', '/api/v1/inventory/resources', undefined, { params })
+  }
+
+  async getInventorySummary(params?: Record<string, string>) {
+    return this.request<any>('GET', '/api/v1/inventory/summary', undefined, { params })
+  }
 }
 
 export const api = new ApiClient()
