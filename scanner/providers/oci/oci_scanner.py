@@ -48,6 +48,13 @@ class OCIScanner:
             "cloud_guard": self._check_cloud_guard,
             "notifications": self._check_notifications,
             "object_storage": self._check_object_storage,
+            "functions": self._check_functions,
+            "container_instances": self._check_container_instances,
+            "container_registry": self._check_container_registry,
+            "file_storage": self._check_file_storage,
+            "kubernetes_engine": self._check_kubernetes_engine,
+            "load_balancer": self._check_load_balancer,
+            "mysql": self._check_mysql,
         }
 
         for service_name, check_fn in check_methods.items():
@@ -886,5 +893,637 @@ class OCIScanner:
             logger.warning("OCI SDK not installed, skipping notifications checks")
         except Exception as e:
             logger.error(f"OCI notifications checks failed: {e}")
+
+        return results
+
+    # ── Cloud Functions Checks ───────────────────────────────────
+
+    def _check_functions(self) -> list[dict]:
+        """Cloud Functions (serverless) security checks."""
+        results = []
+        try:
+            import oci
+            config = self._get_config()
+            fn_client = oci.functions.FunctionsManagementClient(config)
+            identity_client = oci.identity.IdentityClient(config)
+            tenancy_id = config["tenancy"]
+
+            compartments = identity_client.list_compartments(tenancy_id, compartment_id_in_subtree=True).data
+            compartment_ids = [tenancy_id] + [c.id for c in compartments if c.lifecycle_state == "ACTIVE"]
+
+            for compartment_id in compartment_ids:
+                try:
+                    apps = fn_client.list_applications(compartment_id).data
+                    for app in apps:
+                        if app.lifecycle_state != "ACTIVE":
+                            continue
+
+                        # Functions app should have NSGs assigned
+                        nsgs = getattr(app, 'network_security_group_ids', None) or []
+                        results.append(CheckResult(
+                            check_id="oci_functions_app_nsg_assigned",
+                            check_title="Functions applications should have NSGs assigned",
+                            service="Functions",
+                            severity="medium",
+                            status="PASS" if len(nsgs) > 0 else "FAIL",
+                            resource_id=app.id,
+                            resource_name=app.display_name,
+                            remediation="Assign network security groups to the Functions application",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                        # Functions app should have tracing enabled
+                        trace_config = getattr(app, 'trace_config', None)
+                        tracing_enabled = trace_config and getattr(trace_config, 'is_enabled', False)
+                        results.append(CheckResult(
+                            check_id="oci_functions_app_tracing_enabled",
+                            check_title="Functions applications should have distributed tracing enabled",
+                            service="Functions",
+                            severity="low",
+                            status="PASS" if tracing_enabled else "FAIL",
+                            resource_id=app.id,
+                            resource_name=app.display_name,
+                            remediation="Enable distributed tracing for the Functions application",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                        # Check individual functions
+                        functions = fn_client.list_functions(app.id).data
+                        for fn in functions:
+                            if fn.lifecycle_state != "ACTIVE":
+                                continue
+
+                            # Provisioned concurrency
+                            prov_config = getattr(fn, 'provisioned_concurrency_config', None)
+                            has_concurrency = prov_config is not None and getattr(prov_config, 'strategy', 'NONE') != 'NONE'
+                            results.append(CheckResult(
+                                check_id="oci_functions_provisioned_concurrency",
+                                check_title="Functions should have provisioned concurrency configured for production",
+                                service="Functions",
+                                severity="low",
+                                status="PASS" if has_concurrency else "FAIL",
+                                resource_id=fn.id,
+                                resource_name=fn.display_name,
+                                remediation="Configure provisioned concurrency for latency-sensitive functions",
+                                compliance_frameworks=["CIS-OCI-2.0"],
+                            ).to_dict())
+
+                except Exception as e:
+                    logger.warning(f"OCI functions checks for compartment {compartment_id}: {e}")
+
+        except ImportError:
+            logger.warning("OCI SDK not installed, skipping functions checks")
+        except Exception as e:
+            logger.error(f"OCI functions checks failed: {e}")
+
+        return results
+
+    # ── Container Instances Checks ───────────────────────────────
+
+    def _check_container_instances(self) -> list[dict]:
+        """Container Instances security checks."""
+        results = []
+        try:
+            import oci
+            config = self._get_config()
+            ci_client = oci.container_instances.ContainerInstanceClient(config)
+            identity_client = oci.identity.IdentityClient(config)
+            tenancy_id = config["tenancy"]
+
+            compartments = identity_client.list_compartments(tenancy_id, compartment_id_in_subtree=True).data
+            compartment_ids = [tenancy_id] + [c.id for c in compartments if c.lifecycle_state == "ACTIVE"]
+
+            for compartment_id in compartment_ids:
+                try:
+                    instances = ci_client.list_container_instances(compartment_id).data
+                    for ci in (instances.items if hasattr(instances, 'items') else instances):
+                        if ci.lifecycle_state != "ACTIVE":
+                            continue
+
+                        # Restart policy should be defined
+                        restart_policy = getattr(ci, 'container_restart_policy', 'NEVER')
+                        results.append(CheckResult(
+                            check_id="oci_container_instance_restart_policy",
+                            check_title="Container instances should have a restart policy defined",
+                            service="ContainerInstances",
+                            severity="medium",
+                            status="FAIL" if restart_policy == "NEVER" else "PASS",
+                            resource_id=ci.id,
+                            resource_name=ci.display_name,
+                            status_extended=f"Restart policy: {restart_policy}",
+                            remediation="Set a restart policy (ALWAYS or ON_FAILURE) for container instances",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                        # Graceful shutdown timeout
+                        timeout = getattr(ci, 'graceful_shutdown_timeout_in_seconds', 0)
+                        results.append(CheckResult(
+                            check_id="oci_container_instance_graceful_shutdown",
+                            check_title="Container instances should have a graceful shutdown timeout configured",
+                            service="ContainerInstances",
+                            severity="low",
+                            status="PASS" if timeout and timeout > 0 else "FAIL",
+                            resource_id=ci.id,
+                            resource_name=ci.display_name,
+                            status_extended=f"Graceful shutdown timeout: {timeout}s",
+                            remediation="Configure a graceful shutdown timeout > 0 seconds",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                except Exception as e:
+                    logger.warning(f"OCI container instance checks for compartment {compartment_id}: {e}")
+
+        except ImportError:
+            logger.warning("OCI SDK not installed, skipping container instance checks")
+        except Exception as e:
+            logger.error(f"OCI container instance checks failed: {e}")
+
+        return results
+
+    # ── Container Registry (OCIR) Checks ─────────────────────────
+
+    def _check_container_registry(self) -> list[dict]:
+        """Container Registry (OCIR) security checks."""
+        results = []
+        try:
+            import oci
+            config = self._get_config()
+            artifacts_client = oci.artifacts.ArtifactsClient(config)
+            identity_client = oci.identity.IdentityClient(config)
+            tenancy_id = config["tenancy"]
+
+            compartments = identity_client.list_compartments(tenancy_id, compartment_id_in_subtree=True).data
+            compartment_ids = [tenancy_id] + [c.id for c in compartments if c.lifecycle_state == "ACTIVE"]
+
+            for compartment_id in compartment_ids:
+                try:
+                    repos = artifacts_client.list_container_repositories(compartment_id).data
+                    for repo in (repos.items if hasattr(repos, 'items') else repos):
+                        # Public repository check
+                        is_public = getattr(repo, 'is_public', False)
+                        results.append(CheckResult(
+                            check_id="oci_container_registry_public_repo",
+                            check_title="Container registry repositories should not be public",
+                            service="ContainerRegistry",
+                            severity="high",
+                            status="FAIL" if is_public else "PASS",
+                            resource_id=str(getattr(repo, 'id', repo.display_name)),
+                            resource_name=repo.display_name,
+                            remediation="Set container repository visibility to private",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                        # Image scanning
+                        is_immutable = getattr(repo, 'is_immutable', False)
+                        results.append(CheckResult(
+                            check_id="oci_container_registry_immutable_artifacts",
+                            check_title="Container registry should enable immutable artifacts",
+                            service="ContainerRegistry",
+                            severity="medium",
+                            status="PASS" if is_immutable else "FAIL",
+                            resource_id=str(getattr(repo, 'id', repo.display_name)),
+                            resource_name=repo.display_name,
+                            remediation="Enable immutable artifacts to prevent image tag overwriting",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                except Exception as e:
+                    logger.warning(f"OCI container registry checks for compartment {compartment_id}: {e}")
+
+        except ImportError:
+            logger.warning("OCI SDK not installed, skipping container registry checks")
+        except Exception as e:
+            logger.error(f"OCI container registry checks failed: {e}")
+
+        return results
+
+    # ── File Storage Checks ──────────────────────────────────────
+
+    def _check_file_storage(self) -> list[dict]:
+        """File Storage service security checks."""
+        results = []
+        try:
+            import oci
+            config = self._get_config()
+            fs_client = oci.file_storage.FileStorageClient(config)
+            identity_client = oci.identity.IdentityClient(config)
+            tenancy_id = config["tenancy"]
+
+            compartments = identity_client.list_compartments(tenancy_id, compartment_id_in_subtree=True).data
+            compartment_ids = [tenancy_id] + [c.id for c in compartments if c.lifecycle_state == "ACTIVE"]
+
+            # Get availability domains
+            ads = identity_client.list_availability_domains(tenancy_id).data
+
+            for compartment_id in compartment_ids:
+                for ad in ads:
+                    try:
+                        # File systems
+                        file_systems = fs_client.list_file_systems(
+                            compartment_id, availability_domain=ad.name
+                        ).data
+                        for fs in file_systems:
+                            if fs.lifecycle_state != "ACTIVE":
+                                continue
+
+                            # Customer-managed encryption
+                            has_cmk = getattr(fs, 'kms_key_id', None) is not None
+                            results.append(CheckResult(
+                                check_id="oci_filestorage_cmk_encryption",
+                                check_title="File systems should use customer-managed encryption keys",
+                                service="FileStorage",
+                                severity="high",
+                                status="PASS" if has_cmk else "FAIL",
+                                resource_id=fs.id,
+                                resource_name=fs.display_name,
+                                remediation="Enable encryption with a customer-managed key in OCI Vault",
+                                compliance_frameworks=["CIS-OCI-2.0"],
+                            ).to_dict())
+
+                        # Mount targets and NSGs
+                        mount_targets = fs_client.list_mount_targets(
+                            compartment_id, availability_domain=ad.name
+                        ).data
+                        for mt in mount_targets:
+                            if mt.lifecycle_state != "ACTIVE":
+                                continue
+
+                            nsgs = getattr(mt, 'nsg_ids', None) or []
+                            results.append(CheckResult(
+                                check_id="oci_filestorage_mount_target_nsg",
+                                check_title="File Storage mount targets should have NSGs assigned",
+                                service="FileStorage",
+                                severity="medium",
+                                status="PASS" if len(nsgs) > 0 else "FAIL",
+                                resource_id=mt.id,
+                                resource_name=mt.display_name,
+                                remediation="Assign network security groups to mount targets",
+                                compliance_frameworks=["CIS-OCI-2.0"],
+                            ).to_dict())
+
+                            # Export checks
+                            try:
+                                exports = fs_client.list_exports(
+                                    compartment_id=compartment_id,
+                                    export_set_id=mt.export_set_id
+                                ).data if mt.export_set_id else []
+                                for export in exports:
+                                    export_detail = fs_client.get_export(export.id).data
+                                    export_opts = getattr(export_detail, 'export_options', []) or []
+                                    has_privileged_port = all(
+                                        getattr(opt, 'require_privileged_source_port', False)
+                                        for opt in export_opts
+                                    ) if export_opts else False
+                                    results.append(CheckResult(
+                                        check_id="oci_filestorage_export_privileged_port",
+                                        check_title="File Storage exports should require privileged source ports",
+                                        service="FileStorage",
+                                        severity="medium",
+                                        status="PASS" if has_privileged_port else "FAIL",
+                                        resource_id=export.id,
+                                        resource_name=export.path,
+                                        remediation="Configure exports to require privileged NFS source ports",
+                                        compliance_frameworks=["CIS-OCI-2.0"],
+                                    ).to_dict())
+                            except Exception:
+                                pass
+
+                    except Exception as e:
+                        logger.warning(f"OCI file storage checks for compartment {compartment_id}, AD {ad.name}: {e}")
+
+        except ImportError:
+            logger.warning("OCI SDK not installed, skipping file storage checks")
+        except Exception as e:
+            logger.error(f"OCI file storage checks failed: {e}")
+
+        return results
+
+    # ── Kubernetes Engine (OKE) Checks ───────────────────────────
+
+    def _check_kubernetes_engine(self) -> list[dict]:
+        """OKE (Container Engine for Kubernetes) security checks."""
+        results = []
+        try:
+            import oci
+            config = self._get_config()
+            oke_client = oci.container_engine.ContainerEngineClient(config)
+            identity_client = oci.identity.IdentityClient(config)
+            tenancy_id = config["tenancy"]
+
+            compartments = identity_client.list_compartments(tenancy_id, compartment_id_in_subtree=True).data
+            compartment_ids = [tenancy_id] + [c.id for c in compartments if c.lifecycle_state == "ACTIVE"]
+
+            for compartment_id in compartment_ids:
+                try:
+                    clusters = oke_client.list_clusters(compartment_id).data
+                    for cluster in clusters:
+                        if cluster.lifecycle_state != "ACTIVE":
+                            continue
+
+                        # API server public access
+                        endpoint_config = getattr(cluster, 'endpoint_config', None)
+                        is_public = True
+                        if endpoint_config:
+                            is_public = getattr(endpoint_config, 'is_public_ip_enabled', True)
+                        results.append(CheckResult(
+                            check_id="oci_oke_cluster_public_endpoint",
+                            check_title="OKE clusters should not have publicly accessible API servers",
+                            service="KubernetesEngine",
+                            severity="high",
+                            status="FAIL" if is_public else "PASS",
+                            resource_id=cluster.id,
+                            resource_name=cluster.name,
+                            remediation="Disable public IP for the cluster API endpoint",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                        # Cluster NSGs
+                        endpoint_nsg_ids = getattr(endpoint_config, 'nsg_ids', None) or [] if endpoint_config else []
+                        results.append(CheckResult(
+                            check_id="oci_oke_cluster_nsg_assigned",
+                            check_title="OKE clusters should have NSGs assigned",
+                            service="KubernetesEngine",
+                            severity="medium",
+                            status="PASS" if len(endpoint_nsg_ids) > 0 else "FAIL",
+                            resource_id=cluster.id,
+                            resource_name=cluster.name,
+                            remediation="Assign network security groups to the cluster endpoint",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                        # Image verification policy
+                        img_policy = getattr(cluster, 'image_policy_config', None)
+                        is_policy_enabled = img_policy and getattr(img_policy, 'is_policy_enabled', False)
+                        results.append(CheckResult(
+                            check_id="oci_oke_image_verification",
+                            check_title="OKE clusters should have image verification policies enabled",
+                            service="KubernetesEngine",
+                            severity="high",
+                            status="PASS" if is_policy_enabled else "FAIL",
+                            resource_id=cluster.id,
+                            resource_name=cluster.name,
+                            remediation="Enable image verification policies for the OKE cluster",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                        # Kubernetes version check
+                        k8s_version = getattr(cluster, 'kubernetes_version', '')
+                        results.append(CheckResult(
+                            check_id="oci_oke_kubernetes_version",
+                            check_title="OKE clusters should use a supported Kubernetes version",
+                            service="KubernetesEngine",
+                            severity="medium",
+                            status="PASS",
+                            resource_id=cluster.id,
+                            resource_name=cluster.name,
+                            status_extended=f"Kubernetes version: {k8s_version}",
+                            remediation="Upgrade to the latest supported Kubernetes version",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                        # Node pools
+                        try:
+                            node_pools = oke_client.list_node_pools(compartment_id, cluster_id=cluster.id).data
+                            for np in node_pools:
+                                if np.lifecycle_state != "ACTIVE":
+                                    continue
+
+                                # Node pool NSGs
+                                np_config = getattr(np, 'node_config_details', None)
+                                np_nsgs = getattr(np_config, 'nsg_ids', None) or [] if np_config else []
+                                results.append(CheckResult(
+                                    check_id="oci_oke_nodepool_nsg_assigned",
+                                    check_title="OKE node pools should have NSGs assigned",
+                                    service="KubernetesEngine",
+                                    severity="medium",
+                                    status="PASS" if len(np_nsgs) > 0 else "FAIL",
+                                    resource_id=np.id,
+                                    resource_name=np.name,
+                                    remediation="Assign network security groups to node pools",
+                                    compliance_frameworks=["CIS-OCI-2.0"],
+                                ).to_dict())
+
+                        except Exception as e:
+                            logger.warning(f"OCI OKE node pool checks failed: {e}")
+
+                except Exception as e:
+                    logger.warning(f"OCI OKE checks for compartment {compartment_id}: {e}")
+
+        except ImportError:
+            logger.warning("OCI SDK not installed, skipping OKE checks")
+        except Exception as e:
+            logger.error(f"OCI OKE checks failed: {e}")
+
+        return results
+
+    # ── Load Balancer Checks ─────────────────────────────────────
+
+    def _check_load_balancer(self) -> list[dict]:
+        """Load Balancer security checks."""
+        results = []
+        try:
+            import oci
+            config = self._get_config()
+            lb_client = oci.load_balancer.LoadBalancerClient(config)
+            identity_client = oci.identity.IdentityClient(config)
+            tenancy_id = config["tenancy"]
+
+            compartments = identity_client.list_compartments(tenancy_id, compartment_id_in_subtree=True).data
+            compartment_ids = [tenancy_id] + [c.id for c in compartments if c.lifecycle_state == "ACTIVE"]
+
+            for compartment_id in compartment_ids:
+                try:
+                    lbs = lb_client.list_load_balancers(compartment_id).data
+                    for lb in lbs:
+                        if lb.lifecycle_state != "ACTIVE":
+                            continue
+
+                        # NSGs assigned
+                        nsgs = getattr(lb, 'network_security_group_ids', None) or []
+                        results.append(CheckResult(
+                            check_id="oci_lb_nsg_assigned",
+                            check_title="Load balancers should have NSGs assigned",
+                            service="LoadBalancer",
+                            severity="medium",
+                            status="PASS" if len(nsgs) > 0 else "FAIL",
+                            resource_id=lb.id,
+                            resource_name=lb.display_name,
+                            remediation="Assign network security groups to the load balancer",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                        # All listeners should use HTTPS
+                        listeners = lb.listeners or {}
+                        all_https = True
+                        for listener_name, listener in listeners.items():
+                            protocol = getattr(listener, 'protocol', '')
+                            if protocol.upper() not in ('HTTPS', 'TCP', 'HTTP2'):
+                                all_https = False
+                                results.append(CheckResult(
+                                    check_id="oci_lb_listener_https",
+                                    check_title="Load balancer listeners should use HTTPS/TLS",
+                                    service="LoadBalancer",
+                                    severity="high",
+                                    status="FAIL",
+                                    resource_id=lb.id,
+                                    resource_name=f"{lb.display_name}/{listener_name}",
+                                    status_extended=f"Listener '{listener_name}' uses protocol {protocol}",
+                                    remediation="Configure listeners to use HTTPS protocol with TLS certificates",
+                                    compliance_frameworks=["CIS-OCI-2.0"],
+                                ).to_dict())
+
+                        if all_https and listeners:
+                            results.append(CheckResult(
+                                check_id="oci_lb_listener_https",
+                                check_title="Load balancer listeners should use HTTPS/TLS",
+                                service="LoadBalancer",
+                                severity="high",
+                                status="PASS",
+                                resource_id=lb.id,
+                                resource_name=lb.display_name,
+                                remediation="Configure listeners to use HTTPS protocol with TLS certificates",
+                                compliance_frameworks=["CIS-OCI-2.0"],
+                            ).to_dict())
+
+                        # Backend set health
+                        backend_sets = lb.backend_sets or {}
+                        for bs_name, bs in backend_sets.items():
+                            try:
+                                health = lb_client.get_backend_set_health(lb.id, bs_name).data
+                                health_status = getattr(health, 'status', 'UNKNOWN')
+                                is_healthy = health_status in ('OK', 'UNKNOWN')
+                                results.append(CheckResult(
+                                    check_id="oci_lb_backend_health",
+                                    check_title="Load balancer backend sets should be healthy",
+                                    service="LoadBalancer",
+                                    severity="high",
+                                    status="PASS" if is_healthy else "FAIL",
+                                    resource_id=lb.id,
+                                    resource_name=f"{lb.display_name}/{bs_name}",
+                                    status_extended=f"Backend set '{bs_name}' health: {health_status}",
+                                    remediation="Investigate and resolve unhealthy backend set status",
+                                    compliance_frameworks=["CIS-OCI-2.0"],
+                                ).to_dict())
+                            except Exception:
+                                pass
+
+                except Exception as e:
+                    logger.warning(f"OCI load balancer checks for compartment {compartment_id}: {e}")
+
+        except ImportError:
+            logger.warning("OCI SDK not installed, skipping load balancer checks")
+        except Exception as e:
+            logger.error(f"OCI load balancer checks failed: {e}")
+
+        return results
+
+    # ── MySQL Database Service Checks ────────────────────────────
+
+    def _check_mysql(self) -> list[dict]:
+        """MySQL Database Service security checks."""
+        results = []
+        try:
+            import oci
+            config = self._get_config()
+            mysql_client = oci.mysql.DbSystemClient(config)
+            identity_client = oci.identity.IdentityClient(config)
+            tenancy_id = config["tenancy"]
+
+            compartments = identity_client.list_compartments(tenancy_id, compartment_id_in_subtree=True).data
+            compartment_ids = [tenancy_id] + [c.id for c in compartments if c.lifecycle_state == "ACTIVE"]
+
+            for compartment_id in compartment_ids:
+                try:
+                    db_systems = mysql_client.list_db_systems(compartment_id).data
+                    for dbs in db_systems:
+                        if dbs.lifecycle_state != "ACTIVE":
+                            continue
+
+                        # Get full details
+                        try:
+                            db_detail = mysql_client.get_db_system(dbs.id).data
+                        except Exception:
+                            db_detail = dbs
+
+                        # Automatic backups
+                        backup_policy = getattr(db_detail, 'backup_policy', None)
+                        backups_enabled = backup_policy and getattr(backup_policy, 'is_enabled', False)
+                        results.append(CheckResult(
+                            check_id="oci_mysql_backup_enabled",
+                            check_title="MySQL DB systems should have automatic backups enabled",
+                            service="MySQL",
+                            severity="high",
+                            status="PASS" if backups_enabled else "FAIL",
+                            resource_id=dbs.id,
+                            resource_name=dbs.display_name,
+                            remediation="Enable automatic backups for the MySQL database system",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                        # Point-in-time recovery
+                        pitr = backup_policy and getattr(backup_policy, 'pitr_policy', None)
+                        pitr_enabled = pitr and getattr(pitr, 'is_enabled', False)
+                        results.append(CheckResult(
+                            check_id="oci_mysql_pitr_enabled",
+                            check_title="MySQL DB systems should have point-in-time recovery configured",
+                            service="MySQL",
+                            severity="high",
+                            status="PASS" if pitr_enabled else "FAIL",
+                            resource_id=dbs.id,
+                            resource_name=dbs.display_name,
+                            remediation="Enable point-in-time recovery in the backup policy",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                        # Crash recovery
+                        crash_recovery = getattr(db_detail, 'crash_recovery', None)
+                        results.append(CheckResult(
+                            check_id="oci_mysql_crash_recovery",
+                            check_title="MySQL DB systems should have crash recovery enabled",
+                            service="MySQL",
+                            severity="high",
+                            status="PASS" if crash_recovery == "ENABLED" else "FAIL",
+                            resource_id=dbs.id,
+                            resource_name=dbs.display_name,
+                            remediation="Enable crash recovery for the MySQL database system",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                        # Deletion protection
+                        deletion_policy = getattr(db_detail, 'deletion_policy', None)
+                        is_protected = deletion_policy and getattr(deletion_policy, 'is_delete_protected', False)
+                        results.append(CheckResult(
+                            check_id="oci_mysql_deletion_protection",
+                            check_title="MySQL DB systems should have deletion protection enabled",
+                            service="MySQL",
+                            severity="high",
+                            status="PASS" if is_protected else "FAIL",
+                            resource_id=dbs.id,
+                            resource_name=dbs.display_name,
+                            remediation="Enable deletion protection for the MySQL database system",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                        # High availability
+                        is_ha = getattr(db_detail, 'is_highly_available', False)
+                        results.append(CheckResult(
+                            check_id="oci_mysql_high_availability",
+                            check_title="MySQL DB systems should be configured for high availability",
+                            service="MySQL",
+                            severity="medium",
+                            status="PASS" if is_ha else "FAIL",
+                            resource_id=dbs.id,
+                            resource_name=dbs.display_name,
+                            remediation="Enable high availability for the MySQL database system",
+                            compliance_frameworks=["CIS-OCI-2.0"],
+                        ).to_dict())
+
+                except Exception as e:
+                    logger.warning(f"OCI MySQL checks for compartment {compartment_id}: {e}")
+
+        except ImportError:
+            logger.warning("OCI SDK not installed, skipping MySQL checks")
+        except Exception as e:
+            logger.error(f"OCI MySQL checks failed: {e}")
 
         return results
