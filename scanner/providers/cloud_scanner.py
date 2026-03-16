@@ -33,6 +33,7 @@ class CloudScanner:
             "azure": self._run_azure_checks,
             "gcp": self._run_gcp_checks,
             "kubernetes": self._run_kubernetes_checks,
+            "oci": self._run_oci_checks,
         }
 
         scanner_fn = scanner_map.get(self.provider_type)
@@ -59,4 +60,9 @@ class CloudScanner:
     def _run_kubernetes_checks(self) -> list[dict]:
         from scanner.providers.kubernetes.k8s_scanner import K8sScanner
         scanner = K8sScanner(self.credentials)
+        return scanner.scan()
+
+    def _run_oci_checks(self) -> list[dict]:
+        from scanner.providers.oci.oci_scanner import OCIScanner
+        scanner = OCIScanner(self.credentials, self.regions, self.services)
         return scanner.scan()

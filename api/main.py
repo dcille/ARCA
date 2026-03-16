@@ -21,6 +21,7 @@ app = FastAPI(
     description="Asset Risk & Cloud Analysis - Cloud & SaaS Security Posture Management",
     version="1.0.0",
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 app.add_middleware(

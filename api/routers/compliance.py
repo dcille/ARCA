@@ -25,6 +25,10 @@ COMPLIANCE_FRAMEWORKS = {
         "name": "CIS Google Cloud Platform Foundation Benchmark v2.0",
         "description": "Center for Internet Security GCP benchmark",
     },
+    "CIS-OCI-2.0": {
+        "name": "CIS Oracle Cloud Infrastructure Foundations Benchmark v2.0",
+        "description": "Center for Internet Security OCI benchmark",
+    },
     "NIST-800-53": {
         "name": "NIST SP 800-53 Rev. 5",
         "description": "Security and Privacy Controls for Information Systems",
