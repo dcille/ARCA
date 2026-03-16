@@ -18,16 +18,19 @@ import {
 export default function OverviewPage() {
   const [data, setData] = useState<any>(null)
   const [attackSummary, setAttackSummary] = useState<any>(null)
+  const [trends, setTrends] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
       api.getDashboardOverview(),
       api.getAttackPathsSummary().catch(() => null),
+      api.getDashboardTrends(30).catch(() => null),
     ])
-      .then(([dashData, atkData]) => {
+      .then(([dashData, atkData, trendsData]) => {
         setData(dashData)
         setAttackSummary(atkData)
+        setTrends(trendsData)
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -205,6 +208,82 @@ export default function OverviewPage() {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Scan Trend Chart */}
+      {trends?.scan_history && trends.scan_history.length > 1 && (
+        <div className="card mb-8">
+          <h3 className="text-lg font-semibold text-brand-navy mb-4">Pass Rate Trend</h3>
+          <div className="flex items-end gap-1 h-40">
+            {trends.scan_history.map((s: any, i: number) => {
+              const rate = s.pass_rate || 0
+              const barColor = rate >= 80 ? 'bg-status-pass' : rate >= 50 ? 'bg-amber-400' : 'bg-status-fail'
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1 group" title={`${s.date}: ${rate}% (${s.passed}/${s.total_checks})`}>
+                  <span className="text-[9px] text-brand-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {rate}%
+                  </span>
+                  <div className="w-full flex flex-col justify-end" style={{ height: '120px' }}>
+                    <div
+                      className={`w-full rounded-t ${barColor} transition-all hover:opacity-80`}
+                      style={{ height: `${Math.max(rate * 1.2, 3)}px` }}
+                    />
+                  </div>
+                  <span className="text-[8px] text-brand-gray-400 truncate w-full text-center">
+                    {s.date?.slice(5)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex items-center justify-between mt-2 text-xs text-brand-gray-400">
+            <span>{trends.scan_history.length} scans over last 30 days</span>
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-status-pass" /> &ge;80%</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> 50-79%</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-status-fail" /> &lt;50%</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Findings Severity Trend */}
+      {trends?.findings_trend && trends.findings_trend.length > 1 && (
+        <div className="card mb-8">
+          <h3 className="text-lg font-semibold text-brand-navy mb-4">Findings Severity Trend</h3>
+          <div className="flex items-end gap-1 h-40">
+            {trends.findings_trend.map((d: any, i: number) => {
+              const total = (d.critical || 0) + (d.high || 0) + (d.medium || 0) + (d.low || 0)
+              const maxTotal = Math.max(...trends.findings_trend.map((t: any) =>
+                (t.critical || 0) + (t.high || 0) + (t.medium || 0) + (t.low || 0)
+              ), 1)
+              const scale = 120 / maxTotal
+
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1 group" title={`${d.date}: ${total} findings`}>
+                  <span className="text-[9px] text-brand-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {total}
+                  </span>
+                  <div className="w-full flex flex-col justify-end" style={{ height: '120px' }}>
+                    {d.critical > 0 && <div className="w-full bg-severity-critical" style={{ height: `${d.critical * scale}px` }} />}
+                    {d.high > 0 && <div className="w-full bg-severity-high" style={{ height: `${d.high * scale}px` }} />}
+                    {d.medium > 0 && <div className="w-full bg-severity-medium" style={{ height: `${d.medium * scale}px` }} />}
+                    {d.low > 0 && <div className="w-full bg-severity-low" style={{ height: `${d.low * scale}px` }} />}
+                  </div>
+                  <span className="text-[8px] text-brand-gray-400 truncate w-full text-center">
+                    {d.date?.slice(5)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex items-center justify-end mt-2 gap-3 text-xs text-brand-gray-400">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-severity-critical" /> Critical</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-severity-high" /> High</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-severity-medium" /> Medium</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-severity-low" /> Low</span>
           </div>
         </div>
       )}

@@ -85,6 +85,11 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/dashboard/overview')
   }
 
+  async getDashboardTrends(days?: number) {
+    const params = days ? { days: String(days) } : undefined
+    return this.request<any>('GET', '/api/v1/dashboard/trends', undefined, { params })
+  }
+
   // Providers
   async getProviders() {
     return this.request<any[]>('GET', '/api/v1/providers')
