@@ -174,6 +174,9 @@ async def framework_checks(
                 "status_extended": f.status_extended,
                 "remediation": f.remediation,
                 "remediation_url": f.remediation_url,
+                "check_description": f.check_description,
+                "evidence_log": f.evidence_log,
+                "mitre_techniques": f.mitre_techniques,
             }
             for f in findings
         ],

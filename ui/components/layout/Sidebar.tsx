@@ -19,6 +19,7 @@ import {
   CubeIcon,
   BellIcon,
   BoltIcon,
+  TableCellsIcon,
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/auth'
 import { api } from '@/lib/api'
@@ -28,6 +29,7 @@ const navigation = [
   { name: 'Attack Paths', href: '/darca/attack-paths', icon: MapIcon },
   { name: 'Findings', href: '/darca/findings', icon: MagnifyingGlassIcon },
   { name: 'Compliance', href: '/darca/compliance', icon: DocumentChartBarIcon },
+  { name: 'MITRE ATT&CK', href: '/darca/mitre-attack', icon: TableCellsIcon },
   { name: 'Inventory', href: '/darca/inventory', icon: CubeIcon },
   { name: 'Scans', href: '/darca/scans', icon: ShieldCheckIcon },
   { name: 'Cloud Providers', href: '/darca/providers', icon: CloudIcon },

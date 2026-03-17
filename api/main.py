@@ -9,14 +9,14 @@ from api.database import engine, Base
 from api.routers import (
     auth, providers, scans, findings, compliance, saas, dashboard,
     attack_paths, reports, inventory, schedules, notifications, integrations,
-    organizations,
+    organizations, mitre,
 )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(Base.metadata.create_all, checkfirst=True)
     yield
 
 
@@ -50,6 +50,7 @@ app.include_router(schedules.router, prefix="/api/v1/schedules", tags=["Schedule
 app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
 app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["Integrations"])
 app.include_router(organizations.router, prefix="/api/v1/organizations", tags=["Organizations"])
+app.include_router(mitre.router, prefix="/api/v1/mitre", tags=["MITRE ATT&CK"])
 
 
 @app.get("/api/v1/health")

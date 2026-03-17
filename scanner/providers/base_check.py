@@ -19,6 +19,9 @@ class CheckResult:
     remediation: Optional[str] = None
     remediation_url: Optional[str] = None
     compliance_frameworks: list[str] = field(default_factory=list)
+    check_description: Optional[str] = None
+    evidence_log: Optional[str] = None  # JSON string: {"api_call": "...", "response": "..."}
+    mitre_techniques: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -34,6 +37,9 @@ class CheckResult:
             "remediation": self.remediation,
             "remediation_url": self.remediation_url,
             "compliance_frameworks": self.compliance_frameworks,
+            "check_description": self.check_description,
+            "evidence_log": self.evidence_log,
+            "mitre_techniques": self.mitre_techniques,
         }
 
 

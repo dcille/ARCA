@@ -119,6 +119,7 @@ export default function InventoryPage() {
             <option value="azure">Azure</option>
             <option value="gcp">GCP</option>
             <option value="oci">OCI</option>
+            <option value="alibaba">Alibaba Cloud</option>
             <option value="kubernetes">Kubernetes</option>
           </select>
           <input
@@ -189,6 +190,7 @@ export default function InventoryPage() {
                   <th className="text-left text-xs font-semibold text-brand-gray-500 uppercase px-4 py-3">Resource</th>
                   <th className="text-left text-xs font-semibold text-brand-gray-500 uppercase px-4 py-3">Service</th>
                   <th className="text-left text-xs font-semibold text-brand-gray-500 uppercase px-4 py-3">Provider</th>
+                  <th className="text-left text-xs font-semibold text-brand-gray-500 uppercase px-4 py-3">Account</th>
                   <th className="text-left text-xs font-semibold text-brand-gray-500 uppercase px-4 py-3">Region</th>
                   <th className="text-center text-xs font-semibold text-brand-gray-500 uppercase px-4 py-3">Status</th>
                   <th className="text-center text-xs font-semibold text-brand-gray-500 uppercase px-4 py-3">Findings</th>
@@ -213,6 +215,9 @@ export default function InventoryPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-xs text-brand-gray-600">{r.provider_type?.toUpperCase()}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-medium text-brand-navy">{r.provider_alias || '-'}</span>
                       {r.account_id && (
                         <p className="text-[10px] text-brand-gray-400">{r.account_id}</p>
                       )}

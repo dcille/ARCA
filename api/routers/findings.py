@@ -28,7 +28,7 @@ async def list_findings(
     current_user: User = Depends(get_current_user),
 ):
     query = (
-        select(Finding, Provider.provider_type)
+        select(Finding, Provider.provider_type, Provider.alias)
         .join(Scan, Finding.scan_id == Scan.id)
         .outerjoin(Provider, Finding.provider_id == Provider.id)
         .where(Scan.user_id == current_user.id)
@@ -50,8 +50,10 @@ async def list_findings(
     for row in result.all():
         finding = row[0]
         provider_type = row[1]
+        provider_alias = row[2]
         resp = FindingResponse.model_validate(finding)
         resp.provider_type = provider_type
+        resp.provider_alias = provider_alias
         findings.append(resp)
     return findings
 
