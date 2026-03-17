@@ -329,40 +329,69 @@ export default function CompliancePage() {
                       {expandedRows.has(f.id) && (
                         <tr key={`${f.id}-detail`} className="bg-brand-gray-50">
                           <td colSpan={8} className="px-6 py-4">
-                            <div className="space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Security Impact */}
+                              {f.check_description && (
+                                <div>
+                                  <p className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-1">Security Impact</p>
+                                  <p className="text-sm text-brand-gray-700">{f.check_description}</p>
+                                </div>
+                              )}
                               {f.status_extended && (
                                 <div>
-                                  <p className="text-xs font-medium text-brand-gray-500 mb-1">Status Detail</p>
+                                  <p className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-1">Status Detail</p>
                                   <p className="text-sm text-brand-gray-700">{f.status_extended}</p>
                                 </div>
                               )}
                               {f.resource_id && (
                                 <div>
-                                  <p className="text-xs font-medium text-brand-gray-500 mb-1">Resource ID</p>
+                                  <p className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-1">Resource ID</p>
                                   <p className="text-sm text-brand-gray-700 font-mono">{f.resource_id}</p>
                                 </div>
                               )}
                               {f.remediation && (
                                 <div>
-                                  <p className="text-xs font-medium text-brand-gray-500 mb-1">Remediation</p>
+                                  <p className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-1">Remediation</p>
                                   <p className="text-sm text-brand-gray-700">{f.remediation}</p>
+                                  {f.remediation_url && (
+                                    <a
+                                      href={f.remediation_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-sm text-blue-600 hover:underline mt-1 inline-block"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      View guide &rarr;
+                                    </a>
+                                  )}
                                 </div>
                               )}
-                              {f.remediation_url && (
-                                <div>
-                                  <p className="text-xs font-medium text-brand-gray-500 mb-1">Reference</p>
-                                  <a
-                                    href={f.remediation_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-blue-600 hover:underline"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {f.remediation_url}
-                                  </a>
-                                </div>
-                              )}
-                              {!f.status_extended && !f.remediation && !f.remediation_url && (
+                              {/* API Evidence Log */}
+                              {f.evidence_log && (() => {
+                                let ev: any = null
+                                try { ev = JSON.parse(f.evidence_log) } catch {}
+                                if (!ev) return null
+                                return (
+                                  <div className="md:col-span-2">
+                                    <p className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-1">API Evidence Log</p>
+                                    <div className="bg-brand-navy rounded-lg p-3 font-mono text-xs space-y-2 overflow-x-auto">
+                                      {ev.api_call && (
+                                        <div>
+                                          <span className="text-brand-green font-semibold">$ API Call:</span>
+                                          <pre className="text-gray-300 mt-0.5 whitespace-pre-wrap">{ev.api_call}</pre>
+                                        </div>
+                                      )}
+                                      {ev.response && (
+                                        <div>
+                                          <span className="text-amber-400 font-semibold">Response:</span>
+                                          <pre className="text-gray-300 mt-0.5 whitespace-pre-wrap">{ev.response}</pre>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })()}
+                              {!f.status_extended && !f.remediation && !f.check_description && (
                                 <p className="text-sm text-brand-gray-400 italic">No additional details available.</p>
                               )}
                             </div>

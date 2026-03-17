@@ -19,7 +19,11 @@ class FindingResponse(BaseModel):
     remediation: Optional[str]
     remediation_url: Optional[str]
     compliance_frameworks: Optional[str] = None
+    check_description: Optional[str] = None
+    evidence_log: Optional[str] = None
+    mitre_techniques: Optional[str] = None
     provider_type: Optional[str] = None
+    provider_alias: Optional[str] = None
     created_at: datetime
 
     class Config:

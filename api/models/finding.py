@@ -26,4 +26,7 @@ class Finding(Base):
     remediation: Mapped[str] = mapped_column(Text, nullable=True)
     remediation_url: Mapped[str] = mapped_column(String(500), nullable=True)
     compliance_frameworks: Mapped[str] = mapped_column(Text, nullable=True)  # JSON string
+    check_description: Mapped[str] = mapped_column(Text, nullable=True)
+    evidence_log: Mapped[str] = mapped_column(Text, nullable=True)  # JSON: {api_call, response}
+    mitre_techniques: Mapped[str] = mapped_column(Text, nullable=True)  # JSON array of MITRE ATT&CK technique IDs
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -317,6 +317,15 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/inventory/summary', undefined, { params })
   }
 
+  // MITRE ATT&CK
+  async getMitreMatrix(params?: Record<string, string>) {
+    return this.request<any>('GET', '/api/v1/mitre/matrix', undefined, { params })
+  }
+
+  async getMitreTechnique(techniqueId: string, params?: Record<string, string>) {
+    return this.request<any>('GET', `/api/v1/mitre/technique/${techniqueId}`, undefined, { params })
+  }
+
   // Organizations
   async createOrganization(data: { name: string; slug: string }) {
     return this.request<any>('POST', '/api/v1/organizations', data)

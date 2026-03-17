@@ -12,6 +12,16 @@ const PROVIDER_LABELS: Record<string, { label: string; color: string }> = {
   gcp: { label: 'GCP', color: 'bg-red-100 text-red-800' },
   kubernetes: { label: 'K8s', color: 'bg-purple-100 text-purple-800' },
   oci: { label: 'OCI', color: 'bg-orange-100 text-orange-800' },
+  alibaba: { label: 'Alibaba', color: 'bg-orange-100 text-orange-700' },
+}
+
+function parseEvidenceLog(raw?: string | null): { api_call?: string; response?: string } | null {
+  if (!raw) return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
 }
 
 function ProviderBadge({ provider }: { provider?: string | null }) {
@@ -58,10 +68,11 @@ function parseComplianceFrameworks(raw?: string | null): string[] {
 
 function ExpandedRow({ item }: { item: any }) {
   const frameworks = useMemo(() => parseComplianceFrameworks(item.compliance_frameworks), [item.compliance_frameworks])
+  const evidence = useMemo(() => parseEvidenceLog(item.evidence_log), [item.evidence_log])
 
   return (
     <tr>
-      <td colSpan={9} className="px-0 py-0">
+      <td colSpan={11} className="px-0 py-0">
         <div className="overflow-hidden transition-all duration-300 ease-in-out">
           <div className="px-8 py-6 bg-brand-gray-50 border-t border-brand-gray-200 grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Risk description */}
@@ -75,6 +86,16 @@ function ExpandedRow({ item }: { item: any }) {
                 <Badge type="status" value={item.status} />
               </div>
             </div>
+
+            {/* Security Impact Description */}
+            {item.check_description && (
+              <div>
+                <h4 className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-2">
+                  Security Impact
+                </h4>
+                <p className="text-sm text-brand-gray-600">{item.check_description}</p>
+              </div>
+            )}
 
             {/* Evidence */}
             <div>
@@ -108,6 +129,12 @@ function ExpandedRow({ item }: { item: any }) {
                   <dt className="text-brand-gray-400 font-medium min-w-[100px]">Service</dt>
                   <dd className="text-brand-gray-700">{item.service}</dd>
                 </div>
+                {item.provider_alias && (
+                  <div className="flex gap-2">
+                    <dt className="text-brand-gray-400 font-medium min-w-[100px]">Account</dt>
+                    <dd className="text-brand-gray-700">{item.provider_alias}</dd>
+                  </div>
+                )}
               </dl>
             </div>
 
@@ -132,6 +159,29 @@ function ExpandedRow({ item }: { item: any }) {
                 </a>
               )}
             </div>
+
+            {/* API Evidence Log */}
+            {evidence && (
+              <div className="md:col-span-2">
+                <h4 className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-2">
+                  API Evidence Log
+                </h4>
+                <div className="bg-brand-navy rounded-lg p-4 font-mono text-xs space-y-3 overflow-x-auto">
+                  {evidence.api_call && (
+                    <div>
+                      <span className="text-brand-green font-semibold">$ API Call:</span>
+                      <pre className="text-gray-300 mt-1 whitespace-pre-wrap">{evidence.api_call}</pre>
+                    </div>
+                  )}
+                  {evidence.response && (
+                    <div>
+                      <span className="text-amber-400 font-semibold">Response:</span>
+                      <pre className="text-gray-300 mt-1 whitespace-pre-wrap">{evidence.response}</pre>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Compliance frameworks */}
             {frameworks.length > 0 && (
@@ -281,28 +331,31 @@ export default function FindingsPage() {
               <thead>
                 <tr className="bg-brand-gray-50">
                   <th className="w-10 px-3 py-3" />
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider w-28">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider w-24">
                     Severity
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider w-20">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider w-16">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider w-24">
-                    Source
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider w-20">
+                    Provider
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider max-w-md">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider w-28">
+                    Account
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider max-w-sm">
                     Check
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider">
                     Service
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider">
                     Resource
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider">
                     Region
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase tracking-wider">
                     Date
                   </th>
                 </tr>
@@ -310,7 +363,7 @@ export default function FindingsPage() {
               <tbody className="bg-white divide-y divide-brand-gray-100">
                 {findings.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-brand-gray-400">
+                    <td colSpan={11} className="px-6 py-12 text-center text-brand-gray-400">
                       No findings yet. Run a cloud scan to generate findings.
                     </td>
                   </tr>
@@ -330,24 +383,29 @@ export default function FindingsPage() {
                               }`}
                             />
                           </td>
-                          <td className="px-6 py-4 text-sm w-28">
+                          <td className="px-4 py-4 text-sm w-24">
                             <Badge type="severity" value={item.severity} />
                           </td>
-                          <td className="px-6 py-4 text-sm w-20">
+                          <td className="px-4 py-4 text-sm w-16">
                             <Badge type="status" value={item.status} />
                           </td>
-                          <td className="px-6 py-4 text-sm w-24">
+                          <td className="px-4 py-4 text-sm w-20">
                             <ProviderBadge provider={item.provider_type} />
                           </td>
-                          <td className="px-6 py-4 text-sm max-w-md">{item.check_title}</td>
-                          <td className="px-6 py-4 text-sm">{item.service}</td>
-                          <td className="px-6 py-4 text-sm">
+                          <td className="px-4 py-4 text-sm w-28">
+                            <span className="text-brand-navy text-xs font-medium truncate block max-w-28">
+                              {item.provider_alias || '-'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-sm max-w-sm">{item.check_title}</td>
+                          <td className="px-4 py-4 text-sm">{item.service}</td>
+                          <td className="px-4 py-4 text-sm">
                             <span className="text-brand-gray-600 truncate block max-w-48">
                               {item.resource_name || item.resource_id || '-'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-sm">{item.region || '-'}</td>
-                          <td className="px-6 py-4 text-sm">
+                          <td className="px-4 py-4 text-sm">{item.region || '-'}</td>
+                          <td className="px-4 py-4 text-sm">
                             <span className="text-brand-gray-400">{formatDate(item.created_at)}</span>
                           </td>
                         </tr>
