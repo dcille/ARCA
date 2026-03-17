@@ -103,49 +103,107 @@ FRAMEWORKS = {
     "NIST-CSF": {
         "name": "NIST Cybersecurity Framework",
         "description": "Framework for Improving Critical Infrastructure Cybersecurity",
-        "checks": "all_saas",
+        "checks": "all",
     },
     "ISO-27001": {
         "name": "ISO/IEC 27001:2022",
         "description": "Information security management systems",
-        "checks": "all_saas",
+        "checks": "all",
     },
     "PCI-DSS-3.2.1": {
         "name": "PCI DSS v3.2.1",
         "description": "Payment Card Industry Data Security Standard",
         "checks": [
-            "iam_root_mfa_enabled", "iam_user_mfa_enabled", "s3_bucket_public_access_blocked",
+            # AWS
+            "iam_root_mfa_enabled", "iam_user_mfa_enabled", "iam_password_policy_strong",
+            "iam_access_key_rotation", "s3_bucket_public_access_blocked",
             "s3_bucket_encryption_enabled", "s3_bucket_logging_enabled",
+            "ec2_sg_open_port_22", "ec2_sg_open_port_3389", "ec2_ebs_volume_encrypted",
             "rds_encryption_enabled", "rds_public_access_disabled",
-            "cloudtrail_log_validation", "cloudtrail_encrypted",
+            "cloudtrail_multiregion", "cloudtrail_log_validation", "cloudtrail_encrypted",
             "kms_key_rotation_enabled", "vpc_flow_logs_enabled", "guardduty_enabled",
+            # Azure
+            "azure_iam_owner_count", "azure_storage_https_only", "azure_storage_tls_12",
+            "azure_storage_no_public_access", "azure_nsg_open_port_22", "azure_nsg_open_port_3389",
+            "azure_sql_auditing_enabled", "azure_sql_tls_12",
+            "azure_keyvault_soft_delete", "azure_keyvault_purge_protection",
+            "azure_vm_disk_encryption", "azure_appservice_https_only", "azure_appservice_tls_12",
+            "azure_monitor_log_profile",
+            # GCP
+            "gcp_iam_no_public_access", "gcp_sql_no_public_ip", "gcp_sql_ssl_required",
+            "gcp_kms_key_rotation", "gcp_firewall_open_22", "gcp_firewall_open_3389",
+            "gcp_storage_uniform_access",
         ],
     },
     "HIPAA": {
         "name": "HIPAA Security Rule",
         "description": "Health Insurance Portability and Accountability Act",
         "checks": [
+            # AWS
             "s3_bucket_encryption_enabled", "ec2_ebs_volume_encrypted",
             "rds_encryption_enabled", "rds_backup_enabled",
             "cloudtrail_encrypted", "sns_topic_encrypted", "sqs_queue_encrypted",
             "efs_encryption_enabled", "dynamodb_table_encrypted_kms",
+            "kms_key_rotation_enabled", "cloudtrail_multiregion",
+            # Azure
+            "azure_vm_disk_encryption", "azure_storage_https_only", "azure_storage_tls_12",
+            "azure_sql_auditing_enabled", "azure_sql_tls_12",
+            "azure_keyvault_soft_delete", "azure_keyvault_purge_protection",
+            "azure_monitor_log_profile",
+            # GCP
+            "gcp_sql_ssl_required", "gcp_kms_key_rotation",
+            "gcp_storage_uniform_access",
         ],
     },
     "SOC2": {
         "name": "SOC 2 Type II",
         "description": "Service Organization Control 2",
         "checks": [
-            "s3_bucket_versioning_enabled", "rds_multi_az_enabled", "rds_backup_enabled",
+            # AWS
+            "iam_root_mfa_enabled", "iam_user_mfa_enabled", "iam_access_key_rotation",
+            "s3_bucket_versioning_enabled", "s3_bucket_logging_enabled",
+            "rds_multi_az_enabled", "rds_backup_enabled",
             "secretsmanager_rotation_enabled", "dynamodb_pitr_enabled",
-            "cloudwatch_log_group_retention",
+            "cloudwatch_log_group_retention", "cloudtrail_multiregion",
+            "guardduty_enabled", "config_recorder_enabled",
+            # Azure
+            "azure_iam_owner_count", "azure_monitor_log_profile",
+            "azure_sql_auditing_enabled", "azure_network_watcher_enabled",
+            "azure_keyvault_soft_delete", "azure_keyvault_purge_protection",
+            # GCP
+            "gcp_iam_no_public_access", "gcp_gke_private_cluster",
+            "gcp_sql_no_public_ip",
         ],
     },
     "GDPR": {
         "name": "GDPR",
         "description": "General Data Protection Regulation",
         "checks": [
+            # AWS
             "s3_bucket_encryption_enabled", "rds_encryption_enabled",
             "ec2_ebs_volume_encrypted", "cloudtrail_encrypted",
+            "kms_key_rotation_enabled", "s3_bucket_public_access_blocked",
+            "rds_public_access_disabled", "cloudtrail_multiregion",
+            # Azure
+            "azure_vm_disk_encryption", "azure_storage_https_only",
+            "azure_storage_no_public_access", "azure_storage_tls_12",
+            "azure_sql_auditing_enabled", "azure_keyvault_soft_delete",
+            "azure_monitor_log_profile",
+            # GCP
+            "gcp_storage_uniform_access", "gcp_sql_ssl_required",
+            "gcp_kms_key_rotation", "gcp_iam_no_public_access",
         ],
     },
 }
+
+
+def get_frameworks_for_check(check_id: str) -> list[str]:
+    """Return all framework IDs that a given check_id maps to."""
+    frameworks = []
+    for fw_id, fw_data in FRAMEWORKS.items():
+        checks = fw_data.get("checks", [])
+        if checks == "all" or checks == "all_saas":
+            frameworks.append(fw_id)
+        elif isinstance(checks, list) and check_id in checks:
+            frameworks.append(fw_id)
+    return frameworks

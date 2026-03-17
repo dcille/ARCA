@@ -90,6 +90,7 @@ export default function MitreAttackPage() {
 
   const runAnalysis = async () => {
     setAnalyzing(true)
+    setLoading(true)
     setSelectedTechnique(null)
     setTechniqueDetail(null)
     try {
@@ -102,6 +103,7 @@ export default function MitreAttackPage() {
       console.error(err)
     } finally {
       setAnalyzing(false)
+      setLoading(false)
     }
   }
 

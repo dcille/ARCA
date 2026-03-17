@@ -1,9 +1,11 @@
 """D-ARCA API - Asset Risk & Cloud Analysis"""
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect as sa_inspect
 
 from api.config import settings
 from api.database import engine, Base
@@ -20,9 +22,22 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     try:
         async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all, checkfirst=True)
+            # Check which tables already exist to avoid race conditions
+            existing = await conn.run_sync(
+                lambda sync_conn: set(sa_inspect(sync_conn).get_table_names())
+            )
+            # Only create tables that don't exist yet
+            tables_to_create = [
+                t for t in Base.metadata.sorted_tables
+                if t.name not in existing
+            ]
+            if tables_to_create:
+                await conn.run_sync(
+                    lambda sync_conn: Base.metadata.create_all(
+                        sync_conn, tables=tables_to_create
+                    )
+                )
     except Exception as e:
-        # Multiple gunicorn workers may race to create tables - safe to ignore
         logger.warning(f"Table creation warning (likely concurrent workers): {e}")
     yield
 

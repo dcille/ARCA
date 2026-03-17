@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Header from '@/components/layout/Header'
 import { api } from '@/lib/api'
 import { formatPercent } from '@/lib/utils'
-import { XMarkIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, ChevronDownIcon, ChevronRightIcon, BookOpenIcon } from '@heroicons/react/24/outline'
 
 const SEVERITY_COLORS: Record<string, string> = {
   critical: 'bg-red-100 text-red-800',
@@ -31,6 +31,11 @@ export default function CompliancePage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [severityFilter, setSeverityFilter] = useState<string>('all')
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+
+  // Check library state
+  const [showLibrary, setShowLibrary] = useState(false)
+  const [libraryData, setLibraryData] = useState<any>(null)
+  const [libraryLoading, setLibraryLoading] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -81,6 +86,8 @@ export default function CompliancePage() {
     setStatusFilter('all')
     setSeverityFilter('all')
     setExpandedRows(new Set())
+    setShowLibrary(false)
+    setLibraryData(null)
     loadFrameworkDetail(frameworkId)
   }
 
@@ -104,10 +111,35 @@ export default function CompliancePage() {
     })
   }
 
+  const loadCheckLibrary = async (frameworkId: string) => {
+    setLibraryLoading(true)
+    try {
+      const data = await api.getComplianceFrameworkLibrary(frameworkId)
+      setLibraryData(data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLibraryLoading(false)
+    }
+  }
+
+  const toggleLibrary = () => {
+    if (showLibrary) {
+      setShowLibrary(false)
+      return
+    }
+    setShowLibrary(true)
+    if (selectedFramework && !libraryData) {
+      loadCheckLibrary(selectedFramework)
+    }
+  }
+
   const closeDetail = () => {
     setSelectedFramework(null)
     setDetailData(null)
     setExpandedRows(new Set())
+    setShowLibrary(false)
+    setLibraryData(null)
   }
 
   return (
@@ -231,34 +263,98 @@ export default function CompliancePage() {
           )}
 
           {/* Filter Controls */}
-          <div className="flex items-center gap-4 mb-6">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-brand-gray-700">Status:</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => handleFilterChange(e.target.value, severityFilter)}
-                className="px-3 py-1.5 border border-brand-gray-300 rounded-lg text-sm"
-              >
-                <option value="all">All</option>
-                <option value="PASS">Pass</option>
-                <option value="FAIL">Fail</option>
-              </select>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-brand-gray-700">Status:</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => handleFilterChange(e.target.value, severityFilter)}
+                  className="px-3 py-1.5 border border-brand-gray-300 rounded-lg text-sm"
+                >
+                  <option value="all">All</option>
+                  <option value="PASS">Pass</option>
+                  <option value="FAIL">Fail</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-brand-gray-700">Severity:</label>
+                <select
+                  value={severityFilter}
+                  onChange={(e) => handleFilterChange(statusFilter, e.target.value)}
+                  className="px-3 py-1.5 border border-brand-gray-300 rounded-lg text-sm"
+                >
+                  <option value="all">All</option>
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-brand-gray-700">Severity:</label>
-              <select
-                value={severityFilter}
-                onChange={(e) => handleFilterChange(statusFilter, e.target.value)}
-                className="px-3 py-1.5 border border-brand-gray-300 rounded-lg text-sm"
-              >
-                <option value="all">All</option>
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
+            <button
+              onClick={toggleLibrary}
+              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                showLibrary
+                  ? 'bg-brand-green text-white'
+                  : 'border border-brand-gray-300 text-brand-gray-700 hover:bg-brand-gray-50'
+              }`}
+            >
+              <BookOpenIcon className="w-4 h-4" />
+              Check Library
+            </button>
           </div>
+
+          {/* Check Library Panel */}
+          {showLibrary && (
+            <div className="mb-6 border border-brand-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-brand-gray-50 px-4 py-3 border-b border-brand-gray-200">
+                <h3 className="text-sm font-semibold text-brand-navy">
+                  Check Library
+                  {libraryData && (
+                    <span className="text-brand-gray-400 font-normal ml-2">
+                      ({libraryData.total_checks} checks covered)
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs text-brand-gray-400 mt-0.5">
+                  All security checks that this framework evaluates. This shows the full coverage of our platform against this standard.
+                </p>
+              </div>
+              {libraryLoading ? (
+                <div className="p-4 animate-pulse space-y-2">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="h-8 bg-brand-gray-100 rounded" />
+                  ))}
+                </div>
+              ) : libraryData?.checks?.length > 0 ? (
+                <div className="max-h-96 overflow-y-auto divide-y divide-brand-gray-100">
+                  {libraryData.checks.map((check: any) => (
+                    <div key={check.check_id} className="px-4 py-3 hover:bg-brand-gray-50">
+                      <div className="flex items-start gap-3">
+                        <span className="text-[10px] font-mono text-brand-gray-400 bg-brand-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap mt-0.5">
+                          {check.check_id}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-brand-gray-700">{check.description}</p>
+                          {check.evidence_method && (
+                            <p className="text-xs text-brand-gray-400 mt-1">
+                              <span className="font-medium">How it works: </span>
+                              {check.evidence_method}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 text-center text-sm text-brand-gray-400">
+                  No check definitions available for this framework.
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Checks Table */}
           {detailLoading ? (
@@ -370,21 +466,27 @@ export default function CompliancePage() {
                               {f.evidence_log && (() => {
                                 let ev: any = null
                                 try { ev = JSON.parse(f.evidence_log) } catch {}
-                                if (!ev) return null
                                 return (
                                   <div className="md:col-span-2">
                                     <p className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-1">API Evidence Log</p>
                                     <div className="bg-brand-navy rounded-lg p-3 font-mono text-xs space-y-2 overflow-x-auto">
-                                      {ev.api_call && (
+                                      {ev?.api_call ? (
+                                        <>
+                                          <div>
+                                            <span className="text-brand-green font-semibold">$ API Call:</span>
+                                            <pre className="text-gray-300 mt-0.5 whitespace-pre-wrap">{ev.api_call}</pre>
+                                          </div>
+                                          {ev.response && (
+                                            <div>
+                                              <span className="text-amber-400 font-semibold">Response:</span>
+                                              <pre className="text-gray-300 mt-0.5 whitespace-pre-wrap">{ev.response}</pre>
+                                            </div>
+                                          )}
+                                        </>
+                                      ) : (
                                         <div>
-                                          <span className="text-brand-green font-semibold">$ API Call:</span>
-                                          <pre className="text-gray-300 mt-0.5 whitespace-pre-wrap">{ev.api_call}</pre>
-                                        </div>
-                                      )}
-                                      {ev.response && (
-                                        <div>
-                                          <span className="text-amber-400 font-semibold">Response:</span>
-                                          <pre className="text-gray-300 mt-0.5 whitespace-pre-wrap">{ev.response}</pre>
+                                          <span className="text-brand-green font-semibold">$ Method:</span>
+                                          <pre className="text-gray-300 mt-0.5 whitespace-pre-wrap">{f.evidence_log}</pre>
                                         </div>
                                       )}
                                     </div>

@@ -68,6 +68,32 @@ async def get_provider(
     return ProviderResponse.model_validate(provider)
 
 
+@router.put("/{provider_id}", response_model=ProviderResponse)
+async def update_provider(
+    provider_id: str,
+    data: ProviderUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Provider).where(Provider.id == provider_id, Provider.user_id == current_user.id)
+    )
+    provider = result.scalar_one_or_none()
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    if data.alias is not None:
+        provider.alias = data.alias
+    if data.region is not None:
+        provider.region = data.region
+    if data.credentials is not None:
+        provider.credentials_encrypted = encrypt_credentials(data.credentials)
+
+    await db.commit()
+    await db.refresh(provider)
+    return ProviderResponse.model_validate(provider)
+
+
 @router.delete("/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_provider(
     provider_id: str,
