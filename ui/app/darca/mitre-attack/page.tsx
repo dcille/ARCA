@@ -148,7 +148,7 @@ export default function MitreAttackPage() {
     setTechniqueDetail(null)
   }
 
-  const hasData = matrixData?.summary?.assessed > 0
+  const hasMatrix = matrixData?.matrix?.length > 0
 
   return (
     <div>
@@ -249,12 +249,12 @@ export default function MitreAttackPage() {
         <div className="card animate-pulse">
           <div className="h-96 bg-brand-gray-100 rounded" />
         </div>
-      ) : !hasData ? (
+      ) : !hasMatrix ? (
         <div className="card text-center py-16">
           <ShieldCheckIcon className="w-16 h-16 mx-auto text-brand-gray-300 mb-4" />
-          <h3 className="text-lg font-semibold text-brand-navy mb-2">No Scan Data Available</h3>
+          <h3 className="text-lg font-semibold text-brand-navy mb-2">No Matrix Data</h3>
           <p className="text-sm text-brand-gray-400 mb-6 max-w-md mx-auto">
-            Run a cloud security scan first, then click &quot;Run Analysis&quot; to map your findings against the MITRE ATT&CK framework.
+            Click &quot;Run Analysis&quot; to load the MITRE ATT&CK matrix and map your findings.
           </p>
           <button
             onClick={runAnalysis}

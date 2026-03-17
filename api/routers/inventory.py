@@ -121,13 +121,15 @@ async def list_resources(
     return resources
 
 
-@router.get("/resources/{resource_id}/findings")
+@router.get("/resources/findings")
 async def resource_findings(
-    resource_id: str,
+    resource_id: str = Query(..., description="Resource ID to get findings for"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Get all findings for a specific resource."""
+    from scanner.mitre.attack_mapping import CHECK_DESCRIPTIONS, CHECK_EVIDENCE
+
     query = (
         select(Finding)
         .join(Scan, Finding.scan_id == Scan.id)
@@ -153,7 +155,7 @@ async def resource_findings(
             "id": f.id,
             "check_id": f.check_id,
             "check_title": f.check_title,
-            "check_description": f.check_description,
+            "check_description": f.check_description or CHECK_DESCRIPTIONS.get(f.check_id, ""),
             "status": f.status,
             "severity": f.severity,
             "service": f.service,
@@ -162,7 +164,7 @@ async def resource_findings(
             "resource_name": f.resource_name,
             "remediation": f.remediation,
             "remediation_url": f.remediation_url,
-            "evidence_log": f.evidence_log,
+            "evidence_log": f.evidence_log or CHECK_EVIDENCE.get(f.check_id, ""),
             "status_extended": f.status_extended,
             "created_at": f.created_at.isoformat() if f.created_at else None,
         }

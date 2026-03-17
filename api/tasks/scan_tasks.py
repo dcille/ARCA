@@ -1,4 +1,5 @@
 """Cloud scan Celery tasks."""
+import json
 import logging
 from datetime import datetime
 
@@ -25,6 +26,7 @@ def run_cloud_scan(self, scan_id: str, provider_id: str, services=None, regions=
     from api.models.provider import Provider
     from api.models.finding import Finding
     from api.services.auth_service import decrypt_credentials
+    from scanner.mitre.attack_mapping import CHECK_TO_MITRE, CHECK_DESCRIPTIONS, CHECK_EVIDENCE
 
     session = get_sync_session()
     try:
@@ -61,10 +63,17 @@ def run_cloud_scan(self, scan_id: str, provider_id: str, services=None, regions=
         failed = 0
 
         for result in results:
+            check_id = result["check_id"]
+
+            # Enrich with MITRE mappings, descriptions, and evidence
+            mitre_techs = result.get("mitre_techniques") or CHECK_TO_MITRE.get(check_id, [])
+            check_desc = result.get("check_description") or CHECK_DESCRIPTIONS.get(check_id, "")
+            evidence = result.get("evidence_log") or CHECK_EVIDENCE.get(check_id, "")
+
             finding = Finding(
                 scan_id=scan_id,
                 provider_id=provider_id,
-                check_id=result["check_id"],
+                check_id=check_id,
                 check_title=result["check_title"],
                 service=result["service"],
                 severity=result["severity"],
@@ -76,6 +85,9 @@ def run_cloud_scan(self, scan_id: str, provider_id: str, services=None, regions=
                 remediation=result.get("remediation"),
                 remediation_url=result.get("remediation_url"),
                 compliance_frameworks=str(result.get("compliance_frameworks", [])),
+                check_description=check_desc,
+                evidence_log=evidence,
+                mitre_techniques=json.dumps(mitre_techs) if mitre_techs else None,
             )
             session.add(finding)
             total += 1

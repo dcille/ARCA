@@ -46,6 +46,9 @@ async def list_findings(
 
     query = query.order_by(Finding.created_at.desc()).offset(offset).limit(limit)
     result = await db.execute(query)
+
+    from scanner.mitre.attack_mapping import CHECK_DESCRIPTIONS, CHECK_EVIDENCE
+
     findings = []
     for row in result.all():
         finding = row[0]
@@ -54,6 +57,11 @@ async def list_findings(
         resp = FindingResponse.model_validate(finding)
         resp.provider_type = provider_type
         resp.provider_alias = provider_alias
+        # Fallback to static descriptions/evidence for older findings
+        if not resp.check_description:
+            resp.check_description = CHECK_DESCRIPTIONS.get(finding.check_id, "")
+        if not resp.evidence_log:
+            resp.evidence_log = CHECK_EVIDENCE.get(finding.check_id, "")
         findings.append(resp)
     return findings
 

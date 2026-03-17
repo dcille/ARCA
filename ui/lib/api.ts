@@ -318,7 +318,9 @@ class ApiClient {
   }
 
   async getResourceFindings(resourceId: string) {
-    return this.request<any[]>('GET', `/api/v1/inventory/resources/${encodeURIComponent(resourceId)}/findings`)
+    return this.request<any[]>('GET', '/api/v1/inventory/resources/findings', undefined, {
+      params: { resource_id: resourceId },
+    })
   }
 
   // MITRE ATT&CK
