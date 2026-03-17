@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Header from '@/components/layout/Header'
 import { api } from '@/lib/api'
 import {
@@ -23,6 +23,14 @@ const TACTIC_COLORS: Record<string, string> = {
   'exfiltration': 'border-t-indigo-500',
   'impact': 'border-t-purple-500',
 }
+
+const ANALYSIS_PHASES = [
+  'Querying security findings...',
+  'Mapping findings to MITRE ATT&CK techniques...',
+  'Correlating sub-techniques and tactics...',
+  'Assessing protection coverage...',
+  'Building attack matrix visualization...',
+]
 
 function TechniqueCell({
   technique,
@@ -64,48 +72,16 @@ function TechniqueCell({
 
 export default function MitreAttackPage() {
   const [matrixData, setMatrixData] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
+  const [analysisPhase, setAnalysisPhase] = useState(0)
   const [selectedTechnique, setSelectedTechnique] = useState<string | null>(null)
   const [techniqueDetail, setTechniqueDetail] = useState<any>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [providers, setProviders] = useState<any[]>([])
   const [selectedProvider, setSelectedProvider] = useState('')
   const [lastAnalyzed, setLastAnalyzed] = useState<string | null>(null)
-
-  const loadMatrix = async (providerId?: string) => {
-    setLoading(true)
-    try {
-      const params: Record<string, string> = {}
-      if (providerId) params.provider_id = providerId
-      const data = await api.getMitreMatrix(params)
-      setMatrixData(data)
-      setLastAnalyzed(new Date().toLocaleTimeString())
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const runAnalysis = async () => {
-    setAnalyzing(true)
-    setLoading(true)
-    setSelectedTechnique(null)
-    setTechniqueDetail(null)
-    try {
-      const params: Record<string, string> = {}
-      if (selectedProvider) params.provider_id = selectedProvider
-      const data = await api.getMitreMatrix(params)
-      setMatrixData(data)
-      setLastAnalyzed(new Date().toLocaleTimeString())
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setAnalyzing(false)
-      setLoading(false)
-    }
-  }
+  const phaseTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     const loadProviders = async () => {
@@ -115,14 +91,69 @@ export default function MitreAttackPage() {
       } catch {}
     }
     loadProviders()
-    loadMatrix()
+    // Do NOT auto-load matrix — user must click "Run Analysis"
   }, [])
+
+  // Clean up phase timer on unmount
+  useEffect(() => {
+    return () => {
+      if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current)
+    }
+  }, [])
+
+  const runAnalysis = async () => {
+    setAnalyzing(true)
+    setLoading(true)
+    setAnalysisPhase(0)
+    setSelectedTechnique(null)
+    setTechniqueDetail(null)
+
+    // Animate through analysis phases
+    let phase = 0
+    const advancePhase = () => {
+      phase++
+      if (phase < ANALYSIS_PHASES.length) {
+        setAnalysisPhase(phase)
+        phaseTimerRef.current = setTimeout(advancePhase, 600 + Math.random() * 400)
+      }
+    }
+    phaseTimerRef.current = setTimeout(advancePhase, 500)
+
+    try {
+      const params: Record<string, string> = {}
+      if (selectedProvider) params.provider_id = selectedProvider
+      const data = await api.getMitreMatrix(params)
+
+      // Ensure we show all phases before revealing results
+      const minDisplayTime = ANALYSIS_PHASES.length * 700
+      const startTime = Date.now()
+      const elapsed = Date.now() - startTime
+      if (elapsed < minDisplayTime) {
+        await new Promise((r) => setTimeout(r, minDisplayTime - elapsed))
+      }
+
+      // Final phase done
+      setAnalysisPhase(ANALYSIS_PHASES.length - 1)
+      setMatrixData(data)
+      setLastAnalyzed(new Date().toLocaleTimeString())
+    } catch (err) {
+      console.error(err)
+    } finally {
+      if (phaseTimerRef.current) {
+        clearTimeout(phaseTimerRef.current)
+        phaseTimerRef.current = null
+      }
+      // Small delay to show final phase before hiding
+      setTimeout(() => {
+        setAnalyzing(false)
+        setLoading(false)
+      }, 300)
+    }
+  }
 
   const handleProviderChange = (providerId: string) => {
     setSelectedProvider(providerId)
-    setSelectedTechnique(null)
-    setTechniqueDetail(null)
-    loadMatrix(providerId || undefined)
+    // Don't auto-reload - user should click Run Analysis again
   }
 
   const handleTechniqueClick = async (techId: string) => {
@@ -198,7 +229,7 @@ export default function MitreAttackPage() {
       </div>
 
       {/* Summary Stats */}
-      {matrixData?.summary && (
+      {matrixData?.summary && !analyzing && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
           <div className="bg-white rounded-lg border border-brand-gray-200 px-4 py-3">
             <p className="text-xs text-brand-gray-400 uppercase font-semibold">Techniques</p>
@@ -230,83 +261,136 @@ export default function MitreAttackPage() {
         </div>
       )}
 
-      {/* Legend */}
-      <div className="flex items-center gap-6 mb-4 px-1">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-green-100 border border-green-300" />
-          <span className="text-xs text-brand-gray-600">Protected (all checks pass)</span>
+      {/* Analysis in Progress */}
+      {analyzing && (
+        <div className="card text-center py-12 mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand-green/10 mb-6">
+            <ArrowPathIcon className="w-8 h-8 text-brand-green animate-spin" />
+          </div>
+          <h3 className="text-lg font-semibold text-brand-navy mb-4">Analyzing Security Posture</h3>
+          <div className="max-w-md mx-auto space-y-2">
+            {ANALYSIS_PHASES.map((phase, i) => (
+              <div
+                key={i}
+                className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-300 ${
+                  i < analysisPhase
+                    ? 'bg-green-50 text-green-700'
+                    : i === analysisPhase
+                    ? 'bg-brand-green/10 text-brand-navy font-medium'
+                    : 'text-brand-gray-300'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  i < analysisPhase
+                    ? 'bg-green-500 text-white'
+                    : i === analysisPhase
+                    ? 'bg-brand-green text-white animate-pulse'
+                    : 'bg-brand-gray-200'
+                }`}>
+                  {i < analysisPhase ? (
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <span className="text-[9px] font-bold">{i + 1}</span>
+                  )}
+                </div>
+                <span className="text-sm">{phase}</span>
+              </div>
+            ))}
+          </div>
+          {/* Progress bar */}
+          <div className="mt-6 max-w-sm mx-auto">
+            <div className="h-1.5 bg-brand-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-brand-green rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${((analysisPhase + 1) / ANALYSIS_PHASES.length) * 100}%` }}
+              />
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-red-100 border border-red-300" />
-          <span className="text-xs text-brand-gray-600">At Risk (one or more checks fail)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-gray-50 border border-gray-200" />
-          <span className="text-xs text-brand-gray-600">Not Assessed</span>
-        </div>
-      </div>
+      )}
 
-      {/* Matrix */}
-      {loading ? (
-        <div className="card animate-pulse">
-          <div className="h-96 bg-brand-gray-100 rounded" />
-        </div>
-      ) : !hasMatrix ? (
+      {/* Empty state — no analysis run yet */}
+      {!analyzing && !hasMatrix && (
         <div className="card text-center py-16">
           <ShieldCheckIcon className="w-16 h-16 mx-auto text-brand-gray-300 mb-4" />
-          <h3 className="text-lg font-semibold text-brand-navy mb-2">No Matrix Data</h3>
+          <h3 className="text-lg font-semibold text-brand-navy mb-2">MITRE ATT&CK Analysis</h3>
           <p className="text-sm text-brand-gray-400 mb-6 max-w-md mx-auto">
-            Click &quot;Run Analysis&quot; to load the MITRE ATT&CK matrix and map your findings.
+            Map your cloud security findings against the MITRE ATT&CK framework to understand your
+            coverage across 11 tactics and 100+ techniques. Select a provider filter if needed,
+            then click Run Analysis.
           </p>
           <button
             onClick={runAnalysis}
             disabled={analyzing}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-green text-white text-sm font-semibold rounded-lg hover:bg-brand-green/90 transition-colors disabled:opacity-60"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-brand-green text-white text-sm font-semibold rounded-lg hover:bg-brand-green/90 transition-colors disabled:opacity-60 shadow-sm"
           >
-            <ArrowPathIcon className={`w-4 h-4 ${analyzing ? 'animate-spin' : ''}`} />
-            {analyzing ? 'Analyzing...' : 'Run Analysis'}
+            <ArrowPathIcon className="w-5 h-5" />
+            Run Analysis
           </button>
         </div>
-      ) : (
-        <div className="card p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <div className="inline-flex min-w-full">
-              {matrixData?.matrix?.map((tactic: any) => (
-                <div
-                  key={tactic.tactic}
-                  className={`flex-shrink-0 w-36 border-r border-brand-gray-200 last:border-r-0 border-t-4 ${
-                    TACTIC_COLORS[tactic.tactic] || 'border-t-gray-400'
-                  }`}
-                >
-                  {/* Tactic Header */}
-                  <div className="px-2 py-2 bg-brand-gray-50 border-b border-brand-gray-200 sticky top-0">
-                    <h3 className="text-[10px] font-bold text-brand-navy uppercase tracking-wider text-center leading-tight">
-                      {tactic.tactic_label}
-                    </h3>
-                    <p className="text-[9px] text-brand-gray-400 text-center mt-0.5">
-                      {tactic.techniques.length} techniques
-                    </p>
-                  </div>
-                  {/* Technique Cells */}
-                  <div className="p-1.5 space-y-1">
-                    {tactic.techniques.map((tech: any) => (
-                      <TechniqueCell
-                        key={tech.id}
-                        technique={tech}
-                        onClick={() => handleTechniqueClick(tech.id)}
-                      />
-                    ))}
-                    {tactic.techniques.length === 0 && (
-                      <p className="text-[10px] text-brand-gray-400 text-center py-4 italic">
-                        No techniques
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
+      )}
+
+      {/* Matrix display */}
+      {!analyzing && hasMatrix && (
+        <>
+          {/* Legend */}
+          <div className="flex items-center gap-6 mb-4 px-1">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-green-100 border border-green-300" />
+              <span className="text-xs text-brand-gray-600">Protected (all checks pass)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-red-100 border border-red-300" />
+              <span className="text-xs text-brand-gray-600">At Risk (one or more checks fail)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-gray-50 border border-gray-200" />
+              <span className="text-xs text-brand-gray-600">Not Assessed</span>
             </div>
           </div>
-        </div>
+
+          <div className="card p-0 overflow-hidden">
+            <div className="overflow-x-auto">
+              <div className="inline-flex min-w-full">
+                {matrixData?.matrix?.map((tactic: any) => (
+                  <div
+                    key={tactic.tactic}
+                    className={`flex-shrink-0 w-36 border-r border-brand-gray-200 last:border-r-0 border-t-4 ${
+                      TACTIC_COLORS[tactic.tactic] || 'border-t-gray-400'
+                    }`}
+                  >
+                    {/* Tactic Header */}
+                    <div className="px-2 py-2 bg-brand-gray-50 border-b border-brand-gray-200 sticky top-0">
+                      <h3 className="text-[10px] font-bold text-brand-navy uppercase tracking-wider text-center leading-tight">
+                        {tactic.tactic_label}
+                      </h3>
+                      <p className="text-[9px] text-brand-gray-400 text-center mt-0.5">
+                        {tactic.techniques.length} techniques
+                      </p>
+                    </div>
+                    {/* Technique Cells */}
+                    <div className="p-1.5 space-y-1">
+                      {tactic.techniques.map((tech: any) => (
+                        <TechniqueCell
+                          key={tech.id}
+                          technique={tech}
+                          onClick={() => handleTechniqueClick(tech.id)}
+                        />
+                      ))}
+                      {tactic.techniques.length === 0 && (
+                        <p className="text-[10px] text-brand-gray-400 text-center py-4 italic">
+                          No techniques
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Technique Detail Panel */}

@@ -126,9 +126,10 @@ def generate_executive_report(
     findings_by_severity: dict,
     findings_by_service: dict,
     compliance_summary: Optional[dict],
-    attack_paths_summary: Optional[dict],
-    provider_info: dict,
-    filters: dict,
+    mitre_summary: Optional[dict] = None,
+    attack_paths_summary: Optional[dict] = None,
+    provider_info: Optional[dict] = None,
+    filters: Optional[dict] = None,
 ) -> bytes:
     """Generate an executive summary PDF report."""
     pdf = ARCAReport(report_type="executive")
@@ -265,8 +266,35 @@ def generate_executive_report(
             pdf.ln(8)
         pdf.ln(4)
 
+    # ── MITRE ATT&CK ────────────────────────────────────────────────
+    if mitre_summary and mitre_summary.get("assessed", 0) > 0:
+        if pdf.get_y() > 200:
+            pdf.add_page()
+        pdf.section_title("MITRE ATT&CK Coverage")
+        ms = mitre_summary
+        pdf.body_text(
+            f"ARCA mapped your findings against {ms['total_techniques']} MITRE ATT&CK techniques. "
+            f"{ms['assessed']} techniques were assessed ({ms['coverage_rate']}% coverage). "
+            f"{ms['protected']} are fully protected, {ms['at_risk']} are at risk."
+        )
+        y = pdf.get_y()
+        pdf.stat_box(10, y, 35, 24, "Techniques", str(ms["total_techniques"]))
+        pdf.stat_box(49, y, 35, 24, "Assessed", str(ms["assessed"]), (59, 130, 246))
+        pdf.stat_box(88, y, 35, 24, "Protected", str(ms["protected"]), BRAND_GREEN)
+        pdf.stat_box(127, y, 35, 24, "At Risk", str(ms["at_risk"]), SEV_COLORS["critical"])
+        pdf.set_y(y + 30)
+
+        # Top at-risk techniques table
+        top_risk = ms.get("top_at_risk", [])
+        if top_risk:
+            pdf.sub_title("Top At-Risk Techniques")
+            _draw_table(pdf, ["Technique", "Name", "Failed Checks"],
+                        [[t["id"], t["name"][:40], str(t["fail_count"])] for t in top_risk[:8]],
+                        col_widths=[30, 110, 30])
+            pdf.ln(6)
+
     # ── Providers ──────────────────────────────────────────────────
-    if provider_info.get("providers"):
+    if provider_info and provider_info.get("providers"):
         pdf.section_title("Connected Providers")
         for p in provider_info["providers"]:
             pdf.set_font("Helvetica", "", 9)
@@ -300,9 +328,10 @@ def generate_technical_report(
     findings_by_severity: dict,
     findings_by_service: dict,
     compliance_summary: Optional[dict],
-    attack_paths: list[dict],
-    provider_info: dict,
-    filters: dict,
+    mitre_summary: Optional[dict] = None,
+    attack_paths: Optional[list] = None,
+    provider_info: Optional[dict] = None,
+    filters: Optional[dict] = None,
 ) -> bytes:
     """Generate a detailed technical PDF report."""
     pdf = ARCAReport(report_type="technical")
@@ -421,6 +450,34 @@ def generate_technical_report(
 
     if not failed_sorted:
         pdf.body_text("No failed findings matching the selected filters.")
+
+    # ── MITRE ATT&CK Detail ─────────────────────────────────────────
+    if mitre_summary and mitre_summary.get("assessed", 0) > 0:
+        pdf.add_page()
+        pdf.section_title("MITRE ATT&CK Analysis")
+
+        ms = mitre_summary
+        pdf.body_text(
+            f"Coverage: {ms['assessed']}/{ms['total_techniques']} techniques assessed "
+            f"({ms['coverage_rate']}%). Protected: {ms['protected']}, At Risk: {ms['at_risk']}, "
+            f"Not Assessed: {ms['not_assessed']}."
+        )
+
+        y = pdf.get_y()
+        pdf.stat_box(10, y, 43, 24, "Total Techniques", str(ms["total_techniques"]))
+        pdf.stat_box(57, y, 43, 24, "Coverage Rate", f"{ms['coverage_rate']}%",
+                     BRAND_GREEN if ms["coverage_rate"] >= 50 else SEV_COLORS["high"])
+        pdf.stat_box(104, y, 43, 24, "Protected", str(ms["protected"]), BRAND_GREEN)
+        pdf.stat_box(151, y, 43, 24, "At Risk", str(ms["at_risk"]), SEV_COLORS["critical"])
+        pdf.set_y(y + 30)
+
+        top_risk = ms.get("top_at_risk", [])
+        if top_risk:
+            pdf.sub_title("Techniques Requiring Attention")
+            _draw_table(pdf, ["Technique ID", "Name", "Failed Checks"],
+                        [[t["id"], t["name"][:45], str(t["fail_count"])] for t in top_risk],
+                        col_widths=[35, 115, 30])
+            pdf.ln(6)
 
     # ── Attack Paths Detail ────────────────────────────────────────
     if attack_paths:

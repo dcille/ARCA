@@ -19,6 +19,24 @@ const STATUS_COLORS: Record<string, string> = {
   FAIL: 'bg-red-100 text-red-800',
 }
 
+const PROVIDER_LABELS: Record<string, string> = {
+  aws: 'AWS',
+  azure: 'Azure',
+  gcp: 'GCP',
+  oci: 'OCI',
+  alibaba: 'Alibaba',
+  k8s: 'Kubernetes',
+}
+
+const PROVIDER_COLORS: Record<string, string> = {
+  aws: 'bg-[#FF9900]/10 text-[#FF9900] border-[#FF9900]/30',
+  azure: 'bg-[#0078D4]/10 text-[#0078D4] border-[#0078D4]/30',
+  gcp: 'bg-[#4285F4]/10 text-[#4285F4] border-[#4285F4]/30',
+  oci: 'bg-[#C74634]/10 text-[#C74634] border-[#C74634]/30',
+  alibaba: 'bg-[#FF6A00]/10 text-[#FF6A00] border-[#FF6A00]/30',
+  k8s: 'bg-[#326CE5]/10 text-[#326CE5] border-[#326CE5]/30',
+}
+
 export default function CompliancePage() {
   const [frameworks, setFrameworks] = useState<any[]>([])
   const [summaries, setSummaries] = useState<Record<string, any>>({})
@@ -36,6 +54,7 @@ export default function CompliancePage() {
   const [showLibrary, setShowLibrary] = useState(false)
   const [libraryData, setLibraryData] = useState<any>(null)
   const [libraryLoading, setLibraryLoading] = useState(false)
+  const [expandedControls, setExpandedControls] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const load = async () => {
@@ -88,6 +107,7 @@ export default function CompliancePage() {
     setExpandedRows(new Set())
     setShowLibrary(false)
     setLibraryData(null)
+    setExpandedControls(new Set())
     loadFrameworkDetail(frameworkId)
   }
 
@@ -102,11 +122,17 @@ export default function CompliancePage() {
   const toggleRow = (findingId: string) => {
     setExpandedRows((prev) => {
       const next = new Set(prev)
-      if (next.has(findingId)) {
-        next.delete(findingId)
-      } else {
-        next.add(findingId)
-      }
+      if (next.has(findingId)) next.delete(findingId)
+      else next.add(findingId)
+      return next
+    })
+  }
+
+  const toggleControl = (controlId: string) => {
+    setExpandedControls((prev) => {
+      const next = new Set(prev)
+      if (next.has(controlId)) next.delete(controlId)
+      else next.add(controlId)
       return next
     })
   }
@@ -140,6 +166,7 @@ export default function CompliancePage() {
     setExpandedRows(new Set())
     setShowLibrary(false)
     setLibraryData(null)
+    setExpandedControls(new Set())
   }
 
   return (
@@ -171,6 +198,11 @@ export default function CompliancePage() {
                   <div>
                     <h3 className="font-semibold text-brand-navy text-sm">{fw.name}</h3>
                     <p className="text-xs text-brand-gray-400 mt-1">{fw.description}</p>
+                    {fw.total_controls > 0 && (
+                      <p className="text-[10px] text-brand-gray-400 mt-1">
+                        {fw.total_controls} controls &middot; {fw.total_checks} checks
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -200,17 +232,23 @@ export default function CompliancePage() {
                   </div>
                   <div className="flex-1">
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="text-brand-gray-500">Total</span>
+                      <span className="text-brand-gray-500">Total Checks</span>
                       <span className="font-medium text-brand-navy">{summary.total_checks || 0}</span>
                     </div>
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-status-pass">Passed</span>
                       <span className="font-medium text-status-pass">{summary.passed || 0}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-sm mb-1">
                       <span className="text-status-fail">Failed</span>
                       <span className="font-medium text-status-fail">{summary.failed || 0}</span>
                     </div>
+                    {(summary.not_evaluated || 0) > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-brand-gray-400">Not Evaluated</span>
+                        <span className="font-medium text-brand-gray-400">{summary.not_evaluated}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -242,9 +280,9 @@ export default function CompliancePage() {
 
           {/* Summary Stats Bar */}
           {detailData?.summary && (
-            <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-5 gap-4 mb-6">
               <div className="bg-brand-gray-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-brand-navy">{detailData.summary.total}</p>
+                <p className="text-2xl font-bold text-brand-navy">{detailData.summary.total_checks}</p>
                 <p className="text-xs text-brand-gray-400">Total Checks</p>
               </div>
               <div className="bg-green-50 rounded-lg p-3 text-center">
@@ -254,6 +292,10 @@ export default function CompliancePage() {
               <div className="bg-red-50 rounded-lg p-3 text-center">
                 <p className="text-2xl font-bold text-red-700">{detailData.summary.failed}</p>
                 <p className="text-xs text-red-600">Failed</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-gray-400">{detailData.summary.not_evaluated || 0}</p>
+                <p className="text-xs text-gray-400">Not Evaluated</p>
               </div>
               <div className="bg-blue-50 rounded-lg p-3 text-center">
                 <p className="text-2xl font-bold text-blue-700">{detailData.summary.pass_rate}%</p>
@@ -305,7 +347,7 @@ export default function CompliancePage() {
             </button>
           </div>
 
-          {/* Check Library Panel */}
+          {/* Check Library Panel — Control-Level */}
           {showLibrary && (
             <div className="mb-6 border border-brand-gray-200 rounded-lg overflow-hidden">
               <div className="bg-brand-gray-50 px-4 py-3 border-b border-brand-gray-200">
@@ -313,44 +355,122 @@ export default function CompliancePage() {
                   Check Library
                   {libraryData && (
                     <span className="text-brand-gray-400 font-normal ml-2">
-                      ({libraryData.total_checks} checks covered)
+                      ({libraryData.total_controls} controls, {libraryData.total_checks} checks)
                     </span>
                   )}
                 </h3>
                 <p className="text-xs text-brand-gray-400 mt-0.5">
-                  All security checks that this framework evaluates. This shows the full coverage of our platform against this standard.
+                  Framework controls with mapped security checks per cloud provider.
                 </p>
               </div>
               {libraryLoading ? (
                 <div className="p-4 animate-pulse space-y-2">
                   {[...Array(5)].map((_, i) => (
-                    <div key={i} className="h-8 bg-brand-gray-100 rounded" />
+                    <div key={i} className="h-12 bg-brand-gray-100 rounded" />
                   ))}
                 </div>
-              ) : libraryData?.checks?.length > 0 ? (
-                <div className="max-h-96 overflow-y-auto divide-y divide-brand-gray-100">
-                  {libraryData.checks.map((check: any) => (
-                    <div key={check.check_id} className="px-4 py-3 hover:bg-brand-gray-50">
-                      <div className="flex items-start gap-3">
-                        <span className="text-[10px] font-mono text-brand-gray-400 bg-brand-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap mt-0.5">
-                          {check.check_id}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-brand-gray-700">{check.description}</p>
-                          {check.evidence_method && (
-                            <p className="text-xs text-brand-gray-400 mt-1">
-                              <span className="font-medium">How it works: </span>
-                              {check.evidence_method}
-                            </p>
-                          )}
-                        </div>
+              ) : libraryData?.controls?.length > 0 ? (
+                <div className="max-h-[600px] overflow-y-auto divide-y divide-brand-gray-100">
+                  {libraryData.controls.map((ctrl: any) => {
+                    const isExpanded = expandedControls.has(ctrl.id)
+                    const providerKeys = Object.keys(ctrl.checks || {})
+                    const totalChecks = providerKeys.reduce(
+                      (sum: number, k: string) => sum + (ctrl.checks[k]?.length || 0), 0
+                    )
+
+                    return (
+                      <div key={ctrl.id}>
+                        <button
+                          onClick={() => toggleControl(ctrl.id)}
+                          className="w-full text-left px-4 py-3 hover:bg-brand-gray-50 flex items-start gap-3"
+                        >
+                          <div className="mt-0.5">
+                            {isExpanded ? (
+                              <ChevronDownIcon className="w-4 h-4 text-brand-gray-400" />
+                            ) : (
+                              <ChevronRightIcon className="w-4 h-4 text-brand-gray-400" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-mono font-semibold text-brand-green bg-brand-green/10 px-1.5 py-0.5 rounded">
+                                {ctrl.id}
+                              </span>
+                              <span className="text-xs text-brand-gray-400">{totalChecks} checks</span>
+                              <div className="flex gap-1 ml-auto">
+                                {providerKeys.map((p: string) => (
+                                  <span
+                                    key={p}
+                                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                      PROVIDER_COLORS[p] || 'bg-gray-100 text-gray-500 border-gray-200'
+                                    }`}
+                                  >
+                                    {PROVIDER_LABELS[p] || p.toUpperCase()}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <p className="text-sm font-medium text-brand-navy">{ctrl.title}</p>
+                            <p className="text-xs text-brand-gray-500 mt-0.5 line-clamp-2">{ctrl.description}</p>
+                          </div>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="px-4 pb-4 ml-7">
+                            {/* Full description */}
+                            <div className="bg-brand-gray-50 rounded-lg p-3 mb-3">
+                              <p className="text-xs text-brand-gray-600">{ctrl.description}</p>
+                            </div>
+
+                            {/* Checks per provider */}
+                            {providerKeys.map((provider: string) => (
+                              <div key={provider} className="mb-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                      PROVIDER_COLORS[provider] || 'bg-gray-100 text-gray-500 border-gray-200'
+                                    }`}
+                                  >
+                                    {PROVIDER_LABELS[provider] || provider.toUpperCase()}
+                                  </span>
+                                  <span className="text-xs text-brand-gray-400">
+                                    {ctrl.checks[provider]?.length || 0} checks
+                                  </span>
+                                </div>
+                                <div className="space-y-1.5 ml-2">
+                                  {(ctrl.checks[provider] || []).map((check: any) => (
+                                    <div
+                                      key={check.check_id}
+                                      className="border border-brand-gray-200 rounded-lg px-3 py-2 bg-white"
+                                    >
+                                      <div className="flex items-start gap-2">
+                                        <span className="text-[10px] font-mono text-brand-gray-400 bg-brand-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap mt-0.5">
+                                          {check.check_id}
+                                        </span>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-xs text-brand-gray-700">{check.description}</p>
+                                          {check.evidence_method && (
+                                            <p className="text-[10px] text-brand-gray-400 mt-1">
+                                              <span className="font-medium">Evidence: </span>
+                                              {check.evidence_method}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="p-6 text-center text-sm text-brand-gray-400">
-                  No check definitions available for this framework.
+                  No control definitions available for this framework.
                 </div>
               )}
             </div>
@@ -426,7 +546,6 @@ export default function CompliancePage() {
                         <tr key={`${f.id}-detail`} className="bg-brand-gray-50">
                           <td colSpan={8} className="px-6 py-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {/* Security Impact */}
                               {f.check_description && (
                                 <div>
                                   <p className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-1">Security Impact</p>
@@ -462,7 +581,6 @@ export default function CompliancePage() {
                                   )}
                                 </div>
                               )}
-                              {/* API Evidence Log */}
                               {f.evidence_log && (() => {
                                 let ev: any = null
                                 try { ev = JSON.parse(f.evidence_log) } catch {}

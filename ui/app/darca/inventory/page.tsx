@@ -19,6 +19,38 @@ import {
   BuildingOffice2Icon,
 } from '@heroicons/react/24/outline'
 
+const SERVICE_LABELS: Record<string, string> = {
+  // AWS
+  S3: 'S3 Buckets', EC2: 'EC2 Instances', Lambda: 'Lambda Functions', RDS: 'RDS Databases',
+  IAM: 'IAM Resources', VPC: 'VPCs', EKS: 'EKS Clusters', ECS: 'ECS Services',
+  DynamoDB: 'DynamoDB Tables', CloudTrail: 'CloudTrail', KMS: 'KMS Keys',
+  GuardDuty: 'GuardDuty', Config: 'AWS Config', SNS: 'SNS Topics', SQS: 'SQS Queues',
+  SecretsManager: 'Secrets', EFS: 'EFS File Systems', CloudWatch: 'CloudWatch',
+  ElastiCache: 'ElastiCache', Elasticsearch: 'Elasticsearch',
+  // Azure
+  VM: 'Virtual Machines', Storage: 'Storage Accounts', SQL: 'SQL Databases',
+  KeyVault: 'Key Vaults', NSG: 'Network Security Groups', AppService: 'App Services',
+  Monitor: 'Azure Monitor', Network: 'Network Resources', Identity: 'Identity Resources',
+  // GCP
+  Compute: 'Compute Instances', GKE: 'GKE Clusters', Firewall: 'Firewall Rules',
+  CloudSQL: 'Cloud SQL', BigQuery: 'BigQuery Datasets',
+  // OCI
+  ObjectStorage: 'Object Storage', Vault: 'Vault Keys', CloudGuard: 'Cloud Guard',
+  ContainerRegistry: 'Container Registry', FileStorage: 'File Storage',
+  LoadBalancer: 'Load Balancers', MySQL: 'MySQL Databases', OKE: 'OKE Clusters',
+  Functions: 'Functions', Logging: 'Logging Services', Notifications: 'Notifications',
+  // Alibaba
+  ECS_ALI: 'ECS Instances', OSS: 'OSS Buckets', RDS_ALI: 'RDS Databases',
+  ACK: 'ACK Clusters', ActionTrail: 'ActionTrail', RAM: 'RAM Resources',
+  APIGateway: 'API Gateways',
+  // Generic
+  Networking: 'Network Resources', Database: 'Database Resources',
+}
+
+function serviceLabel(svc: string): string {
+  return SERVICE_LABELS[svc] || svc
+}
+
 function parseEvidenceLog(raw?: string | null): { api_call?: string; response?: string } | null {
   if (!raw) return null
   try {
@@ -372,7 +404,7 @@ export default function InventoryPage() {
                     : 'bg-brand-gray-50 text-brand-gray-600 border-brand-gray-200 hover:border-brand-green'
                 )}
               >
-                {svc} ({count})
+                {serviceLabel(svc)} ({count})
               </button>
             ))}
           </div>
@@ -437,7 +469,7 @@ export default function InventoryPage() {
                               : 'bg-brand-gray-50 text-brand-gray-600 border-brand-gray-200'
                           )}
                         >
-                          {svc}: {info.total}
+                          {serviceLabel(svc)}: {info.total}
                           {info.at_risk > 0 && (
                             <span className="text-red-500 text-[10px]">({info.at_risk} fail)</span>
                           )}

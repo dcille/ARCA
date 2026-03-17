@@ -150,7 +150,66 @@ async def _gather_report_data(
     }
 
     # ── Compliance (basic) ─────────────────────────────────────────
-    compliance_summary = None  # Placeholder - extend when compliance detail is available
+    from scanner.compliance.frameworks import FRAMEWORKS, get_all_checks_for_framework
+
+    compliance_frameworks_data = []
+    for fw_id, fw in FRAMEWORKS.items():
+        fw_check_ids = get_all_checks_for_framework(fw_id)
+        # Calculate per-unique-check stats
+        fw_passed = 0
+        fw_failed = 0
+        for cid in (fw_check_ids if fw_check_ids else set()):
+            matching = [f for f in findings_dicts if f["check_id"] == cid]
+            if any(f["status"] == "FAIL" for f in matching):
+                fw_failed += 1
+            elif any(f["status"] == "PASS" for f in matching):
+                fw_passed += 1
+        fw_total = fw_passed + fw_failed
+        fw_rate = (fw_passed / fw_total * 100) if fw_total > 0 else 0
+        compliance_frameworks_data.append({
+            "framework": fw_id,
+            "name": fw["name"],
+            "total_checks": len(fw_check_ids),
+            "passed": fw_passed,
+            "failed": fw_failed,
+            "pass_rate": round(fw_rate, 1),
+        })
+
+    compliance_summary = {
+        "frameworks": sorted(compliance_frameworks_data, key=lambda x: x["pass_rate"])
+    }
+
+    # ── MITRE ATT&CK ─────────────────────────────────────────────
+    from scanner.mitre.attack_mapping import MITRE_TECHNIQUES, CHECK_TO_MITRE
+
+    technique_status = {}
+    for f in findings_dicts:
+        techs = CHECK_TO_MITRE.get(f.get("check_id", ""), [])
+        for tid in techs:
+            if tid not in technique_status:
+                technique_status[tid] = {"pass": 0, "fail": 0}
+            if f["status"] == "PASS":
+                technique_status[tid]["pass"] += 1
+            else:
+                technique_status[tid]["fail"] += 1
+
+    total_techniques = len(MITRE_TECHNIQUES)
+    assessed = len(technique_status)
+    at_risk_techniques = [
+        {"id": tid, "name": MITRE_TECHNIQUES.get(tid, {}).get("name", tid), "fail_count": s["fail"]}
+        for tid, s in technique_status.items() if s["fail"] > 0
+    ]
+    protected_count = sum(1 for s in technique_status.values() if s["fail"] == 0 and s["pass"] > 0)
+
+    mitre_summary = {
+        "total_techniques": total_techniques,
+        "assessed": assessed,
+        "protected": protected_count,
+        "at_risk": len(at_risk_techniques),
+        "not_assessed": total_techniques - assessed,
+        "coverage_rate": round((assessed / total_techniques * 100) if total_techniques > 0 else 0, 1),
+        "top_at_risk": sorted(at_risk_techniques, key=lambda x: x["fail_count"], reverse=True)[:10],
+    }
 
     filters = {
         "provider_type": provider_type,
@@ -166,6 +225,7 @@ async def _gather_report_data(
         "findings_by_severity": severity_breakdown,
         "findings_by_service": by_service,
         "compliance_summary": compliance_summary,
+        "mitre_summary": mitre_summary,
         "attack_paths_summary": attack_paths_summary,
         "attack_paths": attack_paths_list,
         "provider_info": provider_info,
@@ -189,6 +249,7 @@ async def download_executive_report(
         findings_by_severity=data["findings_by_severity"],
         findings_by_service=data["findings_by_service"],
         compliance_summary=data["compliance_summary"],
+        mitre_summary=data.get("mitre_summary"),
         attack_paths_summary=data["attack_paths_summary"],
         provider_info=data["provider_info"],
         filters=data["filters"],
@@ -229,6 +290,7 @@ async def download_technical_report(
         findings_by_severity=data["findings_by_severity"],
         findings_by_service=data["findings_by_service"],
         compliance_summary=data["compliance_summary"],
+        mitre_summary=data.get("mitre_summary"),
         attack_paths=data["attack_paths"],
         provider_info=data["provider_info"],
         filters=data["filters"],
