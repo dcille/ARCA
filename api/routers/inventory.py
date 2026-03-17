@@ -121,6 +121,55 @@ async def list_resources(
     return resources
 
 
+@router.get("/resources/{resource_id}/findings")
+async def resource_findings(
+    resource_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all findings for a specific resource."""
+    query = (
+        select(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id)
+        .where(Finding.resource_id == resource_id)
+        .order_by(
+            case(
+                (Finding.severity == "critical", 1),
+                (Finding.severity == "high", 2),
+                (Finding.severity == "medium", 3),
+                (Finding.severity == "low", 4),
+                else_=5,
+            ),
+            Finding.status.desc(),  # FAIL first
+        )
+    )
+
+    result = await db.execute(query)
+    findings = result.scalars().all()
+
+    return [
+        {
+            "id": f.id,
+            "check_id": f.check_id,
+            "check_title": f.check_title,
+            "check_description": f.check_description,
+            "status": f.status,
+            "severity": f.severity,
+            "service": f.service,
+            "region": f.region,
+            "resource_id": f.resource_id,
+            "resource_name": f.resource_name,
+            "remediation": f.remediation,
+            "remediation_url": f.remediation_url,
+            "evidence_log": f.evidence_log,
+            "status_extended": f.status_extended,
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+        }
+        for f in findings
+    ]
+
+
 @router.get("/summary")
 async def inventory_summary(
     provider_type: Optional[str] = None,
