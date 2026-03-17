@@ -144,6 +144,14 @@ class ApiClient {
     return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/stats`)
   }
 
+  async getComplianceFrameworkLibrary(frameworkId: string) {
+    return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/library`)
+  }
+
+  async updateProvider(id: string, data: any) {
+    return this.request<any>('PUT', `/api/v1/providers/${id}`, data)
+  }
+
   async discoverAccounts(providerId: string) {
     return this.request<any[]>('POST', `/api/v1/providers/${providerId}/discover-accounts`)
   }
@@ -315,6 +323,10 @@ class ApiClient {
 
   async getInventorySummary(params?: Record<string, string>) {
     return this.request<any>('GET', '/api/v1/inventory/summary', undefined, { params })
+  }
+
+  async getInventorySummaryByAccount() {
+    return this.request<any[]>('GET', '/api/v1/inventory/summary/by-account')
   }
 
   async getResourceFindings(resourceId: string) {

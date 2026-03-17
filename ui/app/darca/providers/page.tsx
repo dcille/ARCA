@@ -6,7 +6,7 @@ import Badge from '@/components/ui/Badge'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { TrashIcon, PlusIcon, BuildingOffice2Icon, UserIcon, MagnifyingGlassIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline'
+import { TrashIcon, PlusIcon, BuildingOffice2Icon, UserIcon, MagnifyingGlassIcon, ChevronDownIcon, ChevronRightIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
 
 const PROVIDER_TYPES = [
   { id: 'aws', name: 'Amazon Web Services', color: 'bg-[#FF9900]' },
@@ -22,6 +22,9 @@ export default function ProvidersPage() {
   const [childAccounts, setChildAccounts] = useState<Record<string, any[]>>({})
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingProvider, setEditingProvider] = useState<any>(null)
+  const [editForm, setEditForm] = useState<any>({})
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set())
   const [discoveringAccounts, setDiscoveringAccounts] = useState<string | null>(null)
   const [discoveredAccounts, setDiscoveredAccounts] = useState<any[]>([])
@@ -151,6 +154,110 @@ export default function ProvidersPage() {
     }
   }
 
+  const openEditModal = (provider: any) => {
+    setEditingProvider(provider)
+    setEditForm({
+      alias: provider.alias || '',
+      region: provider.region || '',
+      // Credential fields start empty — only filled values will be sent
+      access_key_id: '',
+      secret_access_key: '',
+      session_token: '',
+      subscription_id: '',
+      tenant_id: '',
+      client_id: '',
+      client_secret: '',
+      project_id: '',
+      service_account_key: '',
+      tenancy_ocid: '',
+      user_ocid: '',
+      fingerprint: '',
+      private_key: '',
+      kubeconfig: '',
+      alibaba_access_key_id: '',
+      alibaba_access_key_secret: '',
+    })
+    setShowEditModal(true)
+  }
+
+  const handleEdit = async () => {
+    if (!editingProvider) return
+    try {
+      const update: any = { alias: editForm.alias, region: editForm.region || undefined }
+
+      // Only include credentials if the user filled in any credential field
+      let credentials: any = {}
+      let hasCredentials = false
+      switch (editingProvider.provider_type) {
+        case 'aws':
+          if (editForm.access_key_id && editForm.secret_access_key) {
+            credentials = {
+              access_key_id: editForm.access_key_id,
+              secret_access_key: editForm.secret_access_key,
+              session_token: editForm.session_token || undefined,
+            }
+            hasCredentials = true
+          }
+          break
+        case 'azure':
+          if (editForm.client_id && editForm.client_secret) {
+            credentials = {
+              subscription_id: editForm.subscription_id,
+              tenant_id: editForm.tenant_id,
+              client_id: editForm.client_id,
+              client_secret: editForm.client_secret,
+            }
+            hasCredentials = true
+          }
+          break
+        case 'gcp':
+          if (editForm.project_id || editForm.service_account_key) {
+            credentials = {
+              project_id: editForm.project_id,
+              service_account_key: editForm.service_account_key,
+            }
+            hasCredentials = true
+          }
+          break
+        case 'oci':
+          if (editForm.tenancy_ocid && editForm.private_key) {
+            credentials = {
+              tenancy_ocid: editForm.tenancy_ocid,
+              user_ocid: editForm.user_ocid,
+              fingerprint: editForm.fingerprint,
+              private_key: editForm.private_key,
+            }
+            hasCredentials = true
+          }
+          break
+        case 'alibaba':
+          if (editForm.alibaba_access_key_id && editForm.alibaba_access_key_secret) {
+            credentials = {
+              access_key_id: editForm.alibaba_access_key_id,
+              access_key_secret: editForm.alibaba_access_key_secret,
+            }
+            hasCredentials = true
+          }
+          break
+        case 'kubernetes':
+          if (editForm.kubeconfig) {
+            credentials = { kubeconfig: editForm.kubeconfig }
+            hasCredentials = true
+          }
+          break
+      }
+      if (hasCredentials) update.credentials = credentials
+
+      await api.updateProvider(editingProvider.id, update)
+      toast.success('Provider updated!')
+      setShowEditModal(false)
+      setEditingProvider(null)
+      loadProviders()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update provider')
+    }
+  }
+
   const handleDiscoverAccounts = async (providerId: string) => {
     setDiscoveringAccounts(providerId)
     try {
@@ -237,9 +344,14 @@ export default function ProvidersPage() {
                         <p className="text-xs text-brand-gray-400">{ptype?.name || p.provider_type}</p>
                       </div>
                     </div>
-                    <button onClick={() => handleDelete(p.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-brand-gray-400 hover:text-red-500">
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => openEditModal(p)} className="p-1.5 rounded-lg hover:bg-blue-50 text-brand-gray-400 hover:text-blue-500" title="Edit provider">
+                        <PencilSquareIcon className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(p.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-brand-gray-400 hover:text-red-500" title="Delete provider">
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between mt-4">
@@ -470,6 +582,136 @@ export default function ProvidersPage() {
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowModal(false)} className="flex-1 btn-outline">Cancel</button>
               <button onClick={handleCreate} disabled={!form.alias} className="flex-1 btn-primary disabled:opacity-50">Add Provider</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Provider Modal */}
+      {showEditModal && editingProvider && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-brand-navy mb-1">Edit Provider</h3>
+            <p className="text-xs text-brand-gray-400 mb-4">
+              Update alias, region, or credentials for <strong>{editingProvider.alias}</strong> ({editingProvider.provider_type?.toUpperCase()}).
+              Leave credential fields empty to keep existing values.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Alias</label>
+                <input
+                  type="text"
+                  value={editForm.alias}
+                  onChange={(e) => setEditForm({ ...editForm, alias: e.target.value })}
+                  className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm"
+                />
+              </div>
+
+              {editingProvider.provider_type === 'aws' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Access Key ID <span className="text-brand-gray-400 font-normal">(leave empty to keep)</span></label>
+                    <input type="text" value={editForm.access_key_id} onChange={(e) => setEditForm({ ...editForm, access_key_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="••••••••" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Secret Access Key <span className="text-brand-gray-400 font-normal">(leave empty to keep)</span></label>
+                    <input type="password" value={editForm.secret_access_key} onChange={(e) => setEditForm({ ...editForm, secret_access_key: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="••••••••" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Region</label>
+                    <input type="text" value={editForm.region} onChange={(e) => setEditForm({ ...editForm, region: e.target.value })} placeholder="us-east-1" className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                  </div>
+                </>
+              )}
+
+              {editingProvider.provider_type === 'azure' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Subscription ID</label>
+                    <input type="text" value={editForm.subscription_id} onChange={(e) => setEditForm({ ...editForm, subscription_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="Leave empty to keep" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Tenant ID</label>
+                    <input type="text" value={editForm.tenant_id} onChange={(e) => setEditForm({ ...editForm, tenant_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="Leave empty to keep" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Client ID</label>
+                    <input type="text" value={editForm.client_id} onChange={(e) => setEditForm({ ...editForm, client_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="Leave empty to keep" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Client Secret</label>
+                    <input type="password" value={editForm.client_secret} onChange={(e) => setEditForm({ ...editForm, client_secret: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="Leave empty to keep" />
+                  </div>
+                </>
+              )}
+
+              {editingProvider.provider_type === 'gcp' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Project ID</label>
+                    <input type="text" value={editForm.project_id} onChange={(e) => setEditForm({ ...editForm, project_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="Leave empty to keep" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Service Account Key (JSON)</label>
+                    <textarea value={editForm.service_account_key} onChange={(e) => setEditForm({ ...editForm, service_account_key: e.target.value })} rows={4} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm font-mono" placeholder="Leave empty to keep" />
+                  </div>
+                </>
+              )}
+
+              {editingProvider.provider_type === 'oci' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Tenancy OCID</label>
+                    <input type="text" value={editForm.tenancy_ocid} onChange={(e) => setEditForm({ ...editForm, tenancy_ocid: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="Leave empty to keep" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">User OCID</label>
+                    <input type="text" value={editForm.user_ocid} onChange={(e) => setEditForm({ ...editForm, user_ocid: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="Leave empty to keep" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">API Key Fingerprint</label>
+                    <input type="text" value={editForm.fingerprint} onChange={(e) => setEditForm({ ...editForm, fingerprint: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="Leave empty to keep" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Private Key (PEM)</label>
+                    <textarea value={editForm.private_key} onChange={(e) => setEditForm({ ...editForm, private_key: e.target.value })} rows={4} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm font-mono" placeholder="Leave empty to keep" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Region</label>
+                    <input type="text" value={editForm.region} onChange={(e) => setEditForm({ ...editForm, region: e.target.value })} placeholder="us-ashburn-1" className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                  </div>
+                </>
+              )}
+
+              {editingProvider.provider_type === 'alibaba' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Access Key ID</label>
+                    <input type="text" value={editForm.alibaba_access_key_id} onChange={(e) => setEditForm({ ...editForm, alibaba_access_key_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="Leave empty to keep" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Access Key Secret</label>
+                    <input type="password" value={editForm.alibaba_access_key_secret} onChange={(e) => setEditForm({ ...editForm, alibaba_access_key_secret: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="Leave empty to keep" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Region</label>
+                    <input type="text" value={editForm.region} onChange={(e) => setEditForm({ ...editForm, region: e.target.value })} placeholder="cn-hangzhou" className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                  </div>
+                </>
+              )}
+
+              {editingProvider.provider_type === 'kubernetes' && (
+                <div>
+                  <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Kubeconfig (YAML)</label>
+                  <textarea value={editForm.kubeconfig} onChange={(e) => setEditForm({ ...editForm, kubeconfig: e.target.value })} rows={6} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm font-mono" placeholder="Leave empty to keep current" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => { setShowEditModal(false); setEditingProvider(null) }} className="flex-1 btn-outline">Cancel</button>
+              <button onClick={handleEdit} disabled={!editForm.alias} className="flex-1 btn-primary disabled:opacity-50">Save Changes</button>
             </div>
           </div>
         </div>

@@ -27,6 +27,7 @@ def run_cloud_scan(self, scan_id: str, provider_id: str, services=None, regions=
     from api.models.finding import Finding
     from api.services.auth_service import decrypt_credentials
     from scanner.mitre.attack_mapping import CHECK_TO_MITRE, CHECK_DESCRIPTIONS, CHECK_EVIDENCE
+    from scanner.compliance.frameworks import get_frameworks_for_check
 
     session = get_sync_session()
     try:
@@ -84,7 +85,9 @@ def run_cloud_scan(self, scan_id: str, provider_id: str, services=None, regions=
                 status_extended=result.get("status_extended"),
                 remediation=result.get("remediation"),
                 remediation_url=result.get("remediation_url"),
-                compliance_frameworks=str(result.get("compliance_frameworks", [])),
+                compliance_frameworks=json.dumps(
+                    list(set(result.get("compliance_frameworks", []) + get_frameworks_for_check(check_id)))
+                ),
                 check_description=check_desc,
                 evidence_log=evidence,
                 mitre_techniques=json.dumps(mitre_techs) if mitre_techs else None,
