@@ -9,6 +9,7 @@ from api.database import engine, Base
 from api.routers import (
     auth, providers, scans, findings, compliance, saas, dashboard,
     attack_paths, reports, inventory, schedules, notifications, integrations,
+    organizations,
 )
 
 
@@ -48,6 +49,7 @@ app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["Inventor
 app.include_router(schedules.router, prefix="/api/v1/schedules", tags=["Schedules"])
 app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
 app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["Integrations"])
+app.include_router(organizations.router, prefix="/api/v1/organizations", tags=["Organizations"])
 
 
 @app.get("/api/v1/health")

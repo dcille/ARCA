@@ -136,6 +136,22 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/compliance/summary', undefined, { params })
   }
 
+  async getComplianceFrameworkChecks(frameworkId: string, params?: Record<string, string>) {
+    return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/checks`, undefined, { params })
+  }
+
+  async getComplianceFrameworkStats(frameworkId: string) {
+    return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/stats`)
+  }
+
+  async discoverAccounts(providerId: string) {
+    return this.request<any[]>('POST', `/api/v1/providers/${providerId}/discover-accounts`)
+  }
+
+  async getChildAccounts(providerId: string) {
+    return this.request<any[]>('GET', `/api/v1/providers/${providerId}/accounts`)
+  }
+
   // SaaS
   async getSaaSConnections(providerType?: string) {
     const params = providerType ? { provider_type: providerType } : undefined
@@ -299,6 +315,35 @@ class ApiClient {
 
   async getInventorySummary(params?: Record<string, string>) {
     return this.request<any>('GET', '/api/v1/inventory/summary', undefined, { params })
+  }
+
+  // Organizations
+  async createOrganization(data: { name: string; slug: string }) {
+    return this.request<any>('POST', '/api/v1/organizations', data)
+  }
+
+  async getCurrentOrganization() {
+    return this.request<any>('GET', '/api/v1/organizations/current')
+  }
+
+  async updateOrganization(data: any) {
+    return this.request<any>('PUT', '/api/v1/organizations/current', data)
+  }
+
+  async getOrganizationMembers() {
+    return this.request<any[]>('GET', '/api/v1/organizations/current/members')
+  }
+
+  async inviteMember(email: string, role?: string) {
+    return this.request<any>('POST', '/api/v1/organizations/current/members/invite', { email, role })
+  }
+
+  async removeMember(userId: string) {
+    return this.request<void>('DELETE', `/api/v1/organizations/current/members/${userId}`)
+  }
+
+  async updateMemberRole(userId: string, role: string) {
+    return this.request<any>('PUT', `/api/v1/organizations/current/members/${userId}/role`, { role })
   }
 }
 

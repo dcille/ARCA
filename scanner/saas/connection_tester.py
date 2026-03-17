@@ -11,6 +11,10 @@ async def test_saas_connection(provider_type: str, credentials: dict) -> tuple[b
         "m365": _test_m365,
         "salesforce": _test_salesforce,
         "snowflake": _test_snowflake,
+        "github": _test_github,
+        "google_workspace": _test_google_workspace,
+        "cloudflare": _test_cloudflare,
+        "openstack": _test_openstack,
     }
 
     tester = testers.get(provider_type)
@@ -89,3 +93,116 @@ async def _test_snowflake(credentials: dict) -> tuple[bool, str]:
         return True, "Successfully connected to Snowflake"
     except Exception as e:
         return False, f"Snowflake connection failed: {str(e)}"
+
+
+async def _test_github(credentials: dict) -> tuple[bool, str]:
+    import httpx
+    headers = {
+        "Authorization": f"token {credentials['personal_access_token']}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    async with httpx.AsyncClient(timeout=15) as client:
+        response = await client.get("https://api.github.com/user", headers=headers)
+    if response.status_code == 200:
+        username = response.json().get("login", "unknown")
+        return True, f"Successfully authenticated with GitHub as {username}"
+    return False, f"GitHub authentication failed: {response.status_code}"
+
+
+async def _test_google_workspace(credentials: dict) -> tuple[bool, str]:
+    import httpx
+    import json
+    import time
+    import hashlib
+    import base64
+
+    try:
+        sa_info = json.loads(credentials["service_account_json"])
+        # Validate required fields are present in the service account JSON
+        required_fields = ["client_email", "token_uri", "private_key"]
+        for field in required_fields:
+            if field not in sa_info:
+                return False, f"Service account JSON missing required field: {field}"
+
+        # Use Google OAuth2 token endpoint to verify credentials
+        async with httpx.AsyncClient(timeout=15) as client:
+            # Build a JWT for service account auth
+            import jwt as pyjwt
+
+            now = int(time.time())
+            payload = {
+                "iss": sa_info["client_email"],
+                "sub": credentials["delegated_admin_email"],
+                "scope": "https://www.googleapis.com/auth/admin.directory.user.readonly",
+                "aud": sa_info["token_uri"],
+                "iat": now,
+                "exp": now + 3600,
+            }
+            signed_jwt = pyjwt.encode(payload, sa_info["private_key"], algorithm="RS256")
+            response = await client.post(
+                sa_info["token_uri"],
+                data={
+                    "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                    "assertion": signed_jwt,
+                },
+            )
+        if response.status_code == 200 and "access_token" in response.json():
+            return True, "Successfully authenticated with Google Workspace"
+        return False, f"Google Workspace authentication failed: {response.status_code}"
+    except json.JSONDecodeError:
+        return False, "Invalid service account JSON format"
+    except ImportError:
+        return False, "PyJWT library required for Google Workspace authentication"
+    except Exception as e:
+        return False, f"Google Workspace connection failed: {str(e)}"
+
+
+async def _test_cloudflare(credentials: dict) -> tuple[bool, str]:
+    import httpx
+    headers = {
+        "Authorization": f"Bearer {credentials['api_token']}",
+        "Content-Type": "application/json",
+    }
+    async with httpx.AsyncClient(timeout=15) as client:
+        response = await client.get(
+            "https://api.cloudflare.com/client/v4/user/tokens/verify",
+            headers=headers,
+        )
+    if response.status_code == 200:
+        data = response.json()
+        if data.get("success"):
+            return True, "Successfully authenticated with Cloudflare"
+    return False, f"Cloudflare authentication failed: {response.status_code}"
+
+
+async def _test_openstack(credentials: dict) -> tuple[bool, str]:
+    import httpx
+    auth_payload = {
+        "auth": {
+            "identity": {
+                "methods": ["password"],
+                "password": {
+                    "user": {
+                        "name": credentials["username"],
+                        "password": credentials["password"],
+                        "domain": {"name": credentials.get("user_domain_name", "Default")},
+                    }
+                },
+            },
+            "scope": {
+                "project": {
+                    "name": credentials["project_name"],
+                    "domain": {"name": credentials.get("project_domain_name", "Default")},
+                }
+            },
+        }
+    }
+    auth_url = credentials["auth_url"].rstrip("/")
+    async with httpx.AsyncClient(timeout=15) as client:
+        response = await client.post(
+            f"{auth_url}/auth/tokens",
+            json=auth_payload,
+        )
+    if response.status_code in (200, 201) and "X-Subject-Token" in response.headers:
+        return True, "Successfully authenticated with OpenStack"
+    return False, f"OpenStack authentication failed: {response.status_code}"
