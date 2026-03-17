@@ -148,6 +148,8 @@ async def framework_checks(
     result = await db.execute(query)
     findings = result.scalars().all()
 
+    from scanner.mitre.attack_mapping import CHECK_DESCRIPTIONS, CHECK_EVIDENCE
+
     return {
         "framework": {
             "id": framework_id,
@@ -174,8 +176,8 @@ async def framework_checks(
                 "status_extended": f.status_extended,
                 "remediation": f.remediation,
                 "remediation_url": f.remediation_url,
-                "check_description": f.check_description,
-                "evidence_log": f.evidence_log,
+                "check_description": f.check_description or CHECK_DESCRIPTIONS.get(f.check_id, ""),
+                "evidence_log": f.evidence_log or CHECK_EVIDENCE.get(f.check_id, ""),
                 "mitre_techniques": f.mitre_techniques,
             }
             for f in findings

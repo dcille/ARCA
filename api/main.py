@@ -1,4 +1,5 @@
 """D-ARCA API - Asset Risk & Cloud Analysis"""
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -12,11 +13,17 @@ from api.routers import (
     organizations, mitre,
 )
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all, checkfirst=True)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all, checkfirst=True)
+    except Exception as e:
+        # Multiple gunicorn workers may race to create tables - safe to ignore
+        logger.warning(f"Table creation warning (likely concurrent workers): {e}")
     yield
 
 
