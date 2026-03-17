@@ -317,6 +317,10 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/inventory/summary', undefined, { params })
   }
 
+  async getResourceFindings(resourceId: string) {
+    return this.request<any[]>('GET', `/api/v1/inventory/resources/${encodeURIComponent(resourceId)}/findings`)
+  }
+
   // MITRE ATT&CK
   async getMitreMatrix(params?: Record<string, string>) {
     return this.request<any>('GET', '/api/v1/mitre/matrix', undefined, { params })

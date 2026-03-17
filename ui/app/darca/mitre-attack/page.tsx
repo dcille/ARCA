@@ -3,7 +3,12 @@
 import { useEffect, useState } from 'react'
 import Header from '@/components/layout/Header'
 import { api } from '@/lib/api'
-import { XMarkIcon } from '@heroicons/react/24/outline'
+import {
+  XMarkIcon,
+  ArrowPathIcon,
+  FunnelIcon,
+  ShieldCheckIcon,
+} from '@heroicons/react/24/outline'
 
 const TACTIC_COLORS: Record<string, string> = {
   'initial-access': 'border-t-red-500',
@@ -60,23 +65,63 @@ function TechniqueCell({
 export default function MitreAttackPage() {
   const [matrixData, setMatrixData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [analyzing, setAnalyzing] = useState(false)
   const [selectedTechnique, setSelectedTechnique] = useState<string | null>(null)
   const [techniqueDetail, setTechniqueDetail] = useState<any>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [providers, setProviders] = useState<any[]>([])
+  const [selectedProvider, setSelectedProvider] = useState('')
+  const [lastAnalyzed, setLastAnalyzed] = useState<string | null>(null)
+
+  const loadMatrix = async (providerId?: string) => {
+    setLoading(true)
+    try {
+      const params: Record<string, string> = {}
+      if (providerId) params.provider_id = providerId
+      const data = await api.getMitreMatrix(params)
+      setMatrixData(data)
+      setLastAnalyzed(new Date().toLocaleTimeString())
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const runAnalysis = async () => {
+    setAnalyzing(true)
+    setSelectedTechnique(null)
+    setTechniqueDetail(null)
+    try {
+      const params: Record<string, string> = {}
+      if (selectedProvider) params.provider_id = selectedProvider
+      const data = await api.getMitreMatrix(params)
+      setMatrixData(data)
+      setLastAnalyzed(new Date().toLocaleTimeString())
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
 
   useEffect(() => {
-    const load = async () => {
+    const loadProviders = async () => {
       try {
-        const data = await api.getMitreMatrix()
-        setMatrixData(data)
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
+        const data = await api.getProviders()
+        setProviders(data)
+      } catch {}
     }
-    load()
+    loadProviders()
+    loadMatrix()
   }, [])
+
+  const handleProviderChange = (providerId: string) => {
+    setSelectedProvider(providerId)
+    setSelectedTechnique(null)
+    setTechniqueDetail(null)
+    loadMatrix(providerId || undefined)
+  }
 
   const handleTechniqueClick = async (techId: string) => {
     if (selectedTechnique === techId) {
@@ -87,7 +132,9 @@ export default function MitreAttackPage() {
     setSelectedTechnique(techId)
     setDetailLoading(true)
     try {
-      const detail = await api.getMitreTechnique(techId)
+      const params: Record<string, string> = {}
+      if (selectedProvider) params.provider_id = selectedProvider
+      const detail = await api.getMitreTechnique(techId, params)
       setTechniqueDetail(detail)
     } catch (err) {
       console.error(err)
@@ -101,12 +148,52 @@ export default function MitreAttackPage() {
     setTechniqueDetail(null)
   }
 
+  const hasData = matrixData?.summary?.assessed > 0
+
   return (
     <div>
       <Header
         title="MITRE ATT&CK Matrix"
         subtitle="Cloud security posture mapped to MITRE ATT&CK framework techniques"
       />
+
+      {/* Controls Bar */}
+      <div className="card mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <FunnelIcon className="w-4 h-4 text-brand-gray-400" />
+              <span className="text-sm font-semibold text-brand-navy">Provider</span>
+            </div>
+            <select
+              value={selectedProvider}
+              onChange={(e) => handleProviderChange(e.target.value)}
+              className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none min-w-[180px]"
+            >
+              <option value="">All Providers</option>
+              {providers.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.alias || p.provider_type?.toUpperCase()} ({p.provider_type})
+                </option>
+              ))}
+            </select>
+            {lastAnalyzed && (
+              <span className="text-xs text-brand-gray-400">
+                Last analyzed: {lastAnalyzed}
+              </span>
+            )}
+          </div>
+
+          <button
+            onClick={runAnalysis}
+            disabled={analyzing}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-green text-white text-sm font-semibold rounded-lg hover:bg-brand-green/90 transition-colors disabled:opacity-60 shadow-sm"
+          >
+            <ArrowPathIcon className={`w-4 h-4 ${analyzing ? 'animate-spin' : ''}`} />
+            {analyzing ? 'Analyzing...' : 'Run Analysis'}
+          </button>
+        </div>
+      </div>
 
       {/* Summary Stats */}
       {matrixData?.summary && (
@@ -161,6 +248,22 @@ export default function MitreAttackPage() {
       {loading ? (
         <div className="card animate-pulse">
           <div className="h-96 bg-brand-gray-100 rounded" />
+        </div>
+      ) : !hasData ? (
+        <div className="card text-center py-16">
+          <ShieldCheckIcon className="w-16 h-16 mx-auto text-brand-gray-300 mb-4" />
+          <h3 className="text-lg font-semibold text-brand-navy mb-2">No Scan Data Available</h3>
+          <p className="text-sm text-brand-gray-400 mb-6 max-w-md mx-auto">
+            Run a cloud security scan first, then click &quot;Run Analysis&quot; to map your findings against the MITRE ATT&CK framework.
+          </p>
+          <button
+            onClick={runAnalysis}
+            disabled={analyzing}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-green text-white text-sm font-semibold rounded-lg hover:bg-brand-green/90 transition-colors disabled:opacity-60"
+          >
+            <ArrowPathIcon className={`w-4 h-4 ${analyzing ? 'animate-spin' : ''}`} />
+            {analyzing ? 'Analyzing...' : 'Run Analysis'}
+          </button>
         </div>
       ) : (
         <div className="card p-0 overflow-hidden">
