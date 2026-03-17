@@ -6,20 +6,26 @@ import Badge from '@/components/ui/Badge'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { TrashIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { TrashIcon, PlusIcon, BuildingOffice2Icon, UserIcon, MagnifyingGlassIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline'
 
 const PROVIDER_TYPES = [
   { id: 'aws', name: 'Amazon Web Services', color: 'bg-[#FF9900]' },
   { id: 'azure', name: 'Microsoft Azure', color: 'bg-[#0078D4]' },
   { id: 'gcp', name: 'Google Cloud Platform', color: 'bg-[#4285F4]' },
   { id: 'oci', name: 'Oracle Cloud Infrastructure', color: 'bg-[#C74634]' },
+  { id: 'alibaba', name: 'Alibaba Cloud', color: 'bg-[#FF6A00]' },
   { id: 'kubernetes', name: 'Kubernetes', color: 'bg-[#326CE5]' },
 ]
 
 export default function ProvidersPage() {
   const [providers, setProviders] = useState<any[]>([])
+  const [childAccounts, setChildAccounts] = useState<Record<string, any[]>>({})
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set())
+  const [discoveringAccounts, setDiscoveringAccounts] = useState<string | null>(null)
+  const [discoveredAccounts, setDiscoveredAccounts] = useState<any[]>([])
+  const [showDiscoverModal, setShowDiscoverModal] = useState(false)
   const [form, setForm] = useState({
     provider_type: 'aws',
     alias: '',
@@ -38,12 +44,28 @@ export default function ProvidersPage() {
     private_key: '',
     kubeconfig: '',
     region: '',
+    alibaba_access_key_id: '',
+    alibaba_access_key_secret: '',
+    account_type: 'single',
   })
 
   const loadProviders = async () => {
     try {
       const data = await api.getProviders()
       setProviders(data)
+
+      // Load child accounts for management/organization providers
+      const children: Record<string, any[]> = {}
+      for (const p of data) {
+        if (p.is_management_account) {
+          try {
+            children[p.id] = await api.getChildAccounts(p.id)
+          } catch {
+            children[p.id] = []
+          }
+        }
+      }
+      setChildAccounts(children)
     } catch (err) {
       console.error(err)
     } finally {
@@ -86,19 +108,32 @@ export default function ProvidersPage() {
             private_key: form.private_key,
           }
           break
+        case 'alibaba':
+          credentials = {
+            access_key_id: form.alibaba_access_key_id,
+            access_key_secret: form.alibaba_access_key_secret,
+          }
+          break
         case 'kubernetes':
           credentials = { kubeconfig: form.kubeconfig }
           break
       }
 
-      await api.createProvider({
+      const newProvider = await api.createProvider({
         provider_type: form.provider_type,
         alias: form.alias,
         credentials,
         region: form.region || undefined,
+        account_type: form.account_type,
       })
       toast.success('Provider added!')
       setShowModal(false)
+
+      // If it's an organization account, prompt to discover accounts
+      if (form.account_type === 'organization') {
+        handleDiscoverAccounts(newProvider.id)
+      }
+
       loadProviders()
     } catch (err: any) {
       toast.error(err.message || 'Failed to add provider')
@@ -115,6 +150,34 @@ export default function ProvidersPage() {
       toast.error(err.message)
     }
   }
+
+  const handleDiscoverAccounts = async (providerId: string) => {
+    setDiscoveringAccounts(providerId)
+    try {
+      const accounts = await api.discoverAccounts(providerId)
+      setDiscoveredAccounts(accounts)
+      setShowDiscoverModal(true)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to discover accounts')
+    } finally {
+      setDiscoveringAccounts(null)
+    }
+  }
+
+  const toggleProviderExpand = (providerId: string) => {
+    setExpandedProviders((prev) => {
+      const next = new Set(prev)
+      if (next.has(providerId)) {
+        next.delete(providerId)
+      } else {
+        next.add(providerId)
+      }
+      return next
+    })
+  }
+
+  // Filter out child accounts from the top-level grid (show only parents / standalone)
+  const topLevelProviders = providers.filter((p) => !p.parent_provider_id)
 
   return (
     <div>
@@ -142,28 +205,105 @@ export default function ProvidersPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {providers.map((p) => {
+          {topLevelProviders.map((p) => {
             const ptype = PROVIDER_TYPES.find((t) => t.id === p.provider_type)
+            const isManagement = p.is_management_account
+            const children = childAccounts[p.id] || []
+            const isExpanded = expandedProviders.has(p.id)
+
             return (
-              <div key={p.id} className="card hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg ${ptype?.color || 'bg-brand-gray-400'} flex items-center justify-center`}>
-                      <span className="text-white font-bold text-sm">{p.provider_type.slice(0, 3).toUpperCase()}</span>
+              <div key={p.id} className="space-y-0">
+                <div className={`card hover:shadow-md transition-shadow ${isManagement ? 'border-l-4 border-l-brand-green' : ''}`}>
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-lg ${ptype?.color || 'bg-brand-gray-400'} flex items-center justify-center`}>
+                        <span className="text-white font-bold text-sm">{p.provider_type.slice(0, 3).toUpperCase()}</span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-brand-navy">{p.alias}</h3>
+                          {isManagement ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-brand-green/10 text-brand-green">
+                              <BuildingOffice2Icon className="w-3 h-3" />
+                              Org
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-brand-gray-100 text-brand-gray-500">
+                              <UserIcon className="w-3 h-3" />
+                              Single
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-brand-gray-400">{ptype?.name || p.provider_type}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-brand-navy">{p.alias}</h3>
-                      <p className="text-xs text-brand-gray-400">{ptype?.name || p.provider_type}</p>
-                    </div>
+                    <button onClick={() => handleDelete(p.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-brand-gray-400 hover:text-red-500">
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button onClick={() => handleDelete(p.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-brand-gray-400 hover:text-red-500">
-                    <TrashIcon className="w-4 h-4" />
-                  </button>
+
+                  <div className="flex items-center justify-between mt-4">
+                    <Badge type="status" value={p.status} />
+                    <span className="text-xs text-brand-gray-400">{formatDate(p.created_at)}</span>
+                  </div>
+
+                  {/* Management account actions */}
+                  {isManagement && (
+                    <div className="mt-4 pt-3 border-t border-brand-gray-100 flex items-center justify-between">
+                      <button
+                        onClick={() => handleDiscoverAccounts(p.id)}
+                        disabled={discoveringAccounts === p.id}
+                        className="flex items-center gap-1.5 text-xs font-medium text-brand-green hover:text-brand-green/80 disabled:opacity-50"
+                      >
+                        <MagnifyingGlassIcon className="w-3.5 h-3.5" />
+                        {discoveringAccounts === p.id ? 'Discovering...' : 'Discover Accounts'}
+                      </button>
+                      {children.length > 0 && (
+                        <button
+                          onClick={() => toggleProviderExpand(p.id)}
+                          className="flex items-center gap-1 text-xs text-brand-gray-500 hover:text-brand-navy"
+                        >
+                          {isExpanded ? (
+                            <ChevronDownIcon className="w-3.5 h-3.5" />
+                          ) : (
+                            <ChevronRightIcon className="w-3.5 h-3.5" />
+                          )}
+                          {children.length} child account{children.length !== 1 ? 's' : ''}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center justify-between mt-4">
-                  <Badge type="status" value={p.status} />
-                  <span className="text-xs text-brand-gray-400">{formatDate(p.created_at)}</span>
-                </div>
+
+                {/* Child accounts nested under parent */}
+                {isManagement && isExpanded && children.length > 0 && (
+                  <div className="ml-4 mt-2 space-y-2">
+                    {children.map((child) => {
+                      const ctype = PROVIDER_TYPES.find((t) => t.id === child.provider_type)
+                      return (
+                        <div key={child.id} className="card py-3 px-4 border-l-4 border-l-brand-gray-300">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-7 h-7 rounded ${ctype?.color || 'bg-brand-gray-400'} flex items-center justify-center`}>
+                                <span className="text-white font-bold text-[10px]">{child.provider_type.slice(0, 3).toUpperCase()}</span>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-brand-navy">{child.alias}</p>
+                                <p className="text-xs text-brand-gray-400 font-mono">{child.account_id || 'No account ID'}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge type="status" value={child.status} />
+                              <button onClick={() => handleDelete(child.id)} className="p-1 rounded hover:bg-red-50 text-brand-gray-400 hover:text-red-500">
+                                <TrashIcon className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )
           })}
@@ -189,6 +329,31 @@ export default function ProvidersPage() {
                   ))}
                 </select>
               </div>
+
+              {form.provider_type !== 'kubernetes' && (
+                <div>
+                  <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Account Type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'single', label: 'Single Account', desc: 'Scan a single account or subscription' },
+                      { id: 'organization', label: 'Organization', desc: 'Management/root account with child accounts' },
+                    ].map((at) => (
+                      <button
+                        key={at.id}
+                        onClick={() => setForm({ ...form, account_type: at.id })}
+                        className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                          form.account_type === at.id
+                            ? 'border-brand-green bg-brand-green/5'
+                            : 'border-brand-gray-200 hover:border-brand-gray-300'
+                        }`}
+                      >
+                        <span className="text-sm font-medium text-brand-navy">{at.label}</span>
+                        <p className="text-xs text-brand-gray-400 mt-0.5">{at.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Alias</label>
@@ -277,6 +442,23 @@ export default function ProvidersPage() {
                 </>
               )}
 
+              {form.provider_type === 'alibaba' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Access Key ID</label>
+                    <input type="text" value={form.alibaba_access_key_id} onChange={(e) => setForm({ ...form, alibaba_access_key_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Access Key Secret</label>
+                    <input type="password" value={form.alibaba_access_key_secret} onChange={(e) => setForm({ ...form, alibaba_access_key_secret: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Region</label>
+                    <input type="text" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} placeholder="cn-hangzhou" className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                  </div>
+                </>
+              )}
+
               {form.provider_type === 'kubernetes' && (
                 <div>
                   <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Kubeconfig (YAML)</label>
@@ -288,6 +470,50 @@ export default function ProvidersPage() {
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowModal(false)} className="flex-1 btn-outline">Cancel</button>
               <button onClick={handleCreate} disabled={!form.alias} className="flex-1 btn-primary disabled:opacity-50">Add Provider</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Discover Accounts Modal */}
+      {showDiscoverModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-brand-navy mb-2">Discovered Accounts</h3>
+            <p className="text-sm text-brand-gray-400 mb-4">
+              The following child accounts/subscriptions were discovered under this organization.
+            </p>
+
+            {discoveredAccounts.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-brand-gray-400">No child accounts discovered.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {discoveredAccounts.map((acct, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-brand-gray-50 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-brand-navy">{acct.name}</p>
+                      <p className="text-xs text-brand-gray-400 font-mono">{acct.account_id}</p>
+                    </div>
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${acct.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                      {acct.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowDiscoverModal(false)
+                  setDiscoveredAccounts([])
+                }}
+                className="flex-1 btn-primary"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

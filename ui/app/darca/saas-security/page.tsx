@@ -24,6 +24,10 @@ const SAAS_PROVIDERS = [
   { id: 'm365', name: 'Microsoft 365', icon: 'M365', color: 'bg-[#0078D4]', checks: 37 },
   { id: 'salesforce', name: 'Salesforce', icon: 'SF', color: 'bg-[#00A1E0]', checks: 18 },
   { id: 'snowflake', name: 'Snowflake', icon: 'SN*', color: 'bg-[#29B5E8]', checks: 21 },
+  { id: 'github', name: 'GitHub', icon: 'GH', color: 'bg-[#24292F]', checks: 30 },
+  { id: 'google_workspace', name: 'Google Workspace', icon: 'GW', color: 'bg-[#4285F4]', checks: 25 },
+  { id: 'cloudflare', name: 'Cloudflare', icon: 'CF', color: 'bg-[#F38020]', checks: 22 },
+  { id: 'openstack', name: 'OpenStack', icon: 'OS', color: 'bg-[#ED1944]', checks: 24 },
 ]
 
 type Tab = 'overview' | 'connections' | 'findings'
@@ -103,6 +107,27 @@ export default function SaaSSecurityPage() {
       { key: 'account_id', label: 'Account ID (e.g., XXXX-YYYY)' },
       { key: 'warehouse_name', label: 'Warehouse Name' },
       { key: 'region', label: 'Region' },
+    ],
+    github: [
+      { key: 'personal_access_token', label: 'Personal Access Token', type: 'password' },
+      { key: 'organization', label: 'Organization (optional)' },
+    ],
+    google_workspace: [
+      { key: 'service_account_json', label: 'Service Account Key (JSON)', type: 'password' },
+      { key: 'delegated_admin_email', label: 'Delegated Admin Email' },
+      { key: 'customer_id', label: 'Customer ID' },
+    ],
+    cloudflare: [
+      { key: 'api_token', label: 'API Token', type: 'password' },
+      { key: 'account_id', label: 'Account ID' },
+    ],
+    openstack: [
+      { key: 'auth_url', label: 'Auth URL (Keystone endpoint)' },
+      { key: 'username', label: 'Username' },
+      { key: 'password', label: 'Password', type: 'password' },
+      { key: 'project_name', label: 'Project Name' },
+      { key: 'user_domain_name', label: 'User Domain Name' },
+      { key: 'project_domain_name', label: 'Project Domain Name' },
     ],
   }
 

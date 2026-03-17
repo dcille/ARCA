@@ -51,11 +51,36 @@ google-auth>=2.29.0,<3.0
 # OCI SDK
 oci>=2.128.0,<3.0
 
+# Alibaba Cloud SDK
+alibabacloud-tea-openapi>=0.3.0,<1.0
+alibabacloud-ecs20140526>=4.0.0,<5.0
+alibabacloud-ram20150501>=1.0.0,<2.0
+alibabacloud-vpc20160428>=6.0.0,<7.0
+alibabacloud-rds20140815>=5.0.0,<6.0
+alibabacloud-kms20160120>=3.0.0,<4.0
+alibabacloud-actiontrail20200706>=2.0.0,<3.0
+alibabacloud-oss20190517>=1.0.0,<2.0
+alibabacloud-cs20151215>=5.0.0,<6.0
+
 # Kubernetes
 kubernetes>=29.0.0,<31.0
 
 # Snowflake
 snowflake-connector-python>=3.6.0,<4.0
+
+# GitHub
+PyGithub>=2.1.0,<3.0
+
+# Google Workspace Admin SDK
+google-api-python-client>=2.100.0,<3.0
+google-auth>=2.29.0,<3.0
+PyJWT>=2.8.0,<3.0
+
+# Cloudflare
+cloudflare>=3.0.0,<4.0
+
+# OpenStack
+openstacksdk>=3.0.0,<4.0
 
 # Utilities
 pyyaml>=6.0.1,<7.0

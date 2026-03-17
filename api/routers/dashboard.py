@@ -1,7 +1,9 @@
 """Dashboard router."""
-from fastapi import APIRouter, Depends
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 
 from api.database import get_db
 from api.models.user import User
@@ -91,4 +93,63 @@ async def dashboard_overview(
         "severity_breakdown": severity_breakdown,
         "findings_by_service": findings_by_service,
         "recent_scans": recent_scans,
+    }
+
+
+@router.get("/trends")
+async def dashboard_trends(
+    days: int = Query(default=30, le=90),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get scan history and finding trends over time."""
+    since = datetime.utcnow() - timedelta(days=days)
+
+    # Get completed scans with stats
+    scans_result = await db.execute(
+        select(Scan)
+        .where(Scan.user_id == current_user.id)
+        .where(Scan.status == "completed")
+        .where(Scan.created_at >= since)
+        .order_by(Scan.created_at.asc())
+    )
+    scans = scans_result.scalars().all()
+
+    scan_history = []
+    for s in scans:
+        total = s.total_checks or 0
+        passed = s.passed_checks or 0
+        rate = round((passed / total * 100) if total > 0 else 0, 1)
+        scan_history.append({
+            "date": s.created_at.strftime("%Y-%m-%d") if s.created_at else "",
+            "total_checks": total,
+            "passed": passed,
+            "failed": s.failed_checks or 0,
+            "pass_rate": rate,
+            "scan_type": s.scan_type,
+        })
+
+    # Finding severity trends - group by date
+    findings_result = await db.execute(
+        select(
+            func.date(Finding.created_at).label("date"),
+            Finding.severity,
+            func.count(Finding.id).label("count"),
+        )
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id)
+        .where(Finding.created_at >= since)
+        .group_by(func.date(Finding.created_at), Finding.severity)
+        .order_by(func.date(Finding.created_at))
+    )
+    findings_by_date: dict[str, dict] = {}
+    for row in findings_result.all():
+        date_str = str(row.date)
+        if date_str not in findings_by_date:
+            findings_by_date[date_str] = {"date": date_str, "critical": 0, "high": 0, "medium": 0, "low": 0}
+        findings_by_date[date_str][row.severity] = row.count
+
+    return {
+        "scan_history": scan_history,
+        "findings_trend": list(findings_by_date.values()),
     }

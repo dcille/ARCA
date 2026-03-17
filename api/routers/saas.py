@@ -18,18 +18,26 @@ from api.schemas.saas import (
     M365Credentials,
     SalesforceCredentials,
     SnowflakeCredentials,
+    GitHubCredentials,
+    GoogleWorkspaceCredentials,
+    CloudflareCredentials,
+    OpenStackCredentials,
 )
 from api.services.auth_service import get_current_user, encrypt_credentials
 
 router = APIRouter()
 
-VALID_SAAS_PROVIDERS = ("servicenow", "m365", "salesforce", "snowflake")
+VALID_SAAS_PROVIDERS = ("servicenow", "m365", "salesforce", "snowflake", "github", "google_workspace", "cloudflare", "openstack")
 
 CREDENTIAL_VALIDATORS = {
     "servicenow": ServiceNowCredentials,
     "m365": M365Credentials,
     "salesforce": SalesforceCredentials,
     "snowflake": SnowflakeCredentials,
+    "github": GitHubCredentials,
+    "google_workspace": GoogleWorkspaceCredentials,
+    "cloudflare": CloudflareCredentials,
+    "openstack": OpenStackCredentials,
 }
 
 

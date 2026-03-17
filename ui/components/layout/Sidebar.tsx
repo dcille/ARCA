@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -14,23 +15,44 @@ import {
   ArrowRightOnRectangleIcon,
   GlobeAltIcon,
   MapIcon,
+  DocumentArrowDownIcon,
+  CubeIcon,
+  BellIcon,
+  BoltIcon,
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/auth'
+import { api } from '@/lib/api'
 
 const navigation = [
   { name: 'Overview', href: '/darca/overview', icon: HomeIcon },
   { name: 'Attack Paths', href: '/darca/attack-paths', icon: MapIcon },
   { name: 'Findings', href: '/darca/findings', icon: MagnifyingGlassIcon },
   { name: 'Compliance', href: '/darca/compliance', icon: DocumentChartBarIcon },
+  { name: 'Inventory', href: '/darca/inventory', icon: CubeIcon },
   { name: 'Scans', href: '/darca/scans', icon: ShieldCheckIcon },
   { name: 'Cloud Providers', href: '/darca/providers', icon: CloudIcon },
   { name: 'SaaS Security', href: '/darca/saas-security', icon: GlobeAltIcon },
+  { name: 'Reports', href: '/darca/reports', icon: DocumentArrowDownIcon },
+  { name: 'Integrations', href: '/darca/integrations', icon: BoltIcon },
   { name: 'Settings', href: '/darca/settings', icon: Cog6ToothIcon },
 ]
 
 export default function Sidebar() {
   const pathname = usePathname()
   const { user, logout } = useAuthStore()
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    api.getNotificationCount()
+      .then(d => setUnreadCount(d.unread_count))
+      .catch(() => {})
+    const interval = setInterval(() => {
+      api.getNotificationCount()
+        .then(d => setUnreadCount(d.unread_count))
+        .catch(() => {})
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-brand-gray-200 flex flex-col">
@@ -86,6 +108,18 @@ export default function Sidebar() {
               {user?.email || ''}
             </p>
           </div>
+          <Link
+            href="/darca/settings"
+            className="p-1.5 rounded-lg hover:bg-brand-gray-100 text-brand-gray-400 hover:text-brand-gray-600 relative"
+            title="Notifications"
+          >
+            <BellIcon className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </Link>
           <button
             onClick={() => {
               logout()

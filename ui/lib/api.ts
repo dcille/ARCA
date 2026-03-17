@@ -85,6 +85,11 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/dashboard/overview')
   }
 
+  async getDashboardTrends(days?: number) {
+    const params = days ? { days: String(days) } : undefined
+    return this.request<any>('GET', '/api/v1/dashboard/trends', undefined, { params })
+  }
+
   // Providers
   async getProviders() {
     return this.request<any[]>('GET', '/api/v1/providers')
@@ -129,6 +134,22 @@ class ApiClient {
   async getComplianceSummary(framework?: string) {
     const params = framework ? { framework } : undefined
     return this.request<any>('GET', '/api/v1/compliance/summary', undefined, { params })
+  }
+
+  async getComplianceFrameworkChecks(frameworkId: string, params?: Record<string, string>) {
+    return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/checks`, undefined, { params })
+  }
+
+  async getComplianceFrameworkStats(frameworkId: string) {
+    return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/stats`)
+  }
+
+  async discoverAccounts(providerId: string) {
+    return this.request<any[]>('POST', `/api/v1/providers/${providerId}/discover-accounts`)
+  }
+
+  async getChildAccounts(providerId: string) {
+    return this.request<any[]>('GET', `/api/v1/providers/${providerId}/accounts`)
   }
 
   // SaaS
@@ -177,6 +198,152 @@ class ApiClient {
 
   async getAttackPath(id: string) {
     return this.request<any>('GET', `/api/v1/attack-paths/${id}`)
+  }
+  // Reports
+  async downloadReport(type: 'executive' | 'technical', params?: Record<string, string>) {
+    const url = new URL(`/api/v1/reports/${type}`, window.location.origin)
+    if (params) {
+      Object.entries(params).forEach(([key, val]) => {
+        if (val) url.searchParams.set(key, val)
+      })
+    }
+    const token = this.getToken()
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    const response = await fetch(url.toString(), { headers })
+    if (!response.ok) throw new Error(`Report generation failed: ${response.status}`)
+
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || `ARCA_${type}_report.pdf`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(downloadUrl)
+  }
+
+  async exportFindings(format: 'csv' | 'json', params?: Record<string, string>) {
+    const url = new URL('/api/v1/reports/export/findings', window.location.origin)
+    url.searchParams.set('format', format)
+    if (params) {
+      Object.entries(params).forEach(([key, val]) => {
+        if (val) url.searchParams.set(key, val)
+      })
+    }
+    const token = this.getToken()
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    const response = await fetch(url.toString(), { headers })
+    if (!response.ok) throw new Error(`Export failed: ${response.status}`)
+
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    const ext = format === 'json' ? 'json' : 'csv'
+    a.download = `ARCA_Findings.${ext}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(downloadUrl)
+  }
+
+  // Schedules
+  async getSchedules() {
+    return this.request<any[]>('GET', '/api/v1/schedules')
+  }
+
+  async createSchedule(data: any) {
+    return this.request<any>('POST', '/api/v1/schedules', data)
+  }
+
+  async updateSchedule(id: string, data: any) {
+    return this.request<any>('PUT', `/api/v1/schedules/${id}`, data)
+  }
+
+  async deleteSchedule(id: string) {
+    return this.request<void>('DELETE', `/api/v1/schedules/${id}`)
+  }
+
+  // Notifications
+  async getNotifications(unreadOnly?: boolean) {
+    const params = unreadOnly ? { unread_only: 'true' } : undefined
+    return this.request<any[]>('GET', '/api/v1/notifications', undefined, { params })
+  }
+
+  async getNotificationCount() {
+    return this.request<{ unread_count: number }>('GET', '/api/v1/notifications/count')
+  }
+
+  async markNotificationRead(id: string) {
+    return this.request<any>('PUT', `/api/v1/notifications/${id}/read`)
+  }
+
+  async markAllNotificationsRead() {
+    return this.request<any>('PUT', '/api/v1/notifications/read-all')
+  }
+
+  // Integrations
+  async getIntegrations() {
+    return this.request<any[]>('GET', '/api/v1/integrations')
+  }
+
+  async createIntegration(data: any) {
+    return this.request<any>('POST', '/api/v1/integrations', data)
+  }
+
+  async updateIntegration(id: string, data: any) {
+    return this.request<any>('PUT', `/api/v1/integrations/${id}`, data)
+  }
+
+  async deleteIntegration(id: string) {
+    return this.request<void>('DELETE', `/api/v1/integrations/${id}`)
+  }
+
+  async testIntegration(id: string) {
+    return this.request<{ success: boolean; message: string }>('POST', `/api/v1/integrations/${id}/test`)
+  }
+
+  // Inventory
+  async getInventoryResources(params?: Record<string, string>) {
+    return this.request<any[]>('GET', '/api/v1/inventory/resources', undefined, { params })
+  }
+
+  async getInventorySummary(params?: Record<string, string>) {
+    return this.request<any>('GET', '/api/v1/inventory/summary', undefined, { params })
+  }
+
+  // Organizations
+  async createOrganization(data: { name: string; slug: string }) {
+    return this.request<any>('POST', '/api/v1/organizations', data)
+  }
+
+  async getCurrentOrganization() {
+    return this.request<any>('GET', '/api/v1/organizations/current')
+  }
+
+  async updateOrganization(data: any) {
+    return this.request<any>('PUT', '/api/v1/organizations/current', data)
+  }
+
+  async getOrganizationMembers() {
+    return this.request<any[]>('GET', '/api/v1/organizations/current/members')
+  }
+
+  async inviteMember(email: string, role?: string) {
+    return this.request<any>('POST', '/api/v1/organizations/current/members/invite', { email, role })
+  }
+
+  async removeMember(userId: string) {
+    return this.request<void>('DELETE', `/api/v1/organizations/current/members/${userId}`)
+  }
+
+  async updateMemberRole(userId: string, role: string) {
+    return this.request<any>('PUT', `/api/v1/organizations/current/members/${userId}/role`, { role })
   }
 }
 

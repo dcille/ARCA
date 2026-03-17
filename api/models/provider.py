@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, DateTime, Text, ForeignKey
+from sqlalchemy import String, DateTime, Text, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
 from api.database import Base
@@ -19,5 +19,8 @@ class Provider(Base):
     status: Mapped[str] = mapped_column(String(50), default="connected")
     region: Mapped[str] = mapped_column(String(100), nullable=True)
     account_id: Mapped[str] = mapped_column(String(255), nullable=True)
+    account_type: Mapped[str] = mapped_column(String(50), default="single")  # single, organization, management
+    parent_provider_id: Mapped[str] = mapped_column(String(36), ForeignKey("providers.id"), nullable=True)
+    is_management_account: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -38,6 +38,10 @@ export function getSaaSIcon(provider: string): string {
     m365: 'M365',
     salesforce: 'SF',
     snowflake: 'SF*',
+    github: 'GH',
+    google_workspace: 'GW',
+    cloudflare: 'CF',
+    openstack: 'OS',
   }
   return map[provider] || provider.slice(0, 2).toUpperCase()
 }
@@ -48,6 +52,10 @@ export function getSaaSLabel(provider: string): string {
     m365: 'Microsoft 365',
     salesforce: 'Salesforce',
     snowflake: 'Snowflake',
+    github: 'GitHub',
+    google_workspace: 'Google Workspace',
+    cloudflare: 'Cloudflare',
+    openstack: 'OpenStack',
   }
   return map[provider] || provider
 }

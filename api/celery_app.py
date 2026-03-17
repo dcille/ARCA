@@ -9,6 +9,7 @@ celery_app = Celery(
     include=[
         "api.tasks.scan_tasks",
         "api.tasks.saas_tasks",
+        "api.tasks.schedule_tasks",
     ],
 )
 
@@ -21,5 +22,10 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
-    beat_schedule={},
+    beat_schedule={
+        "check-scheduled-scans": {
+            "task": "api.tasks.schedule_tasks.check_and_run_scheduled_scans",
+            "schedule": 60.0,  # Check every minute
+        },
+    },
 )

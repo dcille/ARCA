@@ -5,8 +5,14 @@ import Header from '@/components/layout/Header'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import { api } from '@/lib/api'
-import { formatDate } from '@/lib/utils'
+import { formatDate, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
+import {
+  ClockIcon,
+  TrashIcon,
+  PauseCircleIcon,
+  PlayCircleIcon,
+} from '@heroicons/react/24/outline'
 
 export default function ScansPage() {
   const [scans, setScans] = useState<any[]>([])
@@ -14,9 +20,13 @@ export default function ScansPage() {
   const [providers, setProviders] = useState<any[]>([])
   const [connections, setConnections] = useState<any[]>([])
   const [showModal, setShowModal] = useState(false)
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [schedules, setSchedules] = useState<any[]>([])
   const [scanType, setScanType] = useState('cloud')
   const [selectedProvider, setSelectedProvider] = useState('')
   const [selectedConnection, setSelectedConnection] = useState('')
+  const [scheduleName, setScheduleName] = useState('')
+  const [scheduleFrequency, setScheduleFrequency] = useState('daily')
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -31,11 +41,13 @@ export default function ScansPage() {
     try {
       const params: Record<string, string> = {}
       if (filterType) params.scan_type = filterType
-      const [s, p, c] = await Promise.all([
+      const [s, p, c, sch] = await Promise.all([
         api.getScans(filterType || undefined),
         api.getProviders(),
         api.getSaaSConnections(),
+        api.getSchedules().catch(() => []),
       ])
+      setSchedules(sch)
       let filtered = s
       if (filterStatus) {
         filtered = s.filter((scan: any) => scan.status === filterStatus)
@@ -200,6 +212,154 @@ export default function ScansPage() {
         loading={loading}
         emptyMessage="No scans yet. Click 'New Scan' to get started."
       />
+
+      {/* Scheduled Scans */}
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-brand-navy flex items-center gap-2">
+            <ClockIcon className="w-5 h-5" />
+            Scheduled Scans
+          </h3>
+          <button
+            onClick={() => setShowScheduleModal(true)}
+            className="px-3 py-1.5 text-sm font-medium text-brand-green border border-brand-green rounded-lg hover:bg-brand-green/5 transition-colors"
+          >
+            Add Schedule
+          </button>
+        </div>
+
+        {schedules.length > 0 ? (
+          <div className="space-y-3">
+            {schedules.map((sch: any) => (
+              <div key={sch.id} className="card flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    'w-3 h-3 rounded-full',
+                    sch.enabled ? 'bg-brand-green' : 'bg-brand-gray-300'
+                  )} />
+                  <div>
+                    <p className="text-sm font-medium text-brand-navy">{sch.name}</p>
+                    <p className="text-xs text-brand-gray-400">
+                      {sch.scan_type === 'cloud' ? 'Cloud' : 'SaaS'} &middot; {sch.frequency}
+                      {sch.next_run_at && ` · Next: ${formatDate(sch.next_run_at)}`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.updateSchedule(sch.id, { enabled: !sch.enabled })
+                        toast.success(sch.enabled ? 'Schedule paused' : 'Schedule resumed')
+                        loadData()
+                      } catch (e: any) { toast.error(e.message) }
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-brand-gray-100 text-brand-gray-400"
+                    title={sch.enabled ? 'Pause' : 'Resume'}
+                  >
+                    {sch.enabled ? <PauseCircleIcon className="w-5 h-5" /> : <PlayCircleIcon className="w-5 h-5" />}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.deleteSchedule(sch.id)
+                        toast.success('Schedule deleted')
+                        loadData()
+                      } catch (e: any) { toast.error(e.message) }
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-red-50 text-brand-gray-400 hover:text-red-500"
+                    title="Delete"
+                  >
+                    <TrashIcon className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="card text-center py-8">
+            <ClockIcon className="w-10 h-10 mx-auto text-brand-gray-300 mb-2" />
+            <p className="text-sm text-brand-gray-400">No scheduled scans. Add one to automate your security assessments.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Schedule Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-brand-navy mb-4">Create Scan Schedule</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Name</label>
+                <input
+                  type="text"
+                  value={scheduleName}
+                  onChange={(e) => setScheduleName(e.target.value)}
+                  placeholder="e.g., Daily AWS Scan"
+                  className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Scan Type</label>
+                <div className="flex gap-3">
+                  <button onClick={() => setScanType('cloud')} className={`flex-1 py-2 px-4 rounded-lg border-2 text-sm font-medium transition-colors ${scanType === 'cloud' ? 'border-brand-green bg-brand-green/5 text-brand-green' : 'border-brand-gray-200 text-brand-gray-500'}`}>Cloud</button>
+                  <button onClick={() => setScanType('saas')} className={`flex-1 py-2 px-4 rounded-lg border-2 text-sm font-medium transition-colors ${scanType === 'saas' ? 'border-brand-teal bg-brand-teal/5 text-brand-teal' : 'border-brand-gray-200 text-brand-gray-500'}`}>SaaS</button>
+                </div>
+              </div>
+              {scanType === 'cloud' ? (
+                <div>
+                  <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Provider</label>
+                  <select value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm">
+                    <option value="">Select...</option>
+                    {providers.map((p) => <option key={p.id} value={p.id}>{p.alias} ({p.provider_type})</option>)}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Connection</label>
+                  <select value={selectedConnection} onChange={(e) => setSelectedConnection(e.target.value)} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm">
+                    <option value="">Select...</option>
+                    {connections.map((c) => <option key={c.id} value={c.id}>{c.alias} ({c.provider_type})</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Frequency</label>
+                <select value={scheduleFrequency} onChange={(e) => setScheduleFrequency(e.target.value)} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm">
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowScheduleModal(false)} className="flex-1 btn-outline">Cancel</button>
+              <button
+                onClick={async () => {
+                  try {
+                    await api.createSchedule({
+                      name: scheduleName,
+                      scan_type: scanType,
+                      frequency: scheduleFrequency,
+                      provider_id: scanType === 'cloud' ? selectedProvider : undefined,
+                      connection_id: scanType === 'saas' ? selectedConnection : undefined,
+                    })
+                    toast.success('Schedule created!')
+                    setShowScheduleModal(false)
+                    setScheduleName('')
+                    loadData()
+                  } catch (e: any) { toast.error(e.message) }
+                }}
+                disabled={!scheduleName}
+                className="flex-1 btn-primary disabled:opacity-50"
+              >
+                Create Schedule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New Scan Modal */}
       {showModal && (

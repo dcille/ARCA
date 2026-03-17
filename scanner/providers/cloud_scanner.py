@@ -34,6 +34,7 @@ class CloudScanner:
             "gcp": self._run_gcp_checks,
             "kubernetes": self._run_kubernetes_checks,
             "oci": self._run_oci_checks,
+            "alibaba": self._run_alibaba_checks,
         }
 
         scanner_fn = scanner_map.get(self.provider_type)
@@ -65,4 +66,9 @@ class CloudScanner:
     def _run_oci_checks(self) -> list[dict]:
         from scanner.providers.oci.oci_scanner import OCIScanner
         scanner = OCIScanner(self.credentials, self.regions, self.services)
+        return scanner.scan()
+
+    def _run_alibaba_checks(self) -> list[dict]:
+        from scanner.providers.alibaba.alibaba_scanner import AlibabaScanner
+        scanner = AlibabaScanner(self.credentials, self.regions, self.services)
         return scanner.scan()

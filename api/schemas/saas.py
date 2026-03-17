@@ -39,6 +39,31 @@ class SnowflakeCredentials(BaseModel):
     service_account_usernames: list[str] = []
 
 
+class GitHubCredentials(BaseModel):
+    personal_access_token: str
+    organization: str = ""
+
+
+class GoogleWorkspaceCredentials(BaseModel):
+    service_account_json: str  # JSON key file contents as string
+    delegated_admin_email: str
+    customer_id: str
+
+
+class CloudflareCredentials(BaseModel):
+    api_token: str
+    account_id: str = ""
+
+
+class OpenStackCredentials(BaseModel):
+    auth_url: str
+    username: str
+    password: str
+    project_name: str
+    user_domain_name: str = "Default"
+    project_domain_name: str = "Default"
+
+
 class SaaSConnectionCreate(BaseModel):
     provider_type: str  # servicenow, m365, salesforce, snowflake
     alias: str

@@ -10,6 +10,7 @@ class ProviderCreate(BaseModel):
     credentials: dict
     region: Optional[str] = None
     account_id: Optional[str] = None
+    account_type: str = "single"  # single, organization, management
 
 
 class ProviderResponse(BaseModel):
@@ -19,6 +20,9 @@ class ProviderResponse(BaseModel):
     status: str
     region: Optional[str]
     account_id: Optional[str]
+    account_type: str = "single"
+    parent_provider_id: Optional[str] = None
+    is_management_account: bool = False
     created_at: datetime
 
     class Config:
@@ -29,3 +33,10 @@ class ProviderUpdate(BaseModel):
     alias: Optional[str] = None
     credentials: Optional[dict] = None
     region: Optional[str] = None
+
+
+class DiscoveredAccount(BaseModel):
+    account_id: str
+    name: str
+    status: str  # active, suspended, etc.
+    provider_type: str

@@ -12,6 +12,10 @@ class SaaSScannerFactory:
             "m365": "scanner.saas.m365.m365_scanner.M365Scanner",
             "salesforce": "scanner.saas.salesforce.salesforce_scanner.SalesforceScanner",
             "snowflake": "scanner.saas.snowflake.snowflake_scanner.SnowflakeScanner",
+            "github": "scanner.saas.github.github_scanner.GitHubScanner",
+            "google_workspace": "scanner.saas.google_workspace.google_workspace_scanner.GoogleWorkspaceScanner",
+            "cloudflare": "scanner.saas.cloudflare.cloudflare_scanner.CloudflareScanner",
+            "openstack": "scanner.saas.openstack.openstack_scanner.OpenStackScanner",
         }
 
         scanner_path = scanners.get(provider_type)
