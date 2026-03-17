@@ -1,7 +1,7 @@
-"""Compliance router."""
+"""Compliance router — per-unique-check calculation and control-level library."""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, case, or_
 from typing import Optional
 
 from api.database import get_db
@@ -9,47 +9,114 @@ from api.models.user import User
 from api.models.finding import Finding
 from api.models.scan import Scan
 from api.services.auth_service import get_current_user
-from scanner.compliance.frameworks import FRAMEWORKS, get_frameworks_for_check
+from scanner.compliance.frameworks import (
+    FRAMEWORKS,
+    get_all_checks_for_framework,
+    get_framework_controls,
+)
 
 router = APIRouter()
 
-COMPLIANCE_FRAMEWORKS = {
-    fw_id: {"name": fw["name"], "description": fw["description"]}
-    for fw_id, fw in FRAMEWORKS.items()
-}
+
+def _get_fw_meta(framework_id: str) -> dict:
+    fw = FRAMEWORKS.get(framework_id, {})
+    return {"id": framework_id, "name": fw.get("name", ""), "description": fw.get("description", "")}
 
 
-def _framework_filter(framework_id: str):
-    """Build SQLAlchemy filter for a compliance framework.
-
-    Frameworks with checks="all" match ALL findings.
-    Frameworks with a specific check list use check_id IN (...) OR
-    compliance_frameworks LIKE '%framework_id%' for backward compat.
-    """
-    fw = FRAMEWORKS.get(framework_id)
-    if not fw:
+def _build_fw_filter(framework_id: str):
+    """Build SQLAlchemy filter for a framework using its check_id list."""
+    check_ids = get_all_checks_for_framework(framework_id)
+    if not check_ids:
+        # Broad frameworks (mapped to ALL checks) — no filter
         return None
+    return or_(
+        Finding.check_id.in_(check_ids),
+        Finding.compliance_frameworks.contains(framework_id),
+    )
 
-    checks = fw.get("checks", [])
-    if checks in ("all", "all_saas"):
-        # Match all findings
-        return None  # No additional filter needed
-    elif isinstance(checks, list) and checks:
-        # Match by check_id list OR by compliance_frameworks string containing framework_id
-        return or_(
-            Finding.check_id.in_(checks),
-            Finding.compliance_frameworks.contains(framework_id),
+
+async def _per_check_summary(
+    db: AsyncSession,
+    user_id: str,
+    framework_id: str,
+) -> dict:
+    """Calculate compliance summary using per-unique-check aggregation.
+
+    For each unique check_id in the framework:
+    - If ANY finding with that check_id has status=FAIL → check is FAIL
+    - If ALL findings with that check_id have status=PASS → check is PASS
+    - If no findings exist → NOT_EVALUATED
+
+    Pass rate = passed_checks / (passed_checks + failed_checks), excluding NOT_EVALUATED.
+    Total checks = number of unique check_ids the framework defines.
+    """
+    all_check_ids = get_all_checks_for_framework(framework_id)
+
+    # Query: for each check_id, get fail_count
+    fw_filter = _build_fw_filter(framework_id)
+    query = (
+        select(
+            Finding.check_id,
+            func.sum(case((Finding.status == "FAIL", 1), else_=0)).label("fail_count"),
+            func.sum(case((Finding.status == "PASS", 1), else_=0)).label("pass_count"),
         )
-    else:
-        return Finding.compliance_frameworks.contains(framework_id)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == user_id)
+    )
+    if fw_filter is not None:
+        query = query.where(fw_filter)
+    query = query.group_by(Finding.check_id)
+
+    result = await db.execute(query)
+    rows = {row.check_id: (row.fail_count or 0, row.pass_count or 0) for row in result.all()}
+
+    # Calculate per-check status
+    total_defined = len(all_check_ids) if all_check_ids else len(rows)
+    passed_checks = 0
+    failed_checks = 0
+    not_evaluated = 0
+
+    check_ids_to_evaluate = all_check_ids if all_check_ids else sorted(rows.keys())
+
+    for cid in check_ids_to_evaluate:
+        if cid in rows:
+            fail_count, pass_count = rows[cid]
+            if fail_count > 0:
+                failed_checks += 1
+            elif pass_count > 0:
+                passed_checks += 1
+            else:
+                not_evaluated += 1
+        else:
+            not_evaluated += 1
+
+    evaluated = passed_checks + failed_checks
+    pass_rate = (passed_checks / evaluated * 100) if evaluated > 0 else 0
+
+    return {
+        "total_checks": total_defined,
+        "passed": passed_checks,
+        "failed": failed_checks,
+        "not_evaluated": not_evaluated,
+        "pass_rate": round(pass_rate, 1),
+    }
 
 
 @router.get("/frameworks")
 async def list_frameworks():
-    return [
-        {"id": k, "name": v["name"], "description": v["description"]}
-        for k, v in COMPLIANCE_FRAMEWORKS.items()
-    ]
+    results = []
+    for fw_id, fw in FRAMEWORKS.items():
+        total_checks = len(get_all_checks_for_framework(fw_id))
+        controls = get_framework_controls(fw_id)
+        results.append({
+            "id": fw_id,
+            "name": fw["name"],
+            "description": fw["description"],
+            "category": fw.get("category", ""),
+            "total_controls": len(controls),
+            "total_checks": total_checks,
+        })
+    return results
 
 
 @router.get("/summary")
@@ -58,22 +125,25 @@ async def compliance_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if framework:
+        return await _per_check_summary(db, current_user.id, framework)
+
+    # Overall summary across all frameworks
     query = (
-        select(Finding.status, func.count(Finding.id))
+        select(
+            Finding.check_id,
+            func.sum(case((Finding.status == "FAIL", 1), else_=0)).label("fail_count"),
+            func.sum(case((Finding.status == "PASS", 1), else_=0)).label("pass_count"),
+        )
         .join(Scan, Finding.scan_id == Scan.id)
         .where(Scan.user_id == current_user.id)
+        .group_by(Finding.check_id)
     )
-    if framework:
-        fw_filter = _framework_filter(framework)
-        if fw_filter is not None:
-            query = query.where(fw_filter)
-    query = query.group_by(Finding.status)
-
     result = await db.execute(query)
-    counts = {row[0]: row[1] for row in result.all()}
+    rows = result.all()
 
-    passed = counts.get("PASS", 0)
-    failed = counts.get("FAIL", 0)
+    passed = sum(1 for r in rows if (r.fail_count or 0) == 0 and (r.pass_count or 0) > 0)
+    failed = sum(1 for r in rows if (r.fail_count or 0) > 0)
     total = passed + failed
     pass_rate = (passed / total * 100) if total > 0 else 0
 
@@ -95,15 +165,19 @@ async def framework_checks(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if framework_id not in COMPLIANCE_FRAMEWORKS:
+    if framework_id not in FRAMEWORKS:
         raise HTTPException(status_code=404, detail="Framework not found")
 
+    # Get per-unique-check summary
+    summary = await _per_check_summary(db, current_user.id, framework_id)
+
+    # Get paginated findings
     base_filter = (
         select(Finding)
         .join(Scan, Finding.scan_id == Scan.id)
         .where(Scan.user_id == current_user.id)
     )
-    fw_filter = _framework_filter(framework_id)
+    fw_filter = _build_fw_filter(framework_id)
     if fw_filter is not None:
         base_filter = base_filter.where(fw_filter)
 
@@ -112,24 +186,6 @@ async def framework_checks(
     if severity:
         base_filter = base_filter.where(Finding.severity == severity.lower())
 
-    # Get summary stats (unfiltered by status/severity for the totals)
-    stats_query = (
-        select(Finding.status, func.count(Finding.id))
-        .join(Scan, Finding.scan_id == Scan.id)
-        .where(Scan.user_id == current_user.id)
-    )
-    if fw_filter is not None:
-        stats_query = stats_query.where(fw_filter)
-    stats_query = stats_query.group_by(Finding.status)
-
-    stats_result = await db.execute(stats_query)
-    stats_counts = {row[0]: row[1] for row in stats_result.all()}
-    passed = stats_counts.get("PASS", 0)
-    failed = stats_counts.get("FAIL", 0)
-    total = passed + failed
-    pass_rate = (passed / total * 100) if total > 0 else 0
-
-    # Get paginated findings
     query = base_filter.order_by(Finding.severity, Finding.status).offset(offset).limit(limit)
     result = await db.execute(query)
     findings = result.scalars().all()
@@ -137,17 +193,8 @@ async def framework_checks(
     from scanner.mitre.attack_mapping import CHECK_DESCRIPTIONS, CHECK_EVIDENCE
 
     return {
-        "framework": {
-            "id": framework_id,
-            "name": COMPLIANCE_FRAMEWORKS[framework_id]["name"],
-            "description": COMPLIANCE_FRAMEWORKS[framework_id]["description"],
-        },
-        "summary": {
-            "total": total,
-            "passed": passed,
-            "failed": failed,
-            "pass_rate": round(pass_rate, 1),
-        },
+        "framework": _get_fw_meta(framework_id),
+        "summary": summary,
         "findings": [
             {
                 "id": f.id,
@@ -168,11 +215,7 @@ async def framework_checks(
             }
             for f in findings
         ],
-        "pagination": {
-            "limit": limit,
-            "offset": offset,
-            "total": total,
-        },
+        "pagination": {"limit": limit, "offset": offset, "total": summary["total_checks"]},
     }
 
 
@@ -182,39 +225,42 @@ async def framework_stats(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if framework_id not in COMPLIANCE_FRAMEWORKS:
+    if framework_id not in FRAMEWORKS:
         raise HTTPException(status_code=404, detail="Framework not found")
 
+    # Per-unique-check aggregation grouped by service
+    fw_filter = _build_fw_filter(framework_id)
     query = (
         select(
             Finding.service,
-            Finding.status,
-            func.count(Finding.id),
+            Finding.check_id,
+            func.sum(case((Finding.status == "FAIL", 1), else_=0)).label("fail_count"),
+            func.sum(case((Finding.status == "PASS", 1), else_=0)).label("pass_count"),
         )
         .join(Scan, Finding.scan_id == Scan.id)
         .where(Scan.user_id == current_user.id)
     )
-    fw_filter = _framework_filter(framework_id)
     if fw_filter is not None:
         query = query.where(fw_filter)
-    query = query.group_by(Finding.service, Finding.status)
+    query = query.group_by(Finding.service, Finding.check_id)
 
     result = await db.execute(query)
     rows = result.all()
 
     services: dict = {}
-    for service, status, count in rows:
-        if service not in services:
-            services[service] = {"service": service, "passed": 0, "failed": 0, "total": 0}
-        if status == "PASS":
-            services[service]["passed"] = count
-        elif status == "FAIL":
-            services[service]["failed"] = count
-        services[service]["total"] = services[service]["passed"] + services[service]["failed"]
+    for row in rows:
+        svc = row.service
+        if svc not in services:
+            services[svc] = {"service": svc, "passed": 0, "failed": 0, "total": 0}
+        if (row.fail_count or 0) > 0:
+            services[svc]["failed"] += 1
+        elif (row.pass_count or 0) > 0:
+            services[svc]["passed"] += 1
+        services[svc]["total"] = services[svc]["passed"] + services[svc]["failed"]
 
     return {
         "framework_id": framework_id,
-        "services": list(services.values()),
+        "services": sorted(services.values(), key=lambda s: s["total"], reverse=True),
     }
 
 
@@ -223,37 +269,44 @@ async def framework_check_library(
     framework_id: str,
     current_user: User = Depends(get_current_user),
 ):
-    """Return the full check library for a compliance framework with descriptions."""
-    if framework_id not in COMPLIANCE_FRAMEWORKS:
+    """Return the full control-level check library for a framework."""
+    if framework_id not in FRAMEWORKS:
         raise HTTPException(status_code=404, detail="Framework not found")
 
     from scanner.mitre.attack_mapping import CHECK_DESCRIPTIONS, CHECK_EVIDENCE
 
-    fw = FRAMEWORKS.get(framework_id, {})
-    checks_def = fw.get("checks", [])
+    fw = FRAMEWORKS[framework_id]
+    controls = get_framework_controls(framework_id)
+    all_check_ids = get_all_checks_for_framework(framework_id)
 
-    # For "all" frameworks, gather all known check IDs
-    if checks_def in ("all", "all_saas"):
-        check_ids = sorted(CHECK_DESCRIPTIONS.keys())
-    elif isinstance(checks_def, list):
-        check_ids = checks_def
-    else:
-        check_ids = []
+    controls_out = []
+    for ctrl in controls:
+        checks_map = ctrl.get("checks", {})
+        # Build per-provider check details
+        provider_checks = {}
+        if isinstance(checks_map, dict):
+            for provider, cids in checks_map.items():
+                provider_checks[provider] = [
+                    {
+                        "check_id": cid,
+                        "description": CHECK_DESCRIPTIONS.get(cid, f"Security check: {cid.replace('_', ' ')}"),
+                        "evidence_method": CHECK_EVIDENCE.get(cid, ""),
+                    }
+                    for cid in cids
+                ]
 
-    library = []
-    for check_id in check_ids:
-        library.append({
-            "check_id": check_id,
-            "description": CHECK_DESCRIPTIONS.get(check_id, "Security check for " + check_id.replace("_", " ")),
-            "evidence_method": CHECK_EVIDENCE.get(check_id, ""),
+        controls_out.append({
+            "id": ctrl.get("id", ""),
+            "title": ctrl.get("title", ""),
+            "description": ctrl.get("description", ""),
+            "checks": provider_checks,
         })
 
     return {
-        "framework": {
-            "id": framework_id,
-            "name": COMPLIANCE_FRAMEWORKS[framework_id]["name"],
-            "description": COMPLIANCE_FRAMEWORKS[framework_id]["description"],
-        },
-        "total_checks": len(library),
-        "checks": library,
+        "framework": _get_fw_meta(framework_id),
+        "framework_description": fw.get("description", ""),
+        "category": fw.get("category", ""),
+        "total_controls": len(controls),
+        "total_checks": len(all_check_ids),
+        "controls": controls_out,
     }
