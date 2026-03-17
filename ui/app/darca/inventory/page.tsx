@@ -16,6 +16,7 @@ import {
   ChartPieIcon,
   ChevronDownIcon,
   ArrowTopRightOnSquareIcon,
+  BuildingOffice2Icon,
 } from '@heroicons/react/24/outline'
 
 function parseEvidenceLog(raw?: string | null): { api_call?: string; response?: string } | null {
@@ -196,6 +197,8 @@ function ResourceExpandedRow({
 export default function InventoryPage() {
   const [resources, setResources] = useState<any[]>([])
   const [summary, setSummary] = useState<any>(null)
+  const [accountSummary, setAccountSummary] = useState<any[]>([])
+  const [showAccountSummary, setShowAccountSummary] = useState(false)
   const [loading, setLoading] = useState(true)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [resourceFindings, setResourceFindings] = useState<Record<string, any[]>>({})
@@ -218,12 +221,14 @@ export default function InventoryPage() {
       if (filters.status) params.status = filters.status
       if (filters.search) params.search = filters.search
 
-      const [resourcesData, summaryData] = await Promise.all([
+      const [resourcesData, summaryData, accountData] = await Promise.all([
         api.getInventoryResources(params),
         api.getInventorySummary(filters.provider_type ? { provider_type: filters.provider_type } : undefined),
+        api.getInventorySummaryByAccount(),
       ])
       setResources(resourcesData)
       setSummary(summaryData)
+      setAccountSummary(accountData)
     } catch (err) {
       console.error(err)
     } finally {
@@ -371,6 +376,88 @@ export default function InventoryPage() {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Account Summary */}
+      {accountSummary.length > 0 && (
+        <div className="card mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <BuildingOffice2Icon className="w-4 h-4 text-brand-gray-400" />
+              <h3 className="text-sm font-semibold text-brand-navy">Resources by Account</h3>
+            </div>
+            <button
+              onClick={() => setShowAccountSummary(!showAccountSummary)}
+              className="text-xs text-brand-green hover:underline font-medium flex items-center gap-1"
+            >
+              <ChevronDownIcon className={cn('w-3.5 h-3.5 transition-transform', !showAccountSummary && '-rotate-90')} />
+              {showAccountSummary ? 'Collapse' : 'Expand'}
+            </button>
+          </div>
+          {showAccountSummary && (
+            <div className="space-y-3">
+              {accountSummary.map((acct) => {
+                const provColor: Record<string, string> = {
+                  aws: 'bg-[#FF9900]',
+                  azure: 'bg-[#0078D4]',
+                  gcp: 'bg-[#4285F4]',
+                  oci: 'bg-[#C74634]',
+                  alibaba: 'bg-[#FF6A00]',
+                  kubernetes: 'bg-[#326CE5]',
+                }
+                return (
+                  <div key={acct.provider_id} className="border border-brand-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', provColor[acct.provider_type] || 'bg-brand-gray-400')}>
+                          <span className="text-white font-bold text-[10px]">{acct.provider_type?.slice(0, 3).toUpperCase()}</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-brand-navy">{acct.alias || acct.provider_type?.toUpperCase()}</p>
+                          {acct.account_id && <p className="text-[10px] text-brand-gray-400 font-mono">{acct.account_id}</p>}
+                        </div>
+                      </div>
+                      <div className="text-right text-xs">
+                        <span className="font-semibold text-brand-navy">{acct.total_resources}</span>
+                        <span className="text-brand-gray-400"> resources</span>
+                        {acct.at_risk > 0 && (
+                          <span className="ml-2 text-red-600 font-medium">({acct.at_risk} at risk)</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(acct.services as Record<string, { total: number; at_risk: number }>).map(([svc, info]) => (
+                        <span
+                          key={svc}
+                          className={cn(
+                            'inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border',
+                            info.at_risk > 0
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : 'bg-brand-gray-50 text-brand-gray-600 border-brand-gray-200'
+                          )}
+                        >
+                          {svc}: {info.total}
+                          {info.at_risk > 0 && (
+                            <span className="text-red-500 text-[10px]">({info.at_risk} fail)</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {!showAccountSummary && (
+            <div className="flex flex-wrap gap-2">
+              {accountSummary.map((acct) => (
+                <span key={acct.provider_id} className="px-3 py-1.5 rounded-full text-xs font-medium bg-brand-gray-50 text-brand-gray-600 border border-brand-gray-200">
+                  {acct.alias || acct.provider_type?.toUpperCase()} — {acct.total_resources} resources
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -325,6 +325,10 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/inventory/summary', undefined, { params })
   }
 
+  async getInventorySummaryByAccount() {
+    return this.request<any[]>('GET', '/api/v1/inventory/summary/by-account')
+  }
+
   async getResourceFindings(resourceId: string) {
     return this.request<any[]>('GET', '/api/v1/inventory/resources/findings', undefined, {
       params: { resource_id: resourceId },

@@ -220,3 +220,73 @@ async def inventory_summary(
         "by_service": dict(sorted(by_service.items(), key=lambda x: x[1], reverse=True)),
         "by_region": dict(sorted(by_region.items(), key=lambda x: x[1], reverse=True)[:15]),
     }
+
+
+@router.get("/summary/by-account")
+async def inventory_summary_by_account(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get inventory summary grouped by provider account with service breakdown."""
+    query = (
+        select(
+            Finding.provider_id,
+            Finding.service,
+            Finding.resource_id,
+            func.sum(case((Finding.status == "FAIL", 1), else_=0)).label("failed"),
+        )
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id)
+        .where(Finding.resource_id.isnot(None))
+        .where(Finding.resource_id != "")
+        .group_by(Finding.provider_id, Finding.service, Finding.resource_id)
+    )
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    # Get provider info
+    provider_ids = list(set(r.provider_id for r in rows if r.provider_id))
+    providers_map = {}
+    if provider_ids:
+        prov_result = await db.execute(
+            select(Provider).where(Provider.id.in_(provider_ids))
+        )
+        for p in prov_result.scalars().all():
+            providers_map[p.id] = {
+                "provider_type": p.provider_type,
+                "alias": p.alias,
+                "account_id": p.account_id,
+            }
+
+    # Group: provider_id -> { services: { service: { total, at_risk } }, totals }
+    accounts: dict = {}
+    for r in rows:
+        pid = r.provider_id
+        if pid not in accounts:
+            pinfo = providers_map.get(pid, {})
+            accounts[pid] = {
+                "provider_id": pid,
+                "provider_type": pinfo.get("provider_type", ""),
+                "alias": pinfo.get("alias", ""),
+                "account_id": pinfo.get("account_id", ""),
+                "total_resources": 0,
+                "at_risk": 0,
+                "services": {},
+            }
+        svc = r.service
+        if svc not in accounts[pid]["services"]:
+            accounts[pid]["services"][svc] = {"total": 0, "at_risk": 0}
+        accounts[pid]["services"][svc]["total"] += 1
+        accounts[pid]["total_resources"] += 1
+        if r.failed > 0:
+            accounts[pid]["services"][svc]["at_risk"] += 1
+            accounts[pid]["at_risk"] += 1
+
+    # Sort services within each account by count descending
+    for acct in accounts.values():
+        acct["services"] = dict(
+            sorted(acct["services"].items(), key=lambda x: x[1]["total"], reverse=True)
+        )
+
+    return sorted(accounts.values(), key=lambda a: a["total_resources"], reverse=True)
