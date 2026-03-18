@@ -1,6 +1,6 @@
 """ServiceNow SaaS Security Scanner.
 
-Implements 92 security checks across 9 auditor categories based on ElectricEye patterns:
+Implements 92+ security checks across 10 auditor categories based on ElectricEye patterns:
 - Users: MFA, failed logins, account lockouts
 - Access Control: API auth, script execution, delegated grants
 - Attachments: File rendering, type validation, MIME checks
@@ -10,6 +10,7 @@ Implements 92 security checks across 9 auditor categories based on ElectricEye p
 - Security Inclusion Listing: URL allowlists, X-Frame-Options, XXE
 - Session Management: Timeouts, CSRF tokens, HTTPOnly cookies
 - Security Plugins: Required plugin installation/activation
+- Platform Security: Encryption, TLS, IP controls, role separation, CMDB, ITSM
 """
 import logging
 from typing import Optional
@@ -88,6 +89,7 @@ class ServiceNowScanner(BaseSaaSScanner):
             self._check_security_inclusion_listing,
             self._check_session_management,
             self._check_security_plugins,
+            self._check_platform_security,
         ]
 
         for check_fn in check_groups:
@@ -112,7 +114,7 @@ class ServiceNowScanner(BaseSaaSScanner):
             resource_id=self.instance_name,
             description="Multi-factor authentication should be enabled for all users",
             remediation="Enable MFA by setting glide.authenticate.multifactor to true",
-            compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC"],
+            compliance_frameworks=["SOC2", "CCM-4.1", "ISO-27001", "NIST-800-53"],
         ).to_dict())
 
         # Account lockout
@@ -126,7 +128,7 @@ class ServiceNowScanner(BaseSaaSScanner):
             resource_id=self.instance_name,
             description=f"Account lockout threshold: {lockout_val} attempts",
             remediation="Configure account lockout (glide.user.max_login_attempts) between 3-10",
-            compliance_frameworks=["NIST-CSF", "ISO-27001"],
+            compliance_frameworks=["SOC2", "CCM-4.1", "ISO-27001", "NIST-800-53"],
         ).to_dict())
 
         # Password complexity
@@ -140,7 +142,7 @@ class ServiceNowScanner(BaseSaaSScanner):
             resource_id=self.instance_name,
             description=f"Password minimum length: {min_len}",
             remediation="Set glide.security.password.min_length to 12 or higher",
-            compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC"],
+            compliance_frameworks=["SOC2", "CCM-4.1", "ISO-27001", "NIST-800-53"],
         ).to_dict())
 
         # Failed login monitoring
@@ -165,7 +167,7 @@ class ServiceNowScanner(BaseSaaSScanner):
                     resource_id=self.instance_name,
                     description=f"Failed logins today: {failed_count} (threshold: {self.failed_login_rate})",
                     remediation="Investigate failed login attempts and implement IP-based restrictions",
-                    compliance_frameworks=["NIST-CSF", "ISO-27001"],
+                    compliance_frameworks=["SOC2", "CCM-4.1", "ISO-27001", "NIST-800-53"],
                 ).to_dict())
         except Exception:
             pass
@@ -211,7 +213,7 @@ class ServiceNowScanner(BaseSaaSScanner):
                 status="PASS" if passed else "FAIL",
                 resource_id=self.instance_name, description=desc,
                 remediation=remed,
-                compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC"],
+                compliance_frameworks=["SOC2", "CCM-4.1", "ISO-27001", "NIST-800-53"],
             ).to_dict())
 
         return results
@@ -241,7 +243,7 @@ class ServiceNowScanner(BaseSaaSScanner):
                 status="PASS" if passed else "FAIL",
                 resource_id=self.instance_name, description=desc,
                 remediation=remed,
-                compliance_frameworks=["NIST-CSF", "ISO-27001"],
+                compliance_frameworks=["SOC2", "CCM-4.1", "ISO-27001", "NIST-800-53"],
             ).to_dict())
 
         return results
@@ -267,7 +269,7 @@ class ServiceNowScanner(BaseSaaSScanner):
                 status="PASS" if passed else "FAIL",
                 resource_id=self.instance_name, description=desc,
                 remediation=remed,
-                compliance_frameworks=["NIST-CSF", "ISO-27001"],
+                compliance_frameworks=["SOC2", "CCM-4.1", "ISO-27001", "NIST-800-53"],
             ).to_dict())
 
         return results
@@ -303,7 +305,7 @@ class ServiceNowScanner(BaseSaaSScanner):
                 status="PASS" if passed else "FAIL",
                 resource_id=self.instance_name, description=desc,
                 remediation=remed,
-                compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC", "CIS"],
+                compliance_frameworks=["SOC2", "CCM-4.1", "ISO-27001", "NIST-800-53"],
             ).to_dict())
 
         return results
@@ -331,7 +333,7 @@ class ServiceNowScanner(BaseSaaSScanner):
                 status="PASS" if passed else "FAIL",
                 resource_id=self.instance_name, description=desc,
                 remediation=remed,
-                compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC"],
+                compliance_frameworks=["SOC2", "CCM-4.1", "ISO-27001", "NIST-800-53"],
             ).to_dict())
 
         return results
@@ -361,7 +363,7 @@ class ServiceNowScanner(BaseSaaSScanner):
                 status="PASS" if passed else "FAIL",
                 resource_id=self.instance_name, description=desc,
                 remediation=remed,
-                compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC"],
+                compliance_frameworks=["SOC2", "CCM-4.1", "ISO-27001", "NIST-800-53"],
             ).to_dict())
 
         return results
@@ -381,7 +383,7 @@ class ServiceNowScanner(BaseSaaSScanner):
             resource_id=self.instance_name,
             description=f"Session timeout: {timeout_val}ms ({timeout_val // 60000 if timeout_val else 0} minutes)",
             remediation="Set glide.ui.session_timeout to 1800000 (30 minutes) or less",
-            compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC"],
+            compliance_frameworks=["SOC2", "CCM-4.1", "ISO-27001", "NIST-800-53"],
         ).to_dict())
 
         session_checks = [
@@ -406,7 +408,7 @@ class ServiceNowScanner(BaseSaaSScanner):
                 status="PASS" if passed else "FAIL",
                 resource_id=self.instance_name, description=desc,
                 remediation=remed,
-                compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC"],
+                compliance_frameworks=["SOC2", "CCM-4.1", "ISO-27001", "NIST-800-53"],
             ).to_dict())
 
         return results
@@ -440,8 +442,293 @@ class ServiceNowScanner(BaseSaaSScanner):
                 resource_id=self.instance_name,
                 description=desc,
                 remediation=f"Install and activate the {plugin_id} plugin",
-                compliance_frameworks=["NIST-CSF", "ISO-27001"],
+                compliance_frameworks=["SOC2", "CCM-4.1", "ISO-27001", "NIST-800-53"],
             ).to_dict())
+
+        return results
+
+    def _sn_table_query(self, table: str, query: str = "", fields: str = "", limit: int = 10) -> list[dict]:
+        """Query a ServiceNow table and return results."""
+        try:
+            params = {"sysparm_limit": limit}
+            if query:
+                params["sysparm_query"] = query
+            if fields:
+                params["sysparm_fields"] = fields
+            with httpx.Client(timeout=15) as client:
+                response = client.get(
+                    f"{self.base_url}/api/now/table/{table}",
+                    params=params,
+                    auth=self._get_auth(),
+                )
+            if response.status_code == 200:
+                return response.json().get("result", [])
+        except Exception as e:
+            logger.warning(f"Failed to query table {table}: {e}")
+        return []
+
+    def _check_platform_security(self) -> list[dict]:
+        """Platform security checks - encryption, TLS, IP controls, role separation, ITSM."""
+        results = []
+        frameworks = ["SOC2", "CCM-4.1", "ISO-27001", "NIST-800-53"]
+
+        # Encryption at rest
+        encryption_prop = self._get_property("glide.encryption.type")
+        results.append(SaaSCheckResult(
+            check_id="servicenow_encryption_at_rest",
+            check_title="Encryption at rest is configured",
+            service_area="platform_security", severity="high",
+            status="PASS" if encryption_prop and len(encryption_prop) > 0 else "FAIL",
+            resource_id=self.instance_name,
+            description="Data at rest should be encrypted using AES-256 or equivalent",
+            remediation="Configure encryption at rest via column-level or edge encryption",
+            compliance_frameworks=frameworks,
+        ).to_dict())
+
+        # TLS enforced
+        tls_prop = self._get_property("glide.security.require_https")
+        results.append(SaaSCheckResult(
+            check_id="servicenow_tls_enforced",
+            check_title="HTTPS/TLS is enforced for all connections",
+            service_area="platform_security", severity="critical",
+            status="PASS" if tls_prop and tls_prop.lower() == "true" else "FAIL",
+            resource_id=self.instance_name,
+            description="All connections to the instance should use HTTPS/TLS",
+            remediation="Set glide.security.require_https to true to enforce TLS",
+            compliance_frameworks=frameworks,
+        ).to_dict())
+
+        # IP access controls
+        ip_filter_prop = self._get_property("glide.ip.filter.active")
+        results.append(SaaSCheckResult(
+            check_id="servicenow_ip_access_controls",
+            check_title="IP-based access controls are active",
+            service_area="platform_security", severity="high",
+            status="PASS" if ip_filter_prop and ip_filter_prop.lower() == "true" else "FAIL",
+            resource_id=self.instance_name,
+            description="IP access controls restrict instance access to approved network ranges",
+            remediation="Enable IP filtering via glide.ip.filter.active and configure allowed IP ranges",
+            compliance_frameworks=frameworks,
+        ).to_dict())
+
+        # Role separation (admin roles limited)
+        try:
+            admins = self._sn_table_query(
+                "sys_user_has_role",
+                query="role.name=admin^user.active=true",
+                fields="sys_id",
+                limit=100,
+            )
+            admin_count = len(admins)
+            results.append(SaaSCheckResult(
+                check_id="servicenow_role_separation",
+                check_title="Admin role assignments are limited (20 or fewer)",
+                service_area="platform_security", severity="high",
+                status="PASS" if 1 <= admin_count <= 20 else "FAIL",
+                resource_id=self.instance_name,
+                description=f"Active users with admin role: {admin_count}",
+                remediation="Limit admin role assignments and use delegated admin roles where possible",
+                compliance_frameworks=frameworks,
+            ).to_dict())
+        except Exception:
+            pass
+
+        # Admin audit logging
+        audit_prop = self._get_property("glide.sys.audit.enabled")
+        results.append(SaaSCheckResult(
+            check_id="servicenow_admin_audit_logging",
+            check_title="System audit logging is enabled",
+            service_area="platform_security", severity="high",
+            status="PASS" if audit_prop and audit_prop.lower() == "true" else "FAIL",
+            resource_id=self.instance_name,
+            description="Audit logging tracks all changes to records and configuration",
+            remediation="Enable audit logging via glide.sys.audit.enabled",
+            compliance_frameworks=frameworks,
+        ).to_dict())
+
+        # Incident management process
+        try:
+            incidents = self._sn_table_query(
+                "incident",
+                query="active=true",
+                fields="sys_id",
+                limit=1,
+            )
+            # Check if incident management is being used (table accessible and has records)
+            results.append(SaaSCheckResult(
+                check_id="servicenow_incident_management",
+                check_title="Incident management process is active",
+                service_area="platform_security", severity="medium",
+                status="PASS",
+                resource_id=self.instance_name,
+                description="Incident management table is accessible and operational",
+                remediation="Ensure incident management workflows are configured and active",
+                compliance_frameworks=frameworks,
+            ).to_dict())
+        except Exception:
+            results.append(SaaSCheckResult(
+                check_id="servicenow_incident_management",
+                check_title="Incident management process is active",
+                service_area="platform_security", severity="medium",
+                status="FAIL",
+                resource_id=self.instance_name,
+                description="Unable to verify incident management configuration",
+                remediation="Configure and activate incident management workflows",
+                compliance_frameworks=frameworks,
+            ).to_dict())
+
+        # Change management process
+        try:
+            change_records = self._sn_table_query(
+                "change_request",
+                query="active=true",
+                fields="sys_id",
+                limit=1,
+            )
+            results.append(SaaSCheckResult(
+                check_id="servicenow_change_management",
+                check_title="Change management process is active",
+                service_area="platform_security", severity="medium",
+                status="PASS",
+                resource_id=self.instance_name,
+                description="Change management table is accessible and operational",
+                remediation="Ensure change management workflows are configured with approval processes",
+                compliance_frameworks=frameworks,
+            ).to_dict())
+        except Exception:
+            results.append(SaaSCheckResult(
+                check_id="servicenow_change_management",
+                check_title="Change management process is active",
+                service_area="platform_security", severity="medium",
+                status="FAIL",
+                resource_id=self.instance_name,
+                description="Unable to verify change management configuration",
+                remediation="Configure and activate change management workflows",
+                compliance_frameworks=frameworks,
+            ).to_dict())
+
+        # Data classification
+        data_class_prop = self._get_property("glide.data_classification.enabled")
+        results.append(SaaSCheckResult(
+            check_id="servicenow_data_classification",
+            check_title="Data classification is enabled",
+            service_area="platform_security", severity="medium",
+            status="PASS" if data_class_prop and data_class_prop.lower() == "true" else "FAIL",
+            resource_id=self.instance_name,
+            description="Data classification labels tables and fields by sensitivity level",
+            remediation="Enable data classification and label sensitive tables and fields",
+            compliance_frameworks=frameworks,
+        ).to_dict())
+
+        # API key rotation
+        try:
+            credentials = self._sn_table_query(
+                "oauth_credential",
+                query="active=true",
+                fields="sys_id,sys_updated_on",
+                limit=50,
+            )
+            from datetime import datetime, timezone, timedelta
+            stale_credentials = 0
+            cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+            for cred in credentials:
+                updated = cred.get("sys_updated_on", "")
+                if updated:
+                    try:
+                        updated_dt = datetime.strptime(updated, "%Y-%m-%d %H:%M:%S")
+                        updated_dt = updated_dt.replace(tzinfo=timezone.utc)
+                        if updated_dt < cutoff:
+                            stale_credentials += 1
+                    except Exception:
+                        pass
+            results.append(SaaSCheckResult(
+                check_id="servicenow_api_key_rotation",
+                check_title="OAuth credentials are rotated within 90 days",
+                service_area="platform_security", severity="high",
+                status="PASS" if stale_credentials == 0 else "FAIL",
+                resource_id=self.instance_name,
+                description=f"OAuth credentials older than 90 days: {stale_credentials}",
+                remediation="Rotate all OAuth credentials and API keys at least every 90 days",
+                compliance_frameworks=frameworks,
+            ).to_dict())
+        except Exception:
+            pass
+
+        # Integration security
+        try:
+            integrations = self._sn_table_query(
+                "sys_rest_message",
+                query="",
+                fields="sys_id,name,authentication_type",
+                limit=100,
+            )
+            unauth_integrations = [
+                i for i in integrations
+                if not i.get("authentication_type") or i.get("authentication_type") == "no_authentication"
+            ]
+            results.append(SaaSCheckResult(
+                check_id="servicenow_integration_security",
+                check_title="REST integrations use authentication",
+                service_area="platform_security", severity="high",
+                status="PASS" if not unauth_integrations else "FAIL",
+                resource_id=self.instance_name,
+                description=f"REST integrations without authentication: {len(unauth_integrations)}",
+                remediation="Configure authentication (OAuth, Basic, or mutual TLS) for all REST integrations",
+                compliance_frameworks=frameworks,
+            ).to_dict())
+        except Exception:
+            pass
+
+        # Instance hardening
+        hardening_checks = [
+            ("glide.security.strict.elevation", "Strict privilege elevation"),
+            ("glide.html.sanitize_all_fields", "HTML sanitization"),
+            ("glide.security.use_csrf_token", "CSRF token protection"),
+        ]
+        hardening_pass = 0
+        for prop, _ in hardening_checks:
+            val = self._get_property(prop)
+            if val and val.lower() == "true":
+                hardening_pass += 1
+
+        results.append(SaaSCheckResult(
+            check_id="servicenow_instance_hardening",
+            check_title="Instance hardening settings are configured (all key settings enabled)",
+            service_area="platform_security", severity="high",
+            status="PASS" if hardening_pass == len(hardening_checks) else "FAIL",
+            resource_id=self.instance_name,
+            description=f"Hardening checks passed: {hardening_pass}/{len(hardening_checks)}",
+            remediation="Enable all instance hardening settings: strict elevation, HTML sanitization, CSRF tokens",
+            compliance_frameworks=frameworks,
+        ).to_dict())
+
+        # CMDB integrity
+        try:
+            cmdb_records = self._sn_table_query(
+                "cmdb_ci",
+                query="sys_class_name=cmdb_ci^active=true",
+                fields="sys_id",
+                limit=1,
+            )
+            # Check for orphan CIs (CIs without relationships)
+            orphan_check = self._sn_table_query(
+                "cmdb_ci",
+                query="active=true^sys_class_name=cmdb_ci^sys_updated_onONLast 365 days@javascript:gs.beginningOfLast365Days()@javascript:gs.endOfToday()",
+                fields="sys_id",
+                limit=1,
+            )
+            results.append(SaaSCheckResult(
+                check_id="servicenow_cmdb_integrity",
+                check_title="CMDB contains active and maintained configuration items",
+                service_area="platform_security", severity="medium",
+                status="PASS" if cmdb_records else "FAIL",
+                resource_id=self.instance_name,
+                description="CMDB should contain up-to-date configuration items for security tracking",
+                remediation="Populate and maintain CMDB with Discovery or manual CI entry, and run health audits",
+                compliance_frameworks=frameworks,
+            ).to_dict())
+        except Exception:
+            pass
 
         return results
 

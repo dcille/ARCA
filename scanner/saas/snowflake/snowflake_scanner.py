@@ -1,8 +1,9 @@
 """Snowflake SaaS Security Scanner.
 
-Implements 21 security checks across 2 auditor categories:
+Implements 32+ security checks across 3 auditor categories:
 - Users: MFA, RSA keys, inactive users, admin roles, password rotation
 - Account: SSO/SCIM, session timeouts, network policies, password policies
+- Data & Operations: Warehouses, retention, masking, row access, stages, audit, sharing
 """
 import logging
 
@@ -58,6 +59,7 @@ class SnowflakeScanner(BaseSaaSScanner):
         check_groups = [
             self._check_users,
             self._check_account,
+            self._check_data_operations,
         ]
 
         for check_fn in check_groups:
@@ -116,7 +118,7 @@ class SnowflakeScanner(BaseSaaSScanner):
                         resource_id=username, resource_name=login_name,
                         description=f"User {username} MFA: {has_mfa}",
                         remediation="Enable MFA (Duo) for password-authenticated users",
-                        compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC", "CIS"],
+                        compliance_frameworks=["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"],
                     ).to_dict())
 
                 # RSA key for service accounts
@@ -129,7 +131,7 @@ class SnowflakeScanner(BaseSaaSScanner):
                         resource_id=username, resource_name=login_name,
                         description=f"Service account {username} RSA key: {has_rsa}",
                         remediation="Configure RSA key pair authentication for service accounts",
-                        compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC"],
+                        compliance_frameworks=["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"],
                     ).to_dict())
 
                 # Inactive user check
@@ -149,7 +151,7 @@ class SnowflakeScanner(BaseSaaSScanner):
                             resource_id=username, resource_name=login_name,
                             description=f"User {username} last login: {days_inactive} days ago",
                             remediation="Disable users inactive for more than 90 days",
-                            compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC"],
+                            compliance_frameworks=["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"],
                         ).to_dict())
                     except Exception:
                         pass
@@ -166,7 +168,7 @@ class SnowflakeScanner(BaseSaaSScanner):
                         resource_id=username, resource_name=login_name,
                         description=f"Admin user {username} email: {'set' if email else 'not set'}",
                         remediation="Set an email address for admin users for recovery and notifications",
-                        compliance_frameworks=["NIST-CSF", "ISO-27001"],
+                        compliance_frameworks=["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"],
                     ).to_dict())
 
                 # Default role check
@@ -179,7 +181,7 @@ class SnowflakeScanner(BaseSaaSScanner):
                         resource_id=username, resource_name=login_name,
                         description=f"User {username} has {default_role} as default role",
                         remediation="Set a custom role as the user's default role instead of admin roles",
-                        compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC"],
+                        compliance_frameworks=["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"],
                     ).to_dict())
 
                 # Password rotation check
@@ -199,7 +201,7 @@ class SnowflakeScanner(BaseSaaSScanner):
                             resource_id=username, resource_name=login_name,
                             description=f"User {username} password age: {pwd_age} days",
                             remediation="Rotate passwords at least every 90 days",
-                            compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC"],
+                            compliance_frameworks=["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"],
                         ).to_dict())
                     except Exception:
                         pass
@@ -213,7 +215,7 @@ class SnowflakeScanner(BaseSaaSScanner):
                 resource_id=self.account_id,
                 description=f"Account admin users: {admin_count}",
                 remediation="Maintain between 2 and 10 account admin users",
-                compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC"],
+                compliance_frameworks=["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"],
             ).to_dict())
 
         except Exception as e:
@@ -247,7 +249,7 @@ class SnowflakeScanner(BaseSaaSScanner):
                 resource_id=self.account_id,
                 description=f"SSO configuration: {'configured' if sso_configured else 'not configured'}",
                 remediation="Configure SAML-based SSO for centralized authentication",
-                compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC", "CIS"],
+                compliance_frameworks=["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"],
             ).to_dict())
 
             # Network policy check
@@ -265,7 +267,7 @@ class SnowflakeScanner(BaseSaaSScanner):
                 resource_id=self.account_id,
                 description=f"Network policies: {'configured' if has_network_policy else 'not configured'}",
                 remediation="Create network policies to restrict access by IP address",
-                compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC", "CIS"],
+                compliance_frameworks=["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"],
             ).to_dict())
 
             # Session timeout check
@@ -282,7 +284,7 @@ class SnowflakeScanner(BaseSaaSScanner):
                     resource_id=self.account_id,
                     description=f"Statement timeout: {timeout} seconds",
                     remediation="Set STATEMENT_TIMEOUT_IN_SECONDS to 900 (15 minutes) or less for admin roles",
-                    compliance_frameworks=["NIST-CSF", "ISO-27001"],
+                    compliance_frameworks=["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"],
                 ).to_dict())
             except Exception:
                 pass
@@ -300,7 +302,7 @@ class SnowflakeScanner(BaseSaaSScanner):
                     resource_id=self.account_id,
                     description=f"Password policies: {'configured' if has_password_policy else 'using defaults'}",
                     remediation="Create a custom password policy with minimum 14 characters",
-                    compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC", "CIS"],
+                    compliance_frameworks=["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"],
                 ).to_dict())
 
                 if has_password_policy:
@@ -316,7 +318,7 @@ class SnowflakeScanner(BaseSaaSScanner):
                             resource_id=self.account_id,
                             description=f"Password minimum length: {min_length}",
                             remediation="Set PASSWORD_MIN_LENGTH to 14 or higher",
-                            compliance_frameworks=["NIST-CSF", "ISO-27001", "AICPA-TSC"],
+                            compliance_frameworks=["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"],
                         ).to_dict())
             except Exception:
                 pass
@@ -340,7 +342,7 @@ class SnowflakeScanner(BaseSaaSScanner):
                             resource_name=f"{task.get('DATABASE_NAME')}.{task.get('SCHEMA_NAME')}.{task.get('NAME')}",
                             description=f"Task owned by {owner} (should use custom role)",
                             remediation="Transfer task ownership to a custom role with least privilege",
-                            compliance_frameworks=["NIST-CSF", "ISO-27001"],
+                            compliance_frameworks=["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"],
                         ).to_dict())
             except Exception:
                 pass
@@ -361,13 +363,246 @@ class SnowflakeScanner(BaseSaaSScanner):
                     resource_id=self.account_id,
                     description=f"Active SCIM integrations: {len(scim_integrations)}",
                     remediation="Configure SCIM for automated user provisioning and deprovisioning",
-                    compliance_frameworks=["NIST-CSF", "ISO-27001"],
+                    compliance_frameworks=["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"],
                 ).to_dict())
             except Exception:
                 pass
 
         except Exception as e:
             logger.warning(f"Snowflake account checks failed: {e}")
+
+        return results
+
+    def _check_data_operations(self) -> list[dict]:
+        """Data protection and operations checks."""
+        results = []
+        frameworks = ["SOC2", "CCM-4.1", "HIPAA", "NIST-800-53"]
+
+        try:
+            # Warehouse auto-suspend
+            try:
+                warehouses = self._execute_query("SHOW WAREHOUSES")
+                for wh in warehouses:
+                    wh_name = wh.get("name", "Unknown")
+                    auto_suspend = wh.get("auto_suspend", 0)
+                    if isinstance(auto_suspend, str):
+                        auto_suspend = int(auto_suspend) if auto_suspend.isdigit() else 0
+                    results.append(SaaSCheckResult(
+                        check_id="snowflake_warehouse_auto_suspend",
+                        check_title="Warehouse has auto-suspend configured (10 minutes or less)",
+                        service_area="data_operations", severity="medium",
+                        status="PASS" if 0 < auto_suspend <= 600 else "FAIL",
+                        resource_id=wh_name, resource_name=wh_name,
+                        description=f"Warehouse {wh_name} auto-suspend: {auto_suspend} seconds",
+                        remediation="Set warehouse auto-suspend to 600 seconds (10 minutes) or less",
+                        compliance_frameworks=frameworks,
+                    ).to_dict())
+            except Exception as e:
+                logger.warning(f"Warehouse auto-suspend check failed: {e}")
+
+            # Data retention configured
+            try:
+                retention_params = self._execute_query(
+                    "SHOW PARAMETERS LIKE 'DATA_RETENTION_TIME_IN_DAYS' IN ACCOUNT"
+                )
+                retention = int(retention_params[0].get("value", 0)) if retention_params else 0
+                results.append(SaaSCheckResult(
+                    check_id="snowflake_data_retention_configured",
+                    check_title="Data retention period is configured (at least 1 day)",
+                    service_area="data_operations", severity="high",
+                    status="PASS" if retention >= 1 else "FAIL",
+                    resource_id=self.account_id,
+                    description=f"Data retention time: {retention} days",
+                    remediation="Set DATA_RETENTION_TIME_IN_DAYS to at least 1 day for Time Travel",
+                    compliance_frameworks=frameworks,
+                ).to_dict())
+            except Exception as e:
+                logger.warning(f"Data retention check failed: {e}")
+
+            # Column masking policies
+            try:
+                masking_policies = self._execute_query("SHOW MASKING POLICIES")
+                has_masking = bool(masking_policies)
+                results.append(SaaSCheckResult(
+                    check_id="snowflake_column_masking_policies",
+                    check_title="Column-level masking policies are configured",
+                    service_area="data_operations", severity="high",
+                    status="PASS" if has_masking else "FAIL",
+                    resource_id=self.account_id,
+                    description=f"Masking policies: {len(masking_policies) if masking_policies else 0}",
+                    remediation="Create dynamic data masking policies to protect sensitive columns",
+                    compliance_frameworks=frameworks,
+                ).to_dict())
+            except Exception as e:
+                logger.warning(f"Masking policies check failed: {e}")
+
+            # Row access policies
+            try:
+                row_policies = self._execute_query("SHOW ROW ACCESS POLICIES")
+                has_row_policies = bool(row_policies)
+                results.append(SaaSCheckResult(
+                    check_id="snowflake_row_access_policies",
+                    check_title="Row access policies are configured",
+                    service_area="data_operations", severity="medium",
+                    status="PASS" if has_row_policies else "FAIL",
+                    resource_id=self.account_id,
+                    description=f"Row access policies: {len(row_policies) if row_policies else 0}",
+                    remediation="Create row access policies to enforce row-level security",
+                    compliance_frameworks=frameworks,
+                ).to_dict())
+            except Exception as e:
+                logger.warning(f"Row access policies check failed: {e}")
+
+            # External functions restricted
+            try:
+                ext_functions = self._execute_query("""
+                    SELECT FUNCTION_NAME, FUNCTION_SCHEMA, FUNCTION_CATALOG
+                    FROM SNOWFLAKE.ACCOUNT_USAGE.FUNCTIONS
+                    WHERE IS_EXTERNAL = 'YES' AND DELETED IS NULL
+                """)
+                ext_count = len(ext_functions) if ext_functions else 0
+                results.append(SaaSCheckResult(
+                    check_id="snowflake_external_functions_restricted",
+                    check_title="External functions are limited and reviewed",
+                    service_area="data_operations", severity="medium",
+                    status="PASS" if ext_count <= 5 else "FAIL",
+                    resource_id=self.account_id,
+                    description=f"External functions configured: {ext_count}",
+                    remediation="Review and limit external functions to only those that are necessary",
+                    compliance_frameworks=frameworks,
+                ).to_dict())
+            except Exception as e:
+                logger.warning(f"External functions check failed: {e}")
+
+            # Stages encrypted
+            try:
+                stages = self._execute_query("SHOW STAGES")
+                unencrypted_stages = []
+                for stage in (stages or []):
+                    stage_name = stage.get("name", "")
+                    stage_type = str(stage.get("type", "")).upper()
+                    # Internal stages are encrypted by default; check external
+                    if stage_type == "EXTERNAL":
+                        encryption = stage.get("encryption", "")
+                        if not encryption or "NONE" in str(encryption).upper():
+                            unencrypted_stages.append(stage_name)
+                results.append(SaaSCheckResult(
+                    check_id="snowflake_stages_encrypted",
+                    check_title="External stages use encryption",
+                    service_area="data_operations", severity="high",
+                    status="PASS" if not unencrypted_stages else "FAIL",
+                    resource_id=self.account_id,
+                    description=f"Unencrypted external stages: {len(unencrypted_stages)}",
+                    remediation="Configure encryption for all external stages (e.g., SSE-S3, SSE-KMS)",
+                    compliance_frameworks=frameworks,
+                ).to_dict())
+            except Exception as e:
+                logger.warning(f"Stage encryption check failed: {e}")
+
+            # Audit logging enabled
+            try:
+                audit_records = self._execute_query("""
+                    SELECT COUNT(*) AS cnt
+                    FROM SNOWFLAKE.ACCOUNT_USAGE.LOGIN_HISTORY
+                    WHERE EVENT_TIMESTAMP >= DATEADD('day', -1, CURRENT_TIMESTAMP())
+                """)
+                count = audit_records[0].get("cnt", audit_records[0].get("CNT", 0)) if audit_records else 0
+                results.append(SaaSCheckResult(
+                    check_id="snowflake_audit_logging_enabled",
+                    check_title="Audit logging is active (login history available)",
+                    service_area="data_operations", severity="high",
+                    status="PASS" if count > 0 else "FAIL",
+                    resource_id=self.account_id,
+                    description=f"Login history records in last 24h: {count}",
+                    remediation="Ensure ACCOUNT_USAGE schema is accessible and audit logging is active",
+                    compliance_frameworks=frameworks,
+                ).to_dict())
+            except Exception as e:
+                logger.warning(f"Audit logging check failed: {e}")
+
+            # Query history retention
+            try:
+                query_records = self._execute_query("""
+                    SELECT MIN(START_TIME) AS oldest
+                    FROM SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY
+                    WHERE START_TIME >= DATEADD('day', -365, CURRENT_TIMESTAMP())
+                    LIMIT 1
+                """)
+                has_history = bool(query_records and query_records[0].get("oldest", query_records[0].get("OLDEST")))
+                results.append(SaaSCheckResult(
+                    check_id="snowflake_query_history_retention",
+                    check_title="Query history is retained for audit purposes",
+                    service_area="data_operations", severity="medium",
+                    status="PASS" if has_history else "FAIL",
+                    resource_id=self.account_id,
+                    description="Query history should be retained for at least 365 days for compliance",
+                    remediation="Ensure query history is available in ACCOUNT_USAGE for audit retention",
+                    compliance_frameworks=frameworks,
+                ).to_dict())
+            except Exception as e:
+                logger.warning(f"Query history retention check failed: {e}")
+
+            # Data sharing monitored
+            try:
+                shares = self._execute_query("SHOW SHARES")
+                outbound_shares = [
+                    s for s in (shares or [])
+                    if str(s.get("kind", "")).upper() == "OUTBOUND"
+                ]
+                results.append(SaaSCheckResult(
+                    check_id="snowflake_data_sharing_monitored",
+                    check_title="Outbound data shares are monitored and limited",
+                    service_area="data_operations", severity="high",
+                    status="PASS" if len(outbound_shares) <= 10 else "FAIL",
+                    resource_id=self.account_id,
+                    description=f"Outbound data shares: {len(outbound_shares)}",
+                    remediation="Review outbound data shares and remove any that are no longer needed",
+                    compliance_frameworks=frameworks,
+                ).to_dict())
+            except Exception as e:
+                logger.warning(f"Data sharing check failed: {e}")
+
+            # Cortex access restricted
+            try:
+                cortex_grants = self._execute_query("""
+                    SELECT GRANTEE_NAME, PRIVILEGE
+                    FROM SNOWFLAKE.ACCOUNT_USAGE.GRANTS_TO_ROLES
+                    WHERE PRIVILEGE ILIKE '%CORTEX%'
+                    AND DELETED_ON IS NULL
+                """)
+                cortex_count = len(cortex_grants) if cortex_grants else 0
+                results.append(SaaSCheckResult(
+                    check_id="snowflake_cortex_access_restricted",
+                    check_title="Snowflake Cortex access is restricted to authorized roles",
+                    service_area="data_operations", severity="medium",
+                    status="PASS" if cortex_count <= 3 else "FAIL",
+                    resource_id=self.account_id,
+                    description=f"Cortex-related privilege grants: {cortex_count}",
+                    remediation="Restrict Cortex function access to only authorized roles",
+                    compliance_frameworks=frameworks,
+                ).to_dict())
+            except Exception as e:
+                logger.warning(f"Cortex access check failed: {e}")
+
+            # Failover configured
+            try:
+                replication = self._execute_query("SHOW REPLICATION ACCOUNTS")
+                has_failover = bool(replication)
+                results.append(SaaSCheckResult(
+                    check_id="snowflake_failover_configured",
+                    check_title="Account replication/failover is configured",
+                    service_area="data_operations", severity="medium",
+                    status="PASS" if has_failover else "FAIL",
+                    resource_id=self.account_id,
+                    description=f"Replication accounts: {len(replication) if replication else 0}",
+                    remediation="Configure account replication and failover for business continuity",
+                    compliance_frameworks=frameworks,
+                ).to_dict())
+            except Exception as e:
+                logger.warning(f"Failover check failed: {e}")
+
+        except Exception as e:
+            logger.warning(f"Snowflake data operations checks failed: {e}")
 
         return results
 
