@@ -332,6 +332,17 @@ export default function MitreAttackPage() {
         </div>
       )}
 
+      {/* No findings banner */}
+      {!analyzing && hasMatrix && matrixData?.summary?.assessed === 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-6 flex items-center gap-3">
+          <ShieldCheckIcon className="w-5 h-5 text-amber-500 flex-shrink-0" />
+          <p className="text-sm text-amber-800">
+            <strong>No scan findings available.</strong> The matrix shows all techniques as &quot;Not Assessed&quot; because no cloud or SaaS scans have been run yet.
+            Go to <a href="/darca/scans" className="underline font-medium">Scans</a> to run your first security scan, then come back to see your MITRE ATT&amp;CK coverage.
+          </p>
+        </div>
+      )}
+
       {/* Matrix display */}
       {!analyzing && hasMatrix && (
         <>

@@ -100,7 +100,9 @@ async def get_attack_matrix(
     for tactic in tactics_order:
         tactic_techniques = []
         for tech_id, tech_info in MITRE_TECHNIQUES.items():
-            if tech_info.get("tactic") == tactic:
+            # Normalize tactic comparison: mapping uses "Initial Access", router uses "initial-access"
+            tech_tactic = tech_info.get("tactic", "").lower().replace(" ", "-")
+            if tech_tactic == tactic:
                 status_data = technique_status.get(tech_id, {})
                 pass_count = status_data.get("pass_count", 0)
                 fail_count = status_data.get("fail_count", 0)
