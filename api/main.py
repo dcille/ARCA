@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from api.config import settings
 from api.database import engine, Base
@@ -19,11 +20,18 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        # checkfirst=True generates CREATE TABLE IF NOT EXISTS - atomic, no race condition
-        await conn.run_sync(
-            lambda sync_conn: Base.metadata.create_all(sync_conn, checkfirst=True)
-        )
+    # When running with multiple gunicorn workers, each worker executes this
+    # lifespan concurrently. Even with checkfirst=True (CREATE TABLE IF NOT
+    # EXISTS), asyncpg + PostgreSQL can raise an IntegrityError on the implicit
+    # pg_type entry for a table name when two workers race. This is safe to
+    # ignore -- the table was already created by the other worker.
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(
+                lambda sync_conn: Base.metadata.create_all(sync_conn, checkfirst=True)
+            )
+    except (IntegrityError, OperationalError) as exc:
+        logger.warning("Table creation race condition (safe to ignore): %s", exc)
     yield
 
 
