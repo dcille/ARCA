@@ -111,6 +111,25 @@ def run_cloud_scan(self, scan_id: str, provider_id: str, services=None, regions=
         scan.completed_at = datetime.utcnow()
         session.commit()
 
+        # Fire notifications and webhooks
+        try:
+            from api.services.notification_service import (
+                create_scan_complete_notification,
+                create_critical_finding_notification,
+            )
+            create_scan_complete_notification(
+                session,
+                user_id=scan.user_id,
+                scan_id=scan_id,
+                scan_type="cloud",
+                total=total,
+                passed=passed,
+                failed=failed,
+            )
+            session.commit()
+        except Exception as notify_err:
+            logger.warning(f"Notification dispatch failed: {notify_err}")
+
         logger.info(f"Cloud scan {scan_id} completed: {total} checks, {passed} passed, {failed} failed")
 
     except Exception as e:
