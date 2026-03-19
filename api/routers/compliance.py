@@ -310,3 +310,108 @@ async def framework_check_library(
         "total_checks": len(all_check_ids),
         "controls": controls_out,
     }
+
+
+@router.get("/frameworks/{framework_id}/controls")
+async def framework_controls_with_results(
+    framework_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return control-level results: each control with its evaluation status and findings."""
+    if framework_id not in FRAMEWORKS:
+        raise HTTPException(status_code=404, detail="Framework not found")
+
+    from scanner.mitre.attack_mapping import CHECK_DESCRIPTIONS, CHECK_EVIDENCE
+
+    fw = FRAMEWORKS[framework_id]
+    controls = get_framework_controls(framework_id)
+
+    # Query all findings for this framework
+    fw_filter = _build_fw_filter(framework_id)
+    query = (
+        select(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id)
+    )
+    if fw_filter is not None:
+        query = query.where(fw_filter)
+    result = await db.execute(query)
+    all_findings = result.scalars().all()
+
+    # Index findings by check_id
+    findings_by_check: dict = {}
+    for f in all_findings:
+        findings_by_check.setdefault(f.check_id, []).append(f)
+
+    # Build per-check status: PASS/FAIL/NOT_EVALUATED
+    check_statuses: dict = {}
+    for cid, findings_list in findings_by_check.items():
+        has_fail = any(f.status == "FAIL" for f in findings_list)
+        has_pass = any(f.status == "PASS" for f in findings_list)
+        if has_fail:
+            check_statuses[cid] = "FAIL"
+        elif has_pass:
+            check_statuses[cid] = "PASS"
+        else:
+            check_statuses[cid] = "NOT_EVALUATED"
+
+    summary = await _per_check_summary(db, current_user.id, framework_id)
+
+    controls_out = []
+    for ctrl in controls:
+        checks_map = ctrl.get("checks", {})
+        provider_checks = {}
+        ctrl_passed = 0
+        ctrl_failed = 0
+        ctrl_not_evaluated = 0
+
+        if isinstance(checks_map, dict):
+            for provider, cids in checks_map.items():
+                provider_checks[provider] = []
+                for cid in cids:
+                    status = check_statuses.get(cid, "NOT_EVALUATED")
+                    if status == "PASS":
+                        ctrl_passed += 1
+                    elif status == "FAIL":
+                        ctrl_failed += 1
+                    else:
+                        ctrl_not_evaluated += 1
+
+                    # Get one representative finding for details
+                    check_findings = findings_by_check.get(cid, [])
+                    provider_checks[provider].append({
+                        "check_id": cid,
+                        "status": status,
+                        "description": CHECK_DESCRIPTIONS.get(cid, f"Security check: {cid.replace('_', ' ')}"),
+                        "evidence_method": CHECK_EVIDENCE.get(cid, ""),
+                        "finding_count": len(check_findings),
+                        "fail_count": sum(1 for f in check_findings if f.status == "FAIL"),
+                        "pass_count": sum(1 for f in check_findings if f.status == "PASS"),
+                    })
+
+        # Control-level status
+        if ctrl_failed > 0:
+            ctrl_status = "FAIL"
+        elif ctrl_passed > 0:
+            ctrl_status = "PASS"
+        else:
+            ctrl_status = "NOT_EVALUATED"
+
+        controls_out.append({
+            "id": ctrl.get("id", ""),
+            "title": ctrl.get("title", ""),
+            "description": ctrl.get("description", ""),
+            "status": ctrl_status,
+            "passed": ctrl_passed,
+            "failed": ctrl_failed,
+            "not_evaluated": ctrl_not_evaluated,
+            "checks": provider_checks,
+        })
+
+    return {
+        "framework": _get_fw_meta(framework_id),
+        "summary": summary,
+        "total_controls": len(controls),
+        "controls": controls_out,
+    }
