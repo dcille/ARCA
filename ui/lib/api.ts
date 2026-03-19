@@ -148,6 +148,10 @@ class ApiClient {
     return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/library`)
   }
 
+  async getComplianceFrameworkControls(frameworkId: string) {
+    return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/controls`)
+  }
+
   async updateProvider(id: string, data: any) {
     return this.request<any>('PUT', `/api/v1/providers/${id}`, data)
   }

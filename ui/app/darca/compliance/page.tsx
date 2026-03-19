@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Header from '@/components/layout/Header'
 import { api } from '@/lib/api'
 import { formatPercent } from '@/lib/utils'
-import { XMarkIcon, ChevronDownIcon, ChevronRightIcon, BookOpenIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, ChevronDownIcon, ChevronRightIcon, BookOpenIcon, FunnelIcon, CheckIcon } from '@heroicons/react/24/outline'
 
 const SEVERITY_COLORS: Record<string, string> = {
   critical: 'bg-red-100 text-red-800',
@@ -17,6 +17,13 @@ const SEVERITY_COLORS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   PASS: 'bg-green-100 text-green-800',
   FAIL: 'bg-red-100 text-red-800',
+  NOT_EVALUATED: 'bg-gray-100 text-gray-500',
+}
+
+const STATUS_DOT: Record<string, string> = {
+  PASS: 'bg-green-500',
+  FAIL: 'bg-red-500',
+  NOT_EVALUATED: 'bg-gray-300',
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -42,25 +49,29 @@ export default function CompliancePage() {
   const [summaries, setSummaries] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
 
+  // Framework filter state
+  const [selectedFrameworkIds, setSelectedFrameworkIds] = useState<Set<string>>(new Set())
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false)
+
   // Detail view state
   const [selectedFramework, setSelectedFramework] = useState<string | null>(null)
-  const [detailData, setDetailData] = useState<any>(null)
+  const [controlsData, setControlsData] = useState<any>(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [severityFilter, setSeverityFilter] = useState<string>('all')
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [controlStatusFilter, setControlStatusFilter] = useState<string>('all')
+  const [expandedControls, setExpandedControls] = useState<Set<string>>(new Set())
 
   // Check library state
   const [showLibrary, setShowLibrary] = useState(false)
   const [libraryData, setLibraryData] = useState<any>(null)
   const [libraryLoading, setLibraryLoading] = useState(false)
-  const [expandedControls, setExpandedControls] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const load = async () => {
       try {
         const fws = await api.getComplianceFrameworks()
         setFrameworks(fws)
+        // All frameworks selected by default
+        setSelectedFrameworkIds(new Set(fws.map((fw: any) => fw.id)))
 
         const sums: Record<string, any> = {}
         for (const fw of fws) {
@@ -80,14 +91,11 @@ export default function CompliancePage() {
     load()
   }, [])
 
-  const loadFrameworkDetail = async (frameworkId: string, status?: string, severity?: string) => {
+  const loadFrameworkControls = async (frameworkId: string) => {
     setDetailLoading(true)
     try {
-      const params: Record<string, string> = {}
-      if (status && status !== 'all') params.status = status
-      if (severity && severity !== 'all') params.severity = severity
-      const data = await api.getComplianceFrameworkChecks(frameworkId, params)
-      setDetailData(data)
+      const data = await api.getComplianceFrameworkControls(frameworkId)
+      setControlsData(data)
     } catch (err) {
       console.error(err)
     } finally {
@@ -98,34 +106,15 @@ export default function CompliancePage() {
   const handleFrameworkClick = (frameworkId: string) => {
     if (selectedFramework === frameworkId) {
       setSelectedFramework(null)
-      setDetailData(null)
+      setControlsData(null)
       return
     }
     setSelectedFramework(frameworkId)
-    setStatusFilter('all')
-    setSeverityFilter('all')
-    setExpandedRows(new Set())
+    setControlStatusFilter('all')
+    setExpandedControls(new Set())
     setShowLibrary(false)
     setLibraryData(null)
-    setExpandedControls(new Set())
-    loadFrameworkDetail(frameworkId)
-  }
-
-  const handleFilterChange = (newStatus: string, newSeverity: string) => {
-    setStatusFilter(newStatus)
-    setSeverityFilter(newSeverity)
-    if (selectedFramework) {
-      loadFrameworkDetail(selectedFramework, newStatus, newSeverity)
-    }
-  }
-
-  const toggleRow = (findingId: string) => {
-    setExpandedRows((prev) => {
-      const next = new Set(prev)
-      if (next.has(findingId)) next.delete(findingId)
-      else next.add(findingId)
-      return next
-    })
+    loadFrameworkControls(frameworkId)
   }
 
   const toggleControl = (controlId: string) => {
@@ -162,16 +151,95 @@ export default function CompliancePage() {
 
   const closeDetail = () => {
     setSelectedFramework(null)
-    setDetailData(null)
-    setExpandedRows(new Set())
+    setControlsData(null)
+    setExpandedControls(new Set())
     setShowLibrary(false)
     setLibraryData(null)
-    setExpandedControls(new Set())
   }
+
+  const toggleFrameworkFilter = (fwId: string) => {
+    setSelectedFrameworkIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(fwId)) next.delete(fwId)
+      else next.add(fwId)
+      return next
+    })
+  }
+
+  const selectAllFrameworks = () => setSelectedFrameworkIds(new Set(frameworks.map((fw) => fw.id)))
+  const clearAllFrameworks = () => setSelectedFrameworkIds(new Set())
+
+  const visibleFrameworks = frameworks.filter((fw) => selectedFrameworkIds.has(fw.id))
+
+  // Filter controls by status
+  const filteredControls = controlsData?.controls?.filter((ctrl: any) => {
+    if (controlStatusFilter === 'all') return true
+    return ctrl.status === controlStatusFilter
+  }) || []
 
   return (
     <div>
       <Header title="Compliance" subtitle="Compliance framework assessment results" />
+
+      {/* Framework Filter Bar */}
+      {!loading && frameworks.length > 0 && (
+        <div className="mb-6 flex items-center gap-3">
+          <div className="relative">
+            <button
+              onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+              className="inline-flex items-center gap-2 px-3 py-2 border border-brand-gray-300 rounded-lg text-sm font-medium text-brand-gray-700 hover:bg-brand-gray-50"
+            >
+              <FunnelIcon className="w-4 h-4" />
+              Frameworks ({selectedFrameworkIds.size}/{frameworks.length})
+              <ChevronDownIcon className="w-3 h-3" />
+            </button>
+
+            {showFilterDropdown && (
+              <div className="absolute z-50 mt-1 w-80 bg-white border border-brand-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+                <div className="sticky top-0 bg-white border-b border-brand-gray-200 px-3 py-2 flex items-center justify-between">
+                  <span className="text-xs font-medium text-brand-gray-500">Select frameworks to display</span>
+                  <div className="flex gap-2">
+                    <button onClick={selectAllFrameworks} className="text-xs text-brand-green hover:underline">All</button>
+                    <button onClick={clearAllFrameworks} className="text-xs text-red-500 hover:underline">None</button>
+                  </div>
+                </div>
+                {frameworks.map((fw) => (
+                  <label
+                    key={fw.id}
+                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-brand-gray-50 cursor-pointer border-b border-brand-gray-100 last:border-b-0"
+                  >
+                    <div
+                      className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                        selectedFrameworkIds.has(fw.id)
+                          ? 'bg-brand-green border-brand-green'
+                          : 'border-brand-gray-300'
+                      }`}
+                      onClick={(e) => { e.preventDefault(); toggleFrameworkFilter(fw.id) }}
+                    >
+                      {selectedFrameworkIds.has(fw.id) && <CheckIcon className="w-3 h-3 text-white" />}
+                    </div>
+                    <div className="flex-1 min-w-0" onClick={() => toggleFrameworkFilter(fw.id)}>
+                      <p className="text-sm font-medium text-brand-navy truncate">{fw.name}</p>
+                      <p className="text-[10px] text-brand-gray-400 truncate">{fw.description}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {selectedFrameworkIds.size < frameworks.length && (
+            <span className="text-xs text-brand-gray-400">
+              Showing {selectedFrameworkIds.size} of {frameworks.length} frameworks
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Close dropdown when clicking outside */}
+      {showFilterDropdown && (
+        <div className="fixed inset-0 z-40" onClick={() => setShowFilterDropdown(false)} />
+      )}
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -183,7 +251,7 @@ export default function CompliancePage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {frameworks.map((fw) => {
+          {visibleFrameworks.map((fw) => {
             const summary = summaries[fw.id] || {}
             const passRate = summary.pass_rate || 0
             const isSelected = selectedFramework === fw.id
@@ -257,17 +325,17 @@ export default function CompliancePage() {
         </div>
       )}
 
-      {/* Framework Detail Panel */}
+      {/* Framework Detail Panel — Control-Level View */}
       {selectedFramework && (
         <div className="mt-8 card">
           {/* Header */}
           <div className="flex items-start justify-between mb-6">
             <div>
               <h2 className="text-lg font-semibold text-brand-navy">
-                {detailData?.framework?.name || 'Loading...'}
+                {controlsData?.framework?.name || 'Loading...'}
               </h2>
               <p className="text-sm text-brand-gray-400 mt-1">
-                {detailData?.framework?.description || ''}
+                {controlsData?.framework?.description || ''}
               </p>
             </div>
             <button
@@ -279,26 +347,26 @@ export default function CompliancePage() {
           </div>
 
           {/* Summary Stats Bar */}
-          {detailData?.summary && (
+          {controlsData?.summary && (
             <div className="grid grid-cols-5 gap-4 mb-6">
               <div className="bg-brand-gray-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-brand-navy">{detailData.summary.total_checks}</p>
+                <p className="text-2xl font-bold text-brand-navy">{controlsData.summary.total_checks}</p>
                 <p className="text-xs text-brand-gray-400">Total Checks</p>
               </div>
               <div className="bg-green-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-green-700">{detailData.summary.passed}</p>
+                <p className="text-2xl font-bold text-green-700">{controlsData.summary.passed}</p>
                 <p className="text-xs text-green-600">Passed</p>
               </div>
               <div className="bg-red-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-red-700">{detailData.summary.failed}</p>
+                <p className="text-2xl font-bold text-red-700">{controlsData.summary.failed}</p>
                 <p className="text-xs text-red-600">Failed</p>
               </div>
               <div className="bg-gray-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-gray-400">{detailData.summary.not_evaluated || 0}</p>
+                <p className="text-2xl font-bold text-gray-400">{controlsData.summary.not_evaluated || 0}</p>
                 <p className="text-xs text-gray-400">Not Evaluated</p>
               </div>
               <div className="bg-blue-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-blue-700">{detailData.summary.pass_rate}%</p>
+                <p className="text-2xl font-bold text-blue-700">{controlsData.summary.pass_rate}%</p>
                 <p className="text-xs text-blue-600">Pass Rate</p>
               </div>
             </div>
@@ -306,33 +374,32 @@ export default function CompliancePage() {
 
           {/* Filter Controls */}
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-brand-gray-700">Status:</label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => handleFilterChange(e.target.value, severityFilter)}
-                  className="px-3 py-1.5 border border-brand-gray-300 rounded-lg text-sm"
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-brand-gray-700">Filter:</label>
+              {['all', 'PASS', 'FAIL', 'NOT_EVALUATED'].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setControlStatusFilter(s)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    controlStatusFilter === s
+                      ? s === 'PASS' ? 'bg-green-100 text-green-800'
+                      : s === 'FAIL' ? 'bg-red-100 text-red-800'
+                      : s === 'NOT_EVALUATED' ? 'bg-gray-200 text-gray-600'
+                      : 'bg-brand-green text-white'
+                      : 'border border-brand-gray-300 text-brand-gray-500 hover:bg-brand-gray-50'
+                  }`}
                 >
-                  <option value="all">All</option>
-                  <option value="PASS">Pass</option>
-                  <option value="FAIL">Fail</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-brand-gray-700">Severity:</label>
-                <select
-                  value={severityFilter}
-                  onChange={(e) => handleFilterChange(statusFilter, e.target.value)}
-                  className="px-3 py-1.5 border border-brand-gray-300 rounded-lg text-sm"
-                >
-                  <option value="all">All</option>
-                  <option value="critical">Critical</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-              </div>
+                  {s === 'all' ? 'All' : s === 'NOT_EVALUATED' ? 'Not Evaluated' : s === 'PASS' ? 'Passed' : 'Failed'}
+                  {controlsData?.controls && (
+                    <span className="ml-1.5 opacity-70">
+                      ({s === 'all'
+                        ? controlsData.controls.length
+                        : controlsData.controls.filter((c: any) => c.status === s).length
+                      })
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
             <button
               onClick={toggleLibrary}
@@ -347,7 +414,7 @@ export default function CompliancePage() {
             </button>
           </div>
 
-          {/* Check Library Panel — Control-Level */}
+          {/* Check Library Panel */}
           {showLibrary && (
             <div className="mb-6 border border-brand-gray-200 rounded-lg overflow-hidden">
               <div className="bg-brand-gray-50 px-4 py-3 border-b border-brand-gray-200">
@@ -372,7 +439,7 @@ export default function CompliancePage() {
               ) : libraryData?.controls?.length > 0 ? (
                 <div className="max-h-[600px] overflow-y-auto divide-y divide-brand-gray-100">
                   {libraryData.controls.map((ctrl: any) => {
-                    const isExpanded = expandedControls.has(ctrl.id)
+                    const isExpanded = expandedControls.has(`lib-${ctrl.id}`)
                     const providerKeys = Object.keys(ctrl.checks || {})
                     const totalChecks = providerKeys.reduce(
                       (sum: number, k: string) => sum + (ctrl.checks[k]?.length || 0), 0
@@ -381,7 +448,7 @@ export default function CompliancePage() {
                     return (
                       <div key={ctrl.id}>
                         <button
-                          onClick={() => toggleControl(ctrl.id)}
+                          onClick={() => toggleControl(`lib-${ctrl.id}`)}
                           className="w-full text-left px-4 py-3 hover:bg-brand-gray-50 flex items-start gap-3"
                         >
                           <div className="mt-0.5">
@@ -417,12 +484,9 @@ export default function CompliancePage() {
 
                         {isExpanded && (
                           <div className="px-4 pb-4 ml-7">
-                            {/* Full description */}
                             <div className="bg-brand-gray-50 rounded-lg p-3 mb-3">
                               <p className="text-xs text-brand-gray-600">{ctrl.description}</p>
                             </div>
-
-                            {/* Checks per provider */}
                             {providerKeys.map((provider: string) => (
                               <div key={provider} className="mb-3">
                                 <div className="flex items-center gap-2 mb-2">
@@ -447,15 +511,7 @@ export default function CompliancePage() {
                                         <span className="text-[10px] font-mono text-brand-gray-400 bg-brand-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap mt-0.5">
                                           {check.check_id}
                                         </span>
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-xs text-brand-gray-700">{check.description}</p>
-                                          {check.evidence_method && (
-                                            <p className="text-[10px] text-brand-gray-400 mt-1">
-                                              <span className="font-medium">Evidence: </span>
-                                              {check.evidence_method}
-                                            </p>
-                                          )}
-                                        </div>
+                                        <p className="text-xs text-brand-gray-700 flex-1">{check.description}</p>
                                       </div>
                                     </div>
                                   ))}
@@ -476,152 +532,163 @@ export default function CompliancePage() {
             </div>
           )}
 
-          {/* Checks Table */}
+          {/* Controls List — Check-Library style with evaluation results */}
           {detailLoading ? (
             <div className="animate-pulse space-y-3">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-10 bg-brand-gray-100 rounded" />
+                <div key={i} className="h-16 bg-brand-gray-100 rounded" />
               ))}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-brand-gray-200">
-                    <th className="text-left py-3 px-2 text-brand-gray-500 font-medium w-8"></th>
-                    <th className="text-left py-3 px-2 text-brand-gray-500 font-medium">Check ID</th>
-                    <th className="text-left py-3 px-2 text-brand-gray-500 font-medium">Check Title</th>
-                    <th className="text-left py-3 px-2 text-brand-gray-500 font-medium">Service</th>
-                    <th className="text-left py-3 px-2 text-brand-gray-500 font-medium">Severity</th>
-                    <th className="text-left py-3 px-2 text-brand-gray-500 font-medium">Status</th>
-                    <th className="text-left py-3 px-2 text-brand-gray-500 font-medium">Region</th>
-                    <th className="text-left py-3 px-2 text-brand-gray-500 font-medium">Resource</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detailData?.findings?.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="text-center py-8 text-brand-gray-400">
-                        No checks found for the selected filters.
-                      </td>
-                    </tr>
+            <div className="border border-brand-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-brand-gray-50 px-4 py-3 border-b border-brand-gray-200">
+                <h3 className="text-sm font-semibold text-brand-navy">
+                  Controls Assessment
+                  {controlsData && (
+                    <span className="text-brand-gray-400 font-normal ml-2">
+                      ({filteredControls.length} controls)
+                    </span>
                   )}
-                  {detailData?.findings?.map((f: any) => (
-                    <>
-                      <tr
-                        key={f.id}
-                        onClick={() => toggleRow(f.id)}
-                        className="border-b border-brand-gray-100 hover:bg-brand-gray-50 cursor-pointer"
-                      >
-                        <td className="py-2.5 px-2">
-                          {expandedRows.has(f.id) ? (
-                            <ChevronDownIcon className="w-4 h-4 text-brand-gray-400" />
-                          ) : (
-                            <ChevronRightIcon className="w-4 h-4 text-brand-gray-400" />
-                          )}
-                        </td>
-                        <td className="py-2.5 px-2 font-mono text-xs text-brand-gray-600 max-w-[140px] truncate">
-                          {f.check_id}
-                        </td>
-                        <td className="py-2.5 px-2 text-brand-navy max-w-[250px] truncate">
-                          {f.check_title}
-                        </td>
-                        <td className="py-2.5 px-2 text-brand-gray-600">{f.service}</td>
-                        <td className="py-2.5 px-2">
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium capitalize ${SEVERITY_COLORS[f.severity] || 'bg-gray-100 text-gray-600'}`}>
-                            {f.severity}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-2">
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[f.status] || 'bg-gray-100 text-gray-600'}`}>
-                            {f.status}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-2 text-brand-gray-600 text-xs">{f.region || '-'}</td>
-                        <td className="py-2.5 px-2 text-brand-gray-600 text-xs max-w-[180px] truncate">
-                          {f.resource_name || f.resource_id || '-'}
-                        </td>
-                      </tr>
-                      {expandedRows.has(f.id) && (
-                        <tr key={`${f.id}-detail`} className="bg-brand-gray-50">
-                          <td colSpan={8} className="px-6 py-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {f.check_description && (
-                                <div>
-                                  <p className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-1">Security Impact</p>
-                                  <p className="text-sm text-brand-gray-700">{f.check_description}</p>
-                                </div>
+                </h3>
+              </div>
+
+              {filteredControls.length === 0 ? (
+                <div className="p-6 text-center text-sm text-brand-gray-400">
+                  No controls found for the selected filter.
+                </div>
+              ) : (
+                <div className="max-h-[700px] overflow-y-auto divide-y divide-brand-gray-100">
+                  {filteredControls.map((ctrl: any) => {
+                    const isExpanded = expandedControls.has(ctrl.id)
+                    const providerKeys = Object.keys(ctrl.checks || {})
+                    const totalChecks = providerKeys.reduce(
+                      (sum: number, k: string) => sum + (ctrl.checks[k]?.length || 0), 0
+                    )
+
+                    return (
+                      <div key={ctrl.id}>
+                        <button
+                          onClick={() => toggleControl(ctrl.id)}
+                          className="w-full text-left px-4 py-3 hover:bg-brand-gray-50 flex items-start gap-3"
+                        >
+                          {/* Status indicator */}
+                          <div className="mt-1.5 flex-shrink-0">
+                            <div className={`w-3 h-3 rounded-full ${STATUS_DOT[ctrl.status] || 'bg-gray-300'}`} />
+                          </div>
+                          <div className="mt-0.5 flex-shrink-0">
+                            {isExpanded ? (
+                              <ChevronDownIcon className="w-4 h-4 text-brand-gray-400" />
+                            ) : (
+                              <ChevronRightIcon className="w-4 h-4 text-brand-gray-400" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-mono font-semibold text-brand-green bg-brand-green/10 px-1.5 py-0.5 rounded">
+                                {ctrl.id}
+                              </span>
+                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_COLORS[ctrl.status] || 'bg-gray-100 text-gray-500'}`}>
+                                {ctrl.status === 'NOT_EVALUATED' ? 'NOT EVALUATED' : ctrl.status}
+                              </span>
+                              {ctrl.status !== 'NOT_EVALUATED' && (
+                                <span className="text-[10px] text-brand-gray-400">
+                                  {ctrl.passed} passed, {ctrl.failed} failed
+                                  {ctrl.not_evaluated > 0 && `, ${ctrl.not_evaluated} not evaluated`}
+                                </span>
                               )}
-                              {f.status_extended && (
-                                <div>
-                                  <p className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-1">Status Detail</p>
-                                  <p className="text-sm text-brand-gray-700">{f.status_extended}</p>
-                                </div>
-                              )}
-                              {f.resource_id && (
-                                <div>
-                                  <p className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-1">Resource ID</p>
-                                  <p className="text-sm text-brand-gray-700 font-mono">{f.resource_id}</p>
-                                </div>
-                              )}
-                              {f.remediation && (
-                                <div>
-                                  <p className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-1">Remediation</p>
-                                  <p className="text-sm text-brand-gray-700">{f.remediation}</p>
-                                  {f.remediation_url && (
-                                    <a
-                                      href={f.remediation_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-sm text-blue-600 hover:underline mt-1 inline-block"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      View guide &rarr;
-                                    </a>
-                                  )}
-                                </div>
-                              )}
-                              {f.evidence_log && (() => {
-                                let ev: any = null
-                                try { ev = JSON.parse(f.evidence_log) } catch {}
-                                return (
-                                  <div className="md:col-span-2">
-                                    <p className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-1">API Evidence Log</p>
-                                    <div className="bg-brand-navy rounded-lg p-3 font-mono text-xs space-y-2 overflow-x-auto">
-                                      {ev?.api_call ? (
-                                        <>
-                                          <div>
-                                            <span className="text-brand-green font-semibold">$ API Call:</span>
-                                            <pre className="text-gray-300 mt-0.5 whitespace-pre-wrap">{ev.api_call}</pre>
-                                          </div>
-                                          {ev.response && (
-                                            <div>
-                                              <span className="text-amber-400 font-semibold">Response:</span>
-                                              <pre className="text-gray-300 mt-0.5 whitespace-pre-wrap">{ev.response}</pre>
-                                            </div>
-                                          )}
-                                        </>
-                                      ) : (
-                                        <div>
-                                          <span className="text-brand-green font-semibold">$ Method:</span>
-                                          <pre className="text-gray-300 mt-0.5 whitespace-pre-wrap">{f.evidence_log}</pre>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )
-                              })()}
-                              {!f.status_extended && !f.remediation && !f.check_description && (
-                                <p className="text-sm text-brand-gray-400 italic">No additional details available.</p>
-                              )}
+                              <div className="flex gap-1 ml-auto">
+                                {providerKeys.map((p: string) => (
+                                  <span
+                                    key={p}
+                                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                      PROVIDER_COLORS[p] || 'bg-gray-100 text-gray-500 border-gray-200'
+                                    }`}
+                                  >
+                                    {PROVIDER_LABELS[p] || p.toUpperCase()}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
-                          </td>
-                        </tr>
-                      )}
-                    </>
-                  ))}
-                </tbody>
-              </table>
+                            <p className="text-sm font-medium text-brand-navy">{ctrl.title}</p>
+                            <p className="text-xs text-brand-gray-500 mt-0.5 line-clamp-2">{ctrl.description}</p>
+                          </div>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="px-4 pb-4 ml-7">
+                            {/* Full description */}
+                            <div className="bg-brand-gray-50 rounded-lg p-3 mb-3">
+                              <p className="text-xs text-brand-gray-600">{ctrl.description}</p>
+                            </div>
+
+                            {/* Checks per provider with evaluation results */}
+                            {providerKeys.map((provider: string) => (
+                              <div key={provider} className="mb-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                      PROVIDER_COLORS[provider] || 'bg-gray-100 text-gray-500 border-gray-200'
+                                    }`}
+                                  >
+                                    {PROVIDER_LABELS[provider] || provider.toUpperCase()}
+                                  </span>
+                                  <span className="text-xs text-brand-gray-400">
+                                    {ctrl.checks[provider]?.length || 0} checks
+                                  </span>
+                                </div>
+                                <div className="space-y-1.5 ml-2">
+                                  {(ctrl.checks[provider] || []).map((check: any) => (
+                                    <div
+                                      key={check.check_id}
+                                      className={`border rounded-lg px-3 py-2 ${
+                                        check.status === 'PASS'
+                                          ? 'border-green-200 bg-green-50/50'
+                                          : check.status === 'FAIL'
+                                          ? 'border-red-200 bg-red-50/50'
+                                          : 'border-brand-gray-200 bg-white'
+                                      }`}
+                                    >
+                                      <div className="flex items-start gap-2">
+                                        <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${STATUS_DOT[check.status] || 'bg-gray-300'}`} />
+                                        <span className="text-[10px] font-mono text-brand-gray-400 bg-brand-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap mt-0.5">
+                                          {check.check_id}
+                                        </span>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-xs text-brand-gray-700">{check.description}</p>
+                                          {check.status !== 'NOT_EVALUATED' && (
+                                            <p className="text-[10px] mt-1">
+                                              <span className={check.status === 'PASS' ? 'text-green-600' : 'text-red-600'}>
+                                                {check.status}
+                                              </span>
+                                              <span className="text-brand-gray-400 ml-2">
+                                                {check.finding_count} finding{check.finding_count !== 1 ? 's' : ''}
+                                                {check.fail_count > 0 && ` (${check.fail_count} failed)`}
+                                              </span>
+                                            </p>
+                                          )}
+                                          {check.status === 'NOT_EVALUATED' && (
+                                            <p className="text-[10px] text-brand-gray-400 mt-1 italic">Not evaluated — no scan data</p>
+                                          )}
+                                          {check.evidence_method && (
+                                            <p className="text-[10px] text-brand-gray-400 mt-1">
+                                              <span className="font-medium">Evidence: </span>
+                                              {check.evidence_method}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>

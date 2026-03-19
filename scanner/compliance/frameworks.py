@@ -1786,6 +1786,367 @@ FRAMEWORKS = {
         ],
     },
     # ═══════════════════════════════════════════════════════════════════
+    # CIS Amazon Web Services Foundations Benchmark v6.0
+    # ═══════════════════════════════════════════════════════════════════
+    "CIS-AWS-6.0": {
+        "name": "CIS Amazon Web Services Foundations Benchmark v6.0",
+        "description": "CIS Benchmark v6.0 for AWS providing prescriptive guidance for configuring security options across IAM, Storage, Logging, Monitoring, and Networking.",
+        "category": "cis",
+        "controls": [
+            # ───────────────────────────────────────────────────────────
+            # Section 2: Identity and Access Management
+            # ───────────────────────────────────────────────────────────
+            {
+                "id": "2.1",
+                "title": "Maintain current contact details",
+                "description": "Ensure contact email and telephone details for AWS accounts are current and map to more than one individual in your organization.",
+                "checks": {},
+            },
+            {
+                "id": "2.2",
+                "title": "Ensure security contact information is registered",
+                "description": "AWS provides the option of specifying contact information for the account's security team. It is recommended that this information be provided.",
+                "checks": {},
+            },
+            {
+                "id": "2.3",
+                "title": "Ensure no 'root' user account access key exists",
+                "description": "It is recommended that all access keys associated with the root user account be deleted to limit vectors by which the account can be compromised.",
+                "checks": {"aws": ["iam_no_root_access_key"]},
+            },
+            {
+                "id": "2.4",
+                "title": "Ensure MFA is enabled for the 'root' user account",
+                "description": "Multi-factor Authentication (MFA) adds an extra layer of protection on top of a username and password for the root account.",
+                "checks": {"aws": ["iam_root_mfa_enabled"]},
+            },
+            {
+                "id": "2.5",
+                "title": "Ensure hardware MFA is enabled for the 'root' user account",
+                "description": "A hardware MFA has a smaller attack surface than a virtual MFA. It is recommended that the root account be protected with a hardware MFA device.",
+                "checks": {"aws": ["iam_root_mfa_enabled"]},
+            },
+            {
+                "id": "2.6",
+                "title": "Eliminate use of the 'root' user for administrative and daily tasks",
+                "description": "The root user has unrestricted access. Use of it is inconsistent with the principles of least privilege and separation of duties.",
+                "checks": {},
+            },
+            {
+                "id": "2.7",
+                "title": "Ensure IAM password policy requires minimum length of 14 or greater",
+                "description": "IAM password policies can enforce minimum password length. It is recommended that the password policy require a minimum length of 14.",
+                "checks": {"aws": ["iam_password_policy_strong", "iam_password_policy_exists"]},
+            },
+            {
+                "id": "2.8",
+                "title": "Ensure IAM password policy prevents password reuse",
+                "description": "IAM password policies can prevent reuse of a given password by the same user. It is recommended to prevent reuse of the last 24 passwords.",
+                "checks": {"aws": ["iam_password_policy_reuse_prevention"]},
+            },
+            {
+                "id": "2.9",
+                "title": "Ensure MFA is enabled for all IAM users that have a console password",
+                "description": "Multi-Factor Authentication adds an extra layer of authentication assurance. It is recommended that MFA be enabled for all accounts with a console password.",
+                "checks": {"aws": ["iam_user_mfa_enabled"]},
+            },
+            {
+                "id": "2.10",
+                "title": "Do not create access keys during initial setup for IAM users with a console password",
+                "description": "AWS console defaults to no check boxes selected when creating a new IAM user. Require programmatic access to be created as a separate step.",
+                "checks": {},
+            },
+            {
+                "id": "2.11",
+                "title": "Ensure credentials unused for 45 days or more are disabled",
+                "description": "It is recommended that all credentials unused for 45 days or more be deactivated or removed to reduce the window of opportunity for compromise.",
+                "checks": {"aws": ["iam_user_unused_credentials_45days"]},
+            },
+            {
+                "id": "2.12",
+                "title": "Ensure there is only one active access key for any single IAM user",
+                "description": "One of the best ways to protect your account is to not allow users to have multiple access keys.",
+                "checks": {"aws": ["iam_user_single_active_access_key"]},
+            },
+            {
+                "id": "2.13",
+                "title": "Ensure access keys are rotated every 90 days or less",
+                "description": "Access keys should be rotated regularly to reduce the window of opportunity for a compromised key.",
+                "checks": {"aws": ["iam_access_key_rotation"]},
+            },
+            {
+                "id": "2.14",
+                "title": "Ensure IAM users receive permissions only through groups",
+                "description": "Assigning IAM policies solely through groups unifies permissions management into a single, flexible layer consistent with organizational roles.",
+                "checks": {"aws": ["iam_user_no_inline_policies", "iam_user_no_attached_policies"]},
+            },
+            {
+                "id": "2.15",
+                "title": "Ensure IAM policies that allow full '*:*' administrative privileges are not attached",
+                "description": "It is recommended to grant least privilege — only the permissions required to perform a task — instead of full administrative privileges.",
+                "checks": {"aws": ["iam_no_star_policies"]},
+            },
+            {
+                "id": "2.16",
+                "title": "Ensure a support role has been created to manage incidents with AWS Support",
+                "description": "Create an IAM Role with the AWSSupportAccess policy to allow authorized users to manage incidents with AWS Support.",
+                "checks": {"aws": ["iam_support_role_created"]},
+            },
+            {
+                "id": "2.17",
+                "title": "Ensure IAM instance roles are used for AWS resource access from instances",
+                "description": "AWS IAM roles reduce the risks associated with sharing and rotating credentials that can be used outside AWS.",
+                "checks": {},
+            },
+            {
+                "id": "2.18",
+                "title": "Ensure that all expired SSL/TLS certificates stored in AWS IAM are removed",
+                "description": "Removing expired SSL/TLS certificates eliminates the risk that an invalid certificate will be deployed accidentally to a resource.",
+                "checks": {"aws": ["iam_ssl_certificate_expiry"]},
+            },
+            {
+                "id": "2.19",
+                "title": "Ensure that IAM External Access Analyzer is enabled for all regions",
+                "description": "Enable the IAM External Access Analyzer to identify resources shared with external entities and unintended access.",
+                "checks": {"aws": ["iam_access_analyzer_enabled"]},
+            },
+            {
+                "id": "2.20",
+                "title": "Ensure IAM users are managed centrally via identity federation or AWS Organizations",
+                "description": "In multi-account environments, IAM user centralization facilitates greater user control and reduces complexity.",
+                "checks": {},
+            },
+            {
+                "id": "2.21",
+                "title": "Ensure access to AWSCloudShellFullAccess is restricted",
+                "description": "AWSCloudShellFullAccess provides full access to CloudShell including file upload/download capability. Access should be restricted.",
+                "checks": {"aws": ["iam_cloudshell_fullaccess_restricted"]},
+            },
+            # ───────────────────────────────────────────────────────────
+            # Section 3: Storage
+            # ───────────────────────────────────────────────────────────
+            {
+                "id": "3.1",
+                "title": "Ensure S3 Bucket Policy is set to deny HTTP requests",
+                "description": "Amazon S3 buckets should require requests to use TLS/SSL (HTTPS) to enforce encryption in transit.",
+                "checks": {"aws": ["s3_bucket_ssl_required"]},
+            },
+            {
+                "id": "3.2",
+                "title": "Ensure that encryption-at-rest is enabled for RDS instances",
+                "description": "RDS instances should use encryption to protect data at rest from unauthorized access.",
+                "checks": {"aws": ["rds_encryption_enabled"]},
+            },
+            {
+                "id": "3.3",
+                "title": "Ensure that encryption is enabled for EFS file systems",
+                "description": "EFS data should be encrypted at rest using AWS KMS to reduce the risk of a data breach via direct access to the storage device.",
+                "checks": {"aws": ["efs_encryption_enabled"]},
+            },
+            # ───────────────────────────────────────────────────────────
+            # Section 4: Logging
+            # ───────────────────────────────────────────────────────────
+            {
+                "id": "4.1",
+                "title": "Ensure CloudTrail is enabled in all regions",
+                "description": "CloudTrail provides a history of AWS API calls. Ensure a multi-region trail exists that logs all management events.",
+                "checks": {"aws": ["cloudtrail_enabled", "cloudtrail_multiregion"]},
+            },
+            {
+                "id": "4.2",
+                "title": "Ensure CloudTrail log file validation is enabled",
+                "description": "CloudTrail log file validation creates a digitally signed digest file for integrity verification of delivered logs.",
+                "checks": {"aws": ["cloudtrail_log_validation"]},
+            },
+            {
+                "id": "4.3",
+                "title": "Ensure AWS Config is enabled in all regions",
+                "description": "AWS Config performs configuration management of supported resources and delivers log files. It should be enabled in all regions.",
+                "checks": {"aws": ["config_recorder_enabled"]},
+            },
+            {
+                "id": "4.4",
+                "title": "Ensure that server access logging is enabled on the CloudTrail S3 bucket",
+                "description": "Server access logging generates a log that contains access records for each request to the S3 bucket used by CloudTrail.",
+                "checks": {"aws": ["cloudtrail_s3_bucket_logging"]},
+            },
+            {
+                "id": "4.5",
+                "title": "Ensure CloudTrail logs are encrypted at rest using KMS CMKs",
+                "description": "CloudTrail logs can be configured to use server side encryption with KMS customer-created master keys for additional confidentiality.",
+                "checks": {"aws": ["cloudtrail_encrypted"]},
+            },
+            {
+                "id": "4.6",
+                "title": "Ensure rotation for customer-created symmetric CMKs is enabled",
+                "description": "Automated key rotation retains all prior backing keys for transparent decryption. CMK key rotation should be enabled for symmetric keys.",
+                "checks": {"aws": ["kms_key_rotation_enabled"]},
+            },
+            {
+                "id": "4.7",
+                "title": "Ensure VPC flow logging is enabled in all VPCs",
+                "description": "VPC Flow Logs capture information about IP traffic going to and from network interfaces in VPCs for anomaly detection and security analysis.",
+                "checks": {"aws": ["vpc_flow_logs_enabled"]},
+            },
+            {
+                "id": "4.8",
+                "title": "Ensure that object-level logging for write events is enabled for S3 buckets",
+                "description": "S3 object-level API operations (PutObject, DeleteObject) are data events. Enable object-level logging for write events on S3 buckets.",
+                "checks": {"aws": ["cloudtrail_s3_object_write_events"]},
+            },
+            {
+                "id": "4.9",
+                "title": "Ensure that object-level logging for read events is enabled for S3 buckets",
+                "description": "S3 object-level API operations (GetObject) are data events. Enable object-level logging for read events on S3 buckets.",
+                "checks": {"aws": ["cloudtrail_s3_object_read_events"]},
+            },
+            # ───────────────────────────────────────────────────────────
+            # Section 5: Monitoring
+            # ───────────────────────────────────────────────────────────
+            {
+                "id": "5.1",
+                "title": "Ensure unauthorized API calls are monitored",
+                "description": "Establish a metric filter and alarm for unauthorized API calls to reduce time to detect malicious activity.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.2",
+                "title": "Ensure management console sign-in without MFA is monitored",
+                "description": "Establish a metric filter and alarm for console logins not protected by multi-factor authentication.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.3",
+                "title": "Ensure usage of the 'root' account is monitored",
+                "description": "Establish a metric filter and alarm for root login attempts to detect unauthorized use of the root account.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.4",
+                "title": "Ensure IAM policy changes are monitored",
+                "description": "Establish a metric filter and alarm for changes made to Identity and Access Management (IAM) policies.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.5",
+                "title": "Ensure CloudTrail configuration changes are monitored",
+                "description": "Establish a metric filter and alarm to detect changes to CloudTrail's configurations.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.6",
+                "title": "Ensure AWS Management Console authentication failures are monitored",
+                "description": "Establish a metric filter and alarm for failed console authentication attempts.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.7",
+                "title": "Ensure disabling or scheduled deletion of customer created CMKs is monitored",
+                "description": "Establish a metric filter and alarm for customer-created CMKs that have changed state to disabled or scheduled for deletion.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.8",
+                "title": "Ensure S3 bucket policy changes are monitored",
+                "description": "Establish a metric filter and alarm for changes to S3 bucket policies to reduce time to detect and correct permissive policies.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.9",
+                "title": "Ensure AWS Config configuration changes are monitored",
+                "description": "Establish a metric filter and alarm for detecting changes to AWS Config's configurations.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.10",
+                "title": "Ensure security group changes are monitored",
+                "description": "Establish a metric filter and alarm to detect changes to security groups to prevent unintentional exposure of resources.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.11",
+                "title": "Ensure Network Access Control List (NACL) changes are monitored",
+                "description": "Establish a metric filter and alarm for any changes made to NACLs to prevent unintended exposure of AWS resources.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.12",
+                "title": "Ensure changes to network gateways are monitored",
+                "description": "Establish a metric filter and alarm for changes to network gateways to ensure all ingress/egress traffic traverses a controlled path.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.13",
+                "title": "Ensure route table changes are monitored",
+                "description": "Establish a metric filter and alarm for changes to route tables to prevent accidental or intentional modifications.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.14",
+                "title": "Ensure VPC changes are monitored",
+                "description": "Establish a metric filter and alarm for changes made to VPCs to ensure VPC traffic flow is not negatively impacted.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.15",
+                "title": "Ensure AWS Organizations changes are monitored",
+                "description": "Establish a metric filter and alarm for changes made to AWS Organizations in the master account.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.16",
+                "title": "Ensure AWS Security Hub is enabled",
+                "description": "Security Hub collects security data from AWS accounts and services, helping analyze security trends and identify priority issues.",
+                "checks": {"aws": ["securityhub_enabled"]},
+            },
+            # ───────────────────────────────────────────────────────────
+            # Section 6: Networking
+            # ───────────────────────────────────────────────────────────
+            {
+                "id": "6.1",
+                "title": "Ensure EBS volume encryption is enabled in all regions",
+                "description": "EBS default encryption should be enabled to ensure all new EBS volumes are encrypted at rest.",
+                "checks": {"aws": ["ec2_ebs_default_encryption", "ec2_ebs_volume_encrypted"]},
+            },
+            {
+                "id": "6.2",
+                "title": "Ensure no Network ACLs allow ingress from 0.0.0.0/0 to remote server administration ports",
+                "description": "No NACL should allow unrestricted ingress access to remote server administration ports such as SSH (22) and RDP (3389).",
+                "checks": {"aws": ["vpc_no_unrestricted_nacl"]},
+            },
+            {
+                "id": "6.3",
+                "title": "Ensure no security groups allow ingress from 0.0.0.0/0 to remote server administration ports",
+                "description": "No security group should allow unrestricted ingress access from 0.0.0.0/0 to remote server administration ports.",
+                "checks": {"aws": ["ec2_sg_no_wide_open_ports"]},
+            },
+            {
+                "id": "6.4",
+                "title": "Ensure no security groups allow ingress from ::/0 to remote server administration ports",
+                "description": "No security group should allow unrestricted IPv6 ingress access from ::/0 to remote server administration ports.",
+                "checks": {"aws": ["ec2_sg_no_ipv6_wide_open"]},
+            },
+            {
+                "id": "6.5",
+                "title": "Ensure the default security group of every VPC restricts all traffic",
+                "description": "The default security group should restrict all traffic, both inbound and outbound, to encourage least privilege security groups.",
+                "checks": {"aws": ["vpc_default_sg_restricts_all", "ec2_default_sg_no_traffic"]},
+            },
+            {
+                "id": "6.6",
+                "title": "Ensure routing tables for VPC peering are 'least access'",
+                "description": "Once a VPC peering connection is established, routing tables should be as specific as possible to minimize breach impact.",
+                "checks": {},
+            },
+            {
+                "id": "6.7",
+                "title": "Ensure that the EC2 Metadata Service only allows IMDSv2",
+                "description": "Require IMDSv2 (session-oriented) instead of IMDSv1 (request/response) to protect against SSRF attacks on EC2 instances.",
+                "checks": {"aws": ["ec2_imdsv2_required"]},
+            },
+        ],
+    },
+    # ═══════════════════════════════════════════════════════════════════
     # CIS GCP Foundations Benchmark v3.0
     # ═══════════════════════════════════════════════════════════════════
     "CIS-GCP-3.0": {
@@ -2262,7 +2623,7 @@ FRAMEWORKS = {
                 "domain": "Audit & Assurance",
                 "title": "Audit and Assurance Policy and Procedures",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain audit and assurance policies and procedures and standards. Review and update the policies and procedures at least annually, o...",
-                "checks": {"aws": ["cloudtrail_enabled", "config_recorder_enabled"], "azure": ["azure_monitor_diagnostic_settings"], "gcp": ["gcp_logging_audit_logs_enabled"]},
+                "checks": {"aws": ["cloudtrail_enabled", "config_recorder_enabled"], "azure": ["azure_monitor_diagnostic_settings", "azure_monitor_log_profile", "azure_monitor_log_retention_365"], "gcp": ["gcp_logging_audit_logs_enabled"]},
             },
             {
                 "id": "A&A-02",
@@ -2276,7 +2637,7 @@ FRAMEWORKS = {
                 "domain": "Audit & Assurance",
                 "title": "Risk Based Planning Assessment",
                 "description": "Perform independent audit and assurance assessments according to risk-based plans and policies,and in response to significant changes or emerging risks.",
-                "checks": {},
+                "checks": {"azure": ["azure_sql_auditing_enabled"]},
             },
             {
                 "id": "A&A-04",
@@ -2290,7 +2651,7 @@ FRAMEWORKS = {
                 "domain": "Audit & Assurance",
                 "title": "Audit Management Process",
                 "description": "Define and implement an Audit Management process aligned with relevant auditing standards to support audit planning, risk analysis, security control assessment, conclusion, remediation schedules, r...",
-                "checks": {},
+                "checks": {"azure": ["azure_monitor_log_retention_365"]},
             },
             {
                 "id": "A&A-06",
@@ -2305,14 +2666,14 @@ FRAMEWORKS = {
                 "domain": "Application & Interface Security",
                 "title": "Application and Interface Security Policy and Procedures",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain policies and procedures for application security. Review and update the policies and procedures at least annually, or upon si...",
-                "checks": {"aws": ["apigateway_rest_api_logging", "waf_web_acl_exists"], "azure": ["azure_appgw_waf_enabled"]},
+                "checks": {"aws": ["apigateway_rest_api_logging", "waf_web_acl_exists"], "azure": ["azure_appgw_waf_enabled", "azure_appservice_https_only", "azure_appservice_tls_12"]},
             },
             {
                 "id": "AIS-02",
                 "domain": "Application & Interface Security",
                 "title": "Application Security Baseline Requirements",
                 "description": "Establish, document and maintain baseline requirements for securing applications.",
-                "checks": {"aws": ["lambda_runtime_supported"], "kubernetes": ["k8s_admission_pod_security"]},
+                "checks": {"aws": ["lambda_runtime_supported"], "kubernetes": ["k8s_admission_pod_security"], "azure": ["azure_appservice_client_certs", "azure_appservice_managed_identity"]},
             },
             {
                 "id": "AIS-03",
@@ -2326,7 +2687,7 @@ FRAMEWORKS = {
                 "domain": "Application & Interface Security",
                 "title": "Secure Application Development Lifecycle",
                 "description": "Define and implement a secure SDLC process for application requirements analysis, planning, design, development, testing, deployment, and operation in accordance with security requirements.",
-                "checks": {"aws": ["ecr_image_scanning", "ecr_lifecycle_policy"], "gcp": ["gcp_gke_binary_auth"]},
+                "checks": {"aws": ["ecr_image_scanning", "ecr_lifecycle_policy"], "gcp": ["gcp_gke_binary_auth"], "azure": ["azure_appservice_remote_debugging_off", "azure_appservice_ftp_disabled"]},
             },
             {
                 "id": "AIS-05",
@@ -2347,7 +2708,7 @@ FRAMEWORKS = {
                 "domain": "Application & Interface Security",
                 "title": "Application Vulnerability Remediation",
                 "description": "Define and implement a process to remediate application security vulnerabilities, automating remediation when possible.",
-                "checks": {"aws": ["ecr_image_scanning", "lambda_runtime_supported"]},
+                "checks": {"aws": ["ecr_image_scanning", "lambda_runtime_supported"], "azure": ["azure_appservice_http_logging"]},
             },
             {
                 "id": "AIS-08",
@@ -2369,7 +2730,7 @@ FRAMEWORKS = {
                 "domain": "Business Continuity Management and Operational Resilience",
                 "title": "Risk Assessment and Impact Analysis",
                 "description": "Determine the impact of business disruptions and risks to establish criteria for developing business continuity and operational resilience strategies and capabilities. Review and update the risk as...",
-                "checks": {},
+                "checks": {"azure": ["azure_backup_vault_redundancy", "azure_storage_soft_delete_blobs"]},
             },
             {
                 "id": "BCR-03",
@@ -2383,7 +2744,7 @@ FRAMEWORKS = {
                 "domain": "Business Continuity Management and Operational Resilience",
                 "title": "Business Continuity Planning",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain a business continuity plan based on the results of the operational resilience strategies and capabilities.",
-                "checks": {"aws": ["backup_plan_exists", "dynamodb_pitr_enabled"], "gcp": ["gcp_sql_pitr_enabled"]},
+                "checks": {"aws": ["backup_plan_exists", "dynamodb_pitr_enabled"], "gcp": ["gcp_sql_pitr_enabled"], "azure": ["azure_storage_soft_delete_blobs"]},
             },
             {
                 "id": "BCR-05",
@@ -2411,7 +2772,7 @@ FRAMEWORKS = {
                 "domain": "Business Continuity Management and Operational Resilience",
                 "title": "Backup",
                 "description": "Periodically perform backups. Ensure the confidentiality, integrity and availability of the backup, and verify restoration from backup for resiliency.",
-                "checks": {},
+                "checks": {"azure": ["azure_resource_locks_configured"]},
             },
             {
                 "id": "BCR-09",
@@ -2440,14 +2801,14 @@ FRAMEWORKS = {
                 "domain": "Change Control and Configuration Management",
                 "title": "Change Management Policy and Procedures",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain policies and procedures for managing the risks associated with applying changes to assets owned, controlled or used by the or...",
-                "checks": {"aws": ["config_recorder_enabled"], "gcp": ["gcp_logging_audit_logs_enabled"], "servicenow": ["servicenow_change_management"]},
+                "checks": {"aws": ["config_recorder_enabled"], "gcp": ["gcp_logging_audit_logs_enabled"], "servicenow": ["servicenow_change_management"], "azure": ["azure_policy_compliance_rate"]},
             },
             {
                 "id": "CCC-02",
                 "domain": "Change Control and Configuration Management",
                 "title": "Quality Testing",
                 "description": "Establish, maintain and implement a defined quality change control, approval and testing process incorporating baselines, testing, and release standards.",
-                "checks": {},
+                "checks": {"azure": ["azure_policy_assignments_exist", "azure_policy_security_initiative"]},
             },
             {
                 "id": "CCC-03",
@@ -2461,14 +2822,14 @@ FRAMEWORKS = {
                 "domain": "Change Control and Configuration Management",
                 "title": "Unauthorized Change Protection",
                 "description": "Implement and enforce a procedure to authorize the addition, removal, update, and management  of assets that are owned, controlled or used by the organization.",
-                "checks": {},
+                "checks": {"azure": ["azure_aks_azure_policy_addon"]},
             },
             {
                 "id": "CCC-05",
                 "domain": "Change Control and Configuration Management",
                 "title": "Change Agreements",
                 "description": "Include provisions limiting changes directly impacting service customers owned environments (tenants)  to explicitly authorized requests within service level agreements.",
-                "checks": {},
+                "checks": {"azure": ["azure_resource_locks_configured"]},
             },
             {
                 "id": "CCC-06",
@@ -2504,56 +2865,56 @@ FRAMEWORKS = {
                 "domain": "Cryptography, Encryption & Key Management",
                 "title": "Encryption and Key Management Policy and Procedures",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain policies and procedures for Cryptography, Encryption and Key Management. Review and update the policies and procedures at lea...",
-                "checks": {"aws": ["kms_key_rotation_enabled"], "azure": ["azure_keyvault_key_expiration"], "gcp": ["gcp_kms_key_rotation"]},
+                "checks": {"aws": ["kms_key_rotation_enabled"], "azure": ["azure_keyvault_key_expiration", "azure_keyvault_secret_expiration"], "gcp": ["gcp_kms_key_rotation"]},
             },
             {
                 "id": "CEK-02",
                 "domain": "Cryptography, Encryption & Key Management",
                 "title": "CEK Roles and Responsibilities",
                 "description": "Define and implement cryptographic, encryption and key management roles and responsibilities.",
-                "checks": {"aws": ["kms_key_rotation_enabled"]},
+                "checks": {"aws": ["kms_key_rotation_enabled"], "azure": ["azure_keyvault_soft_delete", "azure_keyvault_purge_protection"]},
             },
             {
                 "id": "CEK-03",
                 "domain": "Cryptography, Encryption & Key Management",
                 "title": "Data Protection",
                 "description": "Provide data protection at-rest, in-transit, and where applicable, in-use by using cryptographic libraries certified to approved standards.",
-                "checks": {},
+                "checks": {"azure": ["azure_storage_cmk_encryption", "azure_vm_disk_encryption", "azure_sql_tde_enabled", "azure_disk_unattached_encrypted"]},
             },
             {
                 "id": "CEK-04",
                 "domain": "Cryptography, Encryption & Key Management",
                 "title": "Encryption Algorithm",
                 "description": "Utilize encryption algorithms following industry standards for protecting data, based on  the data classification and associated risks.",
-                "checks": {},
+                "checks": {"azure": ["azure_keyvault_network_acls"]},
             },
             {
                 "id": "CEK-05",
                 "domain": "Cryptography, Encryption & Key Management",
                 "title": "Encryption Change Management",
                 "description": "Establish a standard change management procedure, to accommodate changes from internal and external sources, for review, approval, implementation and communication of cryptographic, encryption and ...",
-                "checks": {},
+                "checks": {"azure": ["azure_storage_https_only", "azure_sql_tls_12", "azure_storage_tls_12"]},
             },
             {
                 "id": "CEK-06",
                 "domain": "Cryptography, Encryption & Key Management",
                 "title": "Encryption Change Cost Benefit Analysis",
                 "description": "Manage and adopt changes to cryptography-, encryption-, and key management-related systems (including policies and procedures) that fully account for downstream effects of proposed changes, includi...",
-                "checks": {},
+                "checks": {"azure": ["azure_storage_infrastructure_encryption"]},
             },
             {
                 "id": "CEK-07",
                 "domain": "Cryptography, Encryption & Key Management",
                 "title": "Encryption Risk Management",
                 "description": "Establish and maintain an encryption and key management risk program that includes provisions for risk assessment, risk treatment, risk context, monitoring, and feedback.",
-                "checks": {},
+                "checks": {"azure": ["azure_keyvault_key_expiration", "azure_keyvault_secret_expiration"]},
             },
             {
                 "id": "CEK-08",
                 "domain": "Cryptography, Encryption & Key Management",
                 "title": "Service Customer Key Management Capability",
                 "description": "Service providers must provide the capability for service customers  to manage their own data encryption keys.",
-                "checks": {"aws": ["kms_key_rotation_enabled"], "gcp": ["gcp_kms_hsm_protection"]},
+                "checks": {"aws": ["kms_key_rotation_enabled"], "gcp": ["gcp_kms_hsm_protection"], "azure": ["azure_keyvault_purge_protection"]},
             },
             {
                 "id": "CEK-09",
@@ -2687,7 +3048,7 @@ FRAMEWORKS = {
                 "domain": "Datacenter Security",
                 "title": "Assets Classification",
                 "description": "Classify and document the physical, and logical assets (e.g., applications) based on the organizational business risk. Review and update the assets’ classification  at least annually, or upon signi...",
-                "checks": {"aws": ["config_recorder_enabled"]},
+                "checks": {"aws": ["config_recorder_enabled"], "azure": ["azure_postgresql_public_access"]},
             },
             {
                 "id": "DCS-07",
@@ -2779,7 +3140,7 @@ FRAMEWORKS = {
                 "domain": "Data Security and Privacy Lifecycle Management",
                 "title": "Security and Privacy Policy and Procedures",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain policies and procedures for the preparation, classification, protection and handling of data throughout its lifecycle, and ac...",
-                "checks": {"aws": ["macie_enabled", "s3_bucket_public_access_blocked"], "m365": ["m365_dlp_policies_configured"]},
+                "checks": {"aws": ["macie_enabled", "s3_bucket_public_access_blocked"], "m365": ["m365_dlp_policies_configured"], "azure": ["azure_storage_no_public_access", "azure_sql_public_access_disabled"]},
             },
             {
                 "id": "DSP-02",
@@ -2800,14 +3161,14 @@ FRAMEWORKS = {
                 "domain": "Data Security and Privacy Lifecycle Management",
                 "title": "Data Classification",
                 "description": "Classify data according to its type, criticality and sensitivity level.",
-                "checks": {"aws": ["macie_enabled"], "m365": ["m365_sensitivity_labels_enabled"], "snowflake": ["snowflake_column_masking_policies"]},
+                "checks": {"aws": ["macie_enabled"], "m365": ["m365_sensitivity_labels_enabled"], "snowflake": ["snowflake_column_masking_policies"], "azure": ["azure_storage_cmk_encryption", "azure_sql_tde_enabled"]},
             },
             {
                 "id": "DSP-05",
                 "domain": "Data Security and Privacy Lifecycle Management",
                 "title": "Data Flow Documentation",
                 "description": "Create data flow documentation to identify what data is processed, stored or transmitted where. Review data flow documentation at defined intervals, at least annually, or upon significant changes.",
-                "checks": {"aws": ["vpc_flow_logs_enabled"], "gcp": ["gcp_logging_vpc_flow_logs"]},
+                "checks": {"aws": ["vpc_flow_logs_enabled"], "gcp": ["gcp_logging_vpc_flow_logs"], "azure": ["azure_storage_network_default_deny"]},
             },
             {
                 "id": "DSP-06",
@@ -2842,7 +3203,7 @@ FRAMEWORKS = {
                 "domain": "Data Security and Privacy Lifecycle Management",
                 "title": "Sensitive Data Transfer",
                 "description": "Define, implement and evaluate processes, procedures and technical measures that ensure any transfer of personal or sensitive data is protected from unauthorized access and only processed within sc...",
-                "checks": {"aws": ["cloudfront_https_only", "s3_bucket_ssl_required"], "gcp": ["gcp_sql_ssl_required"]},
+                "checks": {"aws": ["cloudfront_https_only", "s3_bucket_ssl_required"], "gcp": ["gcp_sql_ssl_required"], "azure": ["azure_storage_no_public_access"]},
             },
             {
                 "id": "DSP-11",
@@ -2891,7 +3252,7 @@ FRAMEWORKS = {
                 "domain": "Data Security and Privacy Lifecycle Management",
                 "title": "Sensitive Data Protection",
                 "description": "Define and implement, processes, procedures and technical measures to protect sensitive data throughout it\'s lifecycle.",
-                "checks": {},
+                "checks": {"azure": ["azure_vm_disk_encryption", "azure_disk_unattached_encrypted"]},
             },
             {
                 "id": "DSP-18",
@@ -2920,14 +3281,14 @@ FRAMEWORKS = {
                 "domain": "Governance, Risk and Compliance",
                 "title": "Risk Management Program",
                 "description": "Establish and maintain a formal, documented, and leadership-sponsored Enterprise  Risk Management (ERM) program that includes policies and procedures for identification,  evaluation, ownership, tre...",
-                "checks": {"aws": ["config_recorder_enabled", "guardduty_enabled"]},
+                "checks": {"aws": ["config_recorder_enabled", "guardduty_enabled"], "azure": ["azure_policy_assignments_exist"]},
             },
             {
                 "id": "GRC-03",
                 "domain": "Governance, Risk and Compliance",
                 "title": "Organizational Policy Reviews",
                 "description": "Review all relevant organizational policies and associated procedures at least annually or when a substantial change occurs within the organization.",
-                "checks": {},
+                "checks": {"azure": ["azure_policy_compliance_rate"]},
             },
             {
                 "id": "GRC-04",
@@ -3062,14 +3423,14 @@ FRAMEWORKS = {
                 "domain": "Identity & Access Management",
                 "title": "Identity and Access Management Policy and Procedures",
                 "description": "Establish, document, approve, communicate, implement, apply, evaluate, and  maintain policies and procedures for identity and access management. Review and update the policies and procedures at lea...",
-                "checks": {},
+                "checks": {"azure": ["azure_iam_mfa_enabled_all_users"]},
             },
             {
                 "id": "IAM-02",
                 "domain": "Identity & Access Management",
                 "title": "Credentials Management Policy and Procedures",
                 "description": "Establish, document, approve, communicate, implement, apply, evaluate, and  maintain policies and procedures for the management of authentication credentials,  including passwords. Review and updat...",
-                "checks": {},
+                "checks": {"azure": ["azure_iam_mfa_enabled_all_users", "azure_iam_managed_identity_usage"]},
             },
             {
                 "id": "IAM-03",
@@ -3083,28 +3444,28 @@ FRAMEWORKS = {
                 "domain": "Identity & Access Management",
                 "title": "Separation of Duties",
                 "description": "Employ the separation of duties principle when implementing information system access.",
-                "checks": {"aws": ["iam_no_star_policies"], "gcp": ["gcp_iam_separation_of_duties"], "kubernetes": ["k8s_rbac_no_wildcard_cluster_admin"]},
+                "checks": {"aws": ["iam_no_star_policies"], "gcp": ["gcp_iam_separation_of_duties"], "kubernetes": ["k8s_rbac_no_wildcard_cluster_admin"], "azure": ["azure_iam_no_custom_owner_roles", "azure_iam_owner_count"]},
             },
             {
                 "id": "IAM-05",
                 "domain": "Identity & Access Management",
                 "title": "Least Privilege",
                 "description": "Employ the least privilege principle when implementing information system access.",
-                "checks": {},
+                "checks": {"azure": ["azure_iam_contributor_count", "azure_iam_sp_high_privilege"]},
             },
             {
                 "id": "IAM-06",
                 "domain": "Identity & Access Management",
                 "title": "Access Provisioning",
                 "description": "Define and implement an identity access provisioning process which authorizes, records, and communicates access changes to data and assets.",
-                "checks": {"aws": ["iam_group_no_inline_policies", "iam_user_no_inline_policies"]},
+                "checks": {"aws": ["iam_group_no_inline_policies", "iam_user_no_inline_policies"], "azure": ["azure_classic_admins_removed"]},
             },
             {
                 "id": "IAM-07",
                 "domain": "Identity & Access Management",
                 "title": "Access Changes and Revocation",
                 "description": "De-provision or modify identity access in a timely manner.",
-                "checks": {},
+                "checks": {"azure": ["azure_iam_guest_users_reviewed"]},
             },
             {
                 "id": "IAM-08",
@@ -3118,14 +3479,14 @@ FRAMEWORKS = {
                 "domain": "Identity & Access Management",
                 "title": "Segregation of Privileged Access Roles",
                 "description": "Define, implement and evaluate processes, procedures and technical measures for the segregation of privileged access roles.",
-                "checks": {},
+                "checks": {"azure": ["azure_sql_ad_admin_configured"]},
             },
             {
                 "id": "IAM-10",
                 "domain": "Identity & Access Management",
                 "title": "Management of Privileged Access Roles",
                 "description": "Define and implement an access process to ensure privileged access roles and rights are granted for a time limited period, and implement procedures to prevent the accumulation of segregated privile...",
-                "checks": {},
+                "checks": {"azure": ["azure_keyvault_rbac_authorization"]},
             },
             {
                 "id": "IAM-11",
@@ -3146,7 +3507,7 @@ FRAMEWORKS = {
                 "domain": "Identity & Access Management",
                 "title": "Strong Authentication",
                 "description": "Define, implement and evaluate processes, procedures and technical measures for authenticating access to systems, application and data assets, including multifactor authentication for at least priv...",
-                "checks": {"alibaba": ["ali_ram_mfa_enabled"], "aws": ["iam_root_mfa_enabled", "iam_user_mfa_enabled"], "m365": ["m365_admin_mfa_enforced", "m365_user_phishing_resistant_mfa"], "salesforce": ["salesforce_user_mfa_enabled"], "servicenow": ["servicenow_users_mfa_enabled"], "snowflake": ["snowflake_user_mfa_enabled"]},
+                "checks": {"alibaba": ["ali_ram_mfa_enabled"], "aws": ["iam_root_mfa_enabled", "iam_user_mfa_enabled"], "m365": ["m365_admin_mfa_enforced", "m365_user_phishing_resistant_mfa"], "salesforce": ["salesforce_user_mfa_enabled"], "servicenow": ["servicenow_users_mfa_enabled"], "snowflake": ["snowflake_user_mfa_enabled"], "azure": ["azure_iam_mfa_enabled_all_users"]},
             },
             {
                 "id": "IAM-14",
@@ -3168,7 +3529,7 @@ FRAMEWORKS = {
                 "domain": "Interoperability & Portability",
                 "title": "Interoperability and Portability Policy and Procedures",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain policies and procedures for interoperability and portability including requirements for: a. Communications between applicatio...",
-                "checks": {},
+                "checks": {"azure": ["azure_vm_managed_disks"]},
             },
             {
                 "id": "IPY-02",
@@ -3197,42 +3558,42 @@ FRAMEWORKS = {
                 "domain": "Infrastructure Security",
                 "title": "Infrastructure and Virtualization Security Policy and Procedures",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain policies and procedures for infrastructure and virtualization security. Review and update the policies and procedures at leas...",
-                "checks": {"aws": ["ec2_default_sg_no_traffic", "vpc_flow_logs_enabled"], "kubernetes": ["k8s_namespace_network_policy"]},
+                "checks": {"aws": ["ec2_default_sg_no_traffic", "vpc_flow_logs_enabled"], "kubernetes": ["k8s_namespace_network_policy"], "azure": ["azure_nsg_default_deny_inbound", "azure_subnet_has_nsg"]},
             },
             {
                 "id": "I&S-02",
                 "domain": "Infrastructure Security",
                 "title": "Capacity and Resource Planning",
                 "description": "Plan and monitor the availability, quality, and adequate capacity of resources in order to deliver the required system performance as determined by the business.",
-                "checks": {"kubernetes": ["k8s_namespace_limit_ranges", "k8s_namespace_resource_quotas"]},
+                "checks": {"kubernetes": ["k8s_namespace_limit_ranges", "k8s_namespace_resource_quotas"], "azure": ["azure_nsg_flow_logs_enabled", "azure_network_watcher_enabled"]},
             },
             {
                 "id": "I&S-03",
                 "domain": "Infrastructure Security",
                 "title": "Network Security",
                 "description": "Monitor, encrypt and restrict communications between environments, services, and applications to only authenticated and authorized connections, as justified by the business. Review these configurat...",
-                "checks": {},
+                "checks": {"azure": ["azure_vm_no_public_ip", "azure_private_endpoints_used"]},
             },
             {
                 "id": "I&S-04",
                 "domain": "Infrastructure Security",
                 "title": "OS Hardening and Base Controls",
                 "description": "Harden host and guest OS, hypervisor or infrastructure control plane according to their respective best practices, and supported by technical controls, as part of a security baseline.",
-                "checks": {},
+                "checks": {"azure": ["azure_public_ip_ddos_protection"]},
             },
             {
                 "id": "I&S-05",
                 "domain": "Infrastructure Security",
                 "title": "Production and Non-Production Environments",
                 "description": "Separate production and non-production environments to reduce the risk of sensitive  production data being used in non-production environments. Production data is  sanitized or protected before any...",
-                "checks": {"aws": ["ec2_instance_no_public_ip"], "gcp": ["gcp_compute_no_external_ip"]},
+                "checks": {"aws": ["ec2_instance_no_public_ip"], "gcp": ["gcp_compute_no_external_ip"], "azure": ["azure_aks_network_policy", "azure_aks_authorized_ip_ranges"]},
             },
             {
                 "id": "I&S-06",
                 "domain": "Infrastructure Security",
                 "title": "Segmentation and Segregation",
                 "description": "Design, develop, deploy and configure applications and infrastructures such that  service customer (tenant) access is appropriately segmented and segregated,  monitored and restricted.",
-                "checks": {},
+                "checks": {"azure": ["azure_vm_trusted_launch"]},
             },
             {
                 "id": "I&S-07",
@@ -3253,7 +3614,7 @@ FRAMEWORKS = {
                 "domain": "Infrastructure Security",
                 "title": "Network Defense",
                 "description": "Define, implement and evaluate processes, procedures and defense-in-depth techniques for protection, detection, and timely response to network-based attacks.",
-                "checks": {},
+                "checks": {"azure": ["azure_aks_aad_integration", "azure_aks_rbac_enabled"]},
             },
             # ─── LOG: Logging and Monitoring ───
             {
@@ -3261,35 +3622,35 @@ FRAMEWORKS = {
                 "domain": "Logging and Monitoring",
                 "title": "Logging and Monitoring Policy and Procedures",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain policies and procedures for logging and monitoring. Review and update the policies and procedures at least annually, or upon ...",
-                "checks": {},
+                "checks": {"azure": ["azure_monitor_diagnostic_settings", "azure_monitor_log_profile"]},
             },
             {
                 "id": "LOG-02",
                 "domain": "Logging and Monitoring",
                 "title": "Audit Logs Protection",
                 "description": "Define, implement and evaluate processes, procedures and technical measures to ensure the security and retention of audit logs.",
-                "checks": {"aws": ["cloudtrail_encrypted", "cloudtrail_log_validation"], "gcp": ["gcp_logging_bucket_retention"]},
+                "checks": {"aws": ["cloudtrail_encrypted", "cloudtrail_log_validation"], "gcp": ["gcp_logging_bucket_retention"], "azure": ["azure_nsg_flow_logs_enabled"]},
             },
             {
                 "id": "LOG-03",
                 "domain": "Logging and Monitoring",
                 "title": "Security Monitoring and Alerting",
                 "description": "Identify and monitor security-related events within applications and the underlying infrastructure. Define and implement a system to generate alerts to responsible stakeholders based on such events...",
-                "checks": {},
+                "checks": {"azure": ["azure_monitor_log_retention_365"]},
             },
             {
                 "id": "LOG-04",
                 "domain": "Logging and Monitoring",
                 "title": "Audit Logs Access and Accountability",
                 "description": "Restrict audit log access to authorized identities and maintain records of that access.",
-                "checks": {"aws": ["cloudtrail_s3_bucket_logging"]},
+                "checks": {"aws": ["cloudtrail_s3_bucket_logging"], "azure": ["azure_security_alert_notifications"]},
             },
             {
                 "id": "LOG-05",
                 "domain": "Logging and Monitoring",
                 "title": "Audit Logs Monitoring and Response",
                 "description": "Implement and maintain capabilities to correlate and monitor security audit logs for the  detection of suspicious or anomalous activity that deviates from typical or expected  patterns. Establish a...",
-                "checks": {},
+                "checks": {"azure": ["azure_appservice_http_logging"]},
             },
             {
                 "id": "LOG-06",
@@ -3303,7 +3664,7 @@ FRAMEWORKS = {
                 "domain": "Logging and Monitoring",
                 "title": "Logging Scope",
                 "description": "Establish, document and implement which information meta/data system events should be logged. Review and update the scope at least annually or whenever there is a change in the threat environment, ...",
-                "checks": {"alibaba": ["ali_actiontrail_multi_region"], "aws": ["cloudtrail_multiregion", "config_recorder_enabled"]},
+                "checks": {"alibaba": ["ali_actiontrail_multi_region"], "aws": ["cloudtrail_multiregion", "config_recorder_enabled"], "azure": ["azure_sql_auditing_enabled"]},
             },
             {
                 "id": "LOG-08",
@@ -3317,7 +3678,7 @@ FRAMEWORKS = {
                 "domain": "Logging and Monitoring",
                 "title": "Log Records",
                 "description": "Generate audit records containing relevant security information.",
-                "checks": {"aws": ["cloudtrail_enabled", "cloudwatch_log_group_encrypted"]},
+                "checks": {"aws": ["cloudtrail_enabled", "cloudwatch_log_group_encrypted"], "azure": ["azure_monitor_diagnostic_settings"]},
             },
             {
                 "id": "LOG-10",
@@ -3345,7 +3706,7 @@ FRAMEWORKS = {
                 "domain": "Logging and Monitoring",
                 "title": "Access Control Logs",
                 "description": "Monitor and log physical access using an auditable access control system.",
-                "checks": {"aws": ["cloudtrail_enabled"], "gcp": ["gcp_logging_audit_logs_enabled"], "servicenow": ["servicenow_admin_audit_logging"]},
+                "checks": {"aws": ["cloudtrail_enabled"], "gcp": ["gcp_logging_audit_logs_enabled"], "servicenow": ["servicenow_admin_audit_logging"], "azure": ["azure_security_alert_notifications", "azure_security_contact_configured"]},
             },
             {
                 "id": "LOG-14",
@@ -3360,21 +3721,21 @@ FRAMEWORKS = {
                 "domain": "Security Incident Management, E-Discovery, & Cloud Forensics",
                 "title": "Security Incident Management Policy and Procedures",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain policies and procedures for Security Incident Management, E-Discovery, and Cloud Forensics. Review and update the policies an...",
-                "checks": {"aws": ["guardduty_enabled"], "servicenow": ["servicenow_incident_management"]},
+                "checks": {"aws": ["guardduty_enabled"], "servicenow": ["servicenow_incident_management"], "azure": ["azure_security_alert_notifications", "azure_security_contact_configured"]},
             },
             {
                 "id": "SEF-02",
                 "domain": "Security Incident Management, E-Discovery, & Cloud Forensics",
                 "title": "Service Management Policy and Procedures",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain policies and procedures for the timely management of security incidents. Review and update the policies and procedures at lea...",
-                "checks": {},
+                "checks": {"azure": ["azure_defender_auto_provisioning"]},
             },
             {
                 "id": "SEF-03",
                 "domain": "Security Incident Management, E-Discovery, & Cloud Forensics",
                 "title": "Incident Response Plans",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain a security  incident response plan, which includes but is not limited to: a communication strategy  for notifying relevant in...",
-                "checks": {"aws": ["guardduty_enabled", "iam_support_role_created"]},
+                "checks": {"aws": ["guardduty_enabled", "iam_support_role_created"], "azure": ["azure_security_contact_configured"]},
             },
             {
                 "id": "SEF-04",
@@ -3388,7 +3749,7 @@ FRAMEWORKS = {
                 "domain": "Security Incident Management, E-Discovery, & Cloud Forensics",
                 "title": "Incident Response Metrics",
                 "description": "Establish, monitor and report information security incident metrics.",
-                "checks": {},
+                "checks": {"azure": ["azure_security_alert_notifications"]},
             },
             {
                 "id": "SEF-06",
@@ -3473,7 +3834,7 @@ FRAMEWORKS = {
                 "domain": "Supply Chain Management, Transparency, and Accountability",
                 "title": "SSRM Control Implementation",
                 "description": "Implement, operate, and audit or assess the portions of the SSRM which the organization is responsible for.",
-                "checks": {},
+                "checks": {"azure": ["azure_sql_vulnerability_assessment"]},
             },
             {
                 "id": "STA-08",
@@ -3522,7 +3883,7 @@ FRAMEWORKS = {
                 "domain": "Supply Chain Management, Transparency, and Accountability",
                 "title": "Supply Chain Service Agreement Compliance",
                 "description": "Implement policies requiring all service providers throughout the supply chain to comply with information security, confidentiality, access control, privacy, audit, personnel policy and service lev...",
-                "checks": {},
+                "checks": {"azure": ["azure_sql_atp_enabled"]},
             },
             {
                 "id": "STA-15",
@@ -3544,14 +3905,14 @@ FRAMEWORKS = {
                 "domain": "Threat & Vulnerability Management",
                 "title": "Threat and Vulnerability Management Policy and Procedures",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain policies and procedures to  identify, report and prioritize the remediation of vulnerabilities and threats, in order to prote...",
-                "checks": {"aws": ["ecr_image_scanning", "guardduty_enabled"], "m365": ["m365_defender_low_risk"]},
+                "checks": {"aws": ["ecr_image_scanning", "guardduty_enabled"], "m365": ["m365_defender_low_risk"], "azure": ["azure_sql_vulnerability_assessment", "azure_sql_atp_enabled"]},
             },
             {
                 "id": "TVM-02",
                 "domain": "Threat & Vulnerability Management",
                 "title": "Malware and Malicious Instructions Protection Policy and Procedures",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain policies and procedures to  protect against malware and malicious instructions. Review and update the policies and procedures...",
-                "checks": {},
+                "checks": {"azure": ["azure_defender_auto_provisioning"]},
             },
             {
                 "id": "TVM-03",
@@ -3565,7 +3926,7 @@ FRAMEWORKS = {
                 "domain": "Threat & Vulnerability Management",
                 "title": "Threat Analysis and Modelling",
                 "description": "Define, implement, and evaluate a threat analysis process and procedures to identify, assess  and review the threat landscape for cloud systems. Build threat models according to industry  best prac...",
-                "checks": {"aws": ["guardduty_enabled"]},
+                "checks": {"aws": ["guardduty_enabled"], "azure": ["azure_appgw_waf_enabled"]},
             },
             {
                 "id": "TVM-05",
@@ -3586,7 +3947,7 @@ FRAMEWORKS = {
                 "domain": "Threat & Vulnerability Management",
                 "title": "Penetration Testing",
                 "description": "Define, implement and evaluate processes, procedures and technical measures for the periodic performance of penetration testing by independent third parties.",
-                "checks": {},
+                "checks": {"azure": ["azure_sql_atp_enabled"]},
             },
             {
                 "id": "TVM-08",
@@ -3600,7 +3961,7 @@ FRAMEWORKS = {
                 "domain": "Threat & Vulnerability Management",
                 "title": "Vulnerability Prioritization",
                 "description": "Use a risk-based method for effective prioritization of vulnerability remediation using an industry recognized framework.",
-                "checks": {},
+                "checks": {"azure": ["azure_vm_antimalware_extension"]},
             },
             {
                 "id": "TVM-10",
@@ -3629,7 +3990,7 @@ FRAMEWORKS = {
                 "domain": "Universal Endpoint Management",
                 "title": "Endpoint Devices Policy and Procedures",
                 "description": "Establish, document, approve, communicate, apply, evaluate and maintain policies and procedures for all endpoints. Review and update the policies and procedures at least annually, or upon significa...",
-                "checks": {"m365": ["m365_ca_require_compliant_device"]},
+                "checks": {"m365": ["m365_ca_require_compliant_device"], "azure": ["azure_vm_managed_disks"]},
             },
             {
                 "id": "UEM-02",
@@ -3643,7 +4004,7 @@ FRAMEWORKS = {
                 "domain": "Universal Endpoint Management",
                 "title": "Compatibility",
                 "description": "Define and implement a process for the validation of the endpoint device\'s compatibility with operating systems and applications.",
-                "checks": {},
+                "checks": {"azure": ["azure_vm_trusted_launch"]},
             },
             {
                 "id": "UEM-04",
@@ -3664,7 +4025,7 @@ FRAMEWORKS = {
                 "domain": "Universal Endpoint Management",
                 "title": "Automatic Lock Screen",
                 "description": "Configure all relevant interactive-use endpoints to require an automatic lock screen.",
-                "checks": {},
+                "checks": {"azure": ["azure_aks_rbac_enabled"]},
             },
             {
                 "id": "UEM-07",
@@ -3678,7 +4039,7 @@ FRAMEWORKS = {
                 "domain": "Universal Endpoint Management",
                 "title": "Storage Encryption",
                 "description": "Protect information from unauthorized disclosure on managed endpoint devices with storage encryption.",
-                "checks": {"aws": ["ec2_ebs_default_encryption", "ec2_ebs_volume_encrypted"]},
+                "checks": {"aws": ["ec2_ebs_default_encryption", "ec2_ebs_volume_encrypted"], "azure": ["azure_storage_shared_key_disabled"]},
             },
             {
                 "id": "UEM-09",
