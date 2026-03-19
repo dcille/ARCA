@@ -68,6 +68,7 @@ class AWSScanner:
             "acm": self._check_acm,
             "apigateway": self._check_apigateway,
             "macie": self._check_macie,
+            "securityhub": self._check_securityhub,
         }
 
         for service_name, check_fn in check_methods.items():
@@ -140,6 +141,21 @@ class AWSScanner:
                     status_extended=f"Max password age: {max_age} days",
                     remediation="Set password rotation to 90 days or less",
                     compliance_frameworks=["CIS-AWS-1.5", "NIST-800-53"],
+                ).to_dict())
+
+                # CIS 2.8: Password reuse prevention
+                reuse_prevention = policy.get("PasswordReusePrevention", 0)
+                reuse_ok = reuse_prevention >= 24
+                results.append(CheckResult(
+                    check_id="iam_password_policy_reuse_prevention",
+                    check_title="IAM password policy prevents password reuse (24 or more)",
+                    service="iam",
+                    severity="medium",
+                    status="PASS" if reuse_ok else "FAIL",
+                    resource_id="password-policy",
+                    status_extended=f"Password reuse prevention: {reuse_prevention} (requires >= 24)",
+                    remediation="Set password reuse prevention to 24 or greater: aws iam update-account-password-policy --password-reuse-prevention 24",
+                    compliance_frameworks=["CIS-AWS-6.0", "NIST-800-53"],
                 ).to_dict())
             except ClientError:
                 results.append(CheckResult(
@@ -241,6 +257,36 @@ class AWSScanner:
                         compliance_frameworks=["CIS-AWS-1.5", "NIST-800-53"],
                     ).to_dict())
 
+                # CIS 2.12: Only one active access key per user
+                active_keys = [k for k in keys if k.get("Status") == "Active"]
+                results.append(CheckResult(
+                    check_id="iam_user_single_active_access_key",
+                    check_title="IAM user has at most one active access key",
+                    service="iam",
+                    severity="medium",
+                    status="PASS" if len(active_keys) <= 1 else "FAIL",
+                    resource_id=user["Arn"],
+                    resource_name=username,
+                    status_extended=f"User {username} has {len(active_keys)} active access key(s)",
+                    remediation="Deactivate or delete extra access keys so only one remains active per user",
+                    compliance_frameworks=["CIS-AWS-6.0", "NIST-800-53"],
+                ).to_dict())
+
+                # CIS 2.14: Check user also has no directly attached managed policies
+                attached_user_policies = iam.list_attached_user_policies(UserName=username)["AttachedPolicies"]
+                results.append(CheckResult(
+                    check_id="iam_user_no_attached_policies",
+                    check_title="IAM user receives permissions only through groups",
+                    service="iam",
+                    severity="medium",
+                    status="PASS" if not inline_policies and not attached_user_policies else "FAIL",
+                    resource_id=user["Arn"],
+                    resource_name=username,
+                    status_extended=f"User {username} has {len(inline_policies)} inline and {len(attached_user_policies)} attached policy(ies)",
+                    remediation="Remove all inline and directly attached policies; grant permissions only through IAM groups",
+                    compliance_frameworks=["CIS-AWS-6.0", "NIST-800-53"],
+                ).to_dict())
+
             # Check root account has no access keys
             root_access_keys = summary.get("AccountAccessKeysPresent", 0)
             results.append(CheckResult(
@@ -338,6 +384,28 @@ class AWSScanner:
                     status_extended="AWSSupportAccess policy is attached to a role" if support_role_found else "No role with AWSSupportAccess policy found",
                     remediation="Create an IAM role with the AWSSupportAccess managed policy attached",
                     compliance_frameworks=["CIS-AWS-3.0", "NIST-800-53", "SOC2"],
+                ).to_dict())
+            except ClientError:
+                pass
+
+            # CIS 2.21: Ensure AWSCloudShellFullAccess is not attached to any entity
+            try:
+                cloudshell_arn = "arn:aws:iam::aws:policy/AWSCloudShellFullAccess"
+                cs_entities = iam.list_entities_for_policy(PolicyArn=cloudshell_arn)
+                cs_roles = cs_entities.get("PolicyRoles", [])
+                cs_users = cs_entities.get("PolicyUsers", [])
+                cs_groups = cs_entities.get("PolicyGroups", [])
+                cs_attached = bool(cs_roles or cs_users or cs_groups)
+                results.append(CheckResult(
+                    check_id="iam_cloudshell_fullaccess_restricted",
+                    check_title="AWSCloudShellFullAccess policy is not attached to any entity",
+                    service="iam",
+                    severity="medium",
+                    status="FAIL" if cs_attached else "PASS",
+                    resource_id="AWSCloudShellFullAccess",
+                    status_extended=f"AWSCloudShellFullAccess attached to {len(cs_roles)} role(s), {len(cs_users)} user(s), {len(cs_groups)} group(s)" if cs_attached else "AWSCloudShellFullAccess is not attached to any entity",
+                    remediation="Detach AWSCloudShellFullAccess and use a more restrictive custom policy that denies file transfer",
+                    compliance_frameworks=["CIS-AWS-6.0"],
                 ).to_dict())
             except ClientError:
                 pass
@@ -594,6 +662,26 @@ class AWSScanner:
                                         status_extended=f"Security group {sg_name} ({sg_id}) allows 0.0.0.0/0 on port {port}",
                                         remediation=f"Restrict port {port} access to specific IP ranges",
                                         compliance_frameworks=["CIS-AWS-1.5", "NIST-800-53", "PCI-DSS-3.2.1"],
+                                    ).to_dict())
+
+                # CIS 6.4: Check IPv6 unrestricted access on remote admin ports
+                for sg in sgs:
+                    sg_id = sg["GroupId"]
+                    sg_name = sg.get("GroupName", "")
+                    for perm in sg.get("IpPermissions", []):
+                        for ipv6_range in perm.get("Ipv6Ranges", []):
+                            if ipv6_range.get("CidrIpv6") == "::/0":
+                                port = perm.get("FromPort", "all")
+                                if port in (22, 3389, "all") or perm.get("IpProtocol") == "-1":
+                                    results.append(CheckResult(
+                                        check_id="ec2_sg_no_ipv6_wide_open",
+                                        check_title=f"Security group does not allow ::/0 on remote admin port {port}",
+                                        service="ec2", severity="high",
+                                        status="FAIL", region=region,
+                                        resource_id=sg_id, resource_name=sg_name,
+                                        status_extended=f"SG {sg_name} ({sg_id}) allows ::/0 on port {port}",
+                                        remediation=f"Restrict IPv6 access on port {port} to specific CIDR ranges",
+                                        compliance_frameworks=["CIS-AWS-6.0", "NIST-800-53"],
                                     ).to_dict())
 
                 # EBS encryption
@@ -881,6 +969,64 @@ class AWSScanner:
                             ).to_dict())
                         except ClientError:
                             pass
+
+                    # CIS 4.8/4.9: Check object-level logging for S3
+                    try:
+                        event_selectors = ct.get_event_selectors(TrailName=trail_arn)
+                        has_write_events = False
+                        has_read_events = False
+
+                        # Check advanced event selectors first
+                        adv_selectors = event_selectors.get("AdvancedEventSelectors", [])
+                        if adv_selectors:
+                            for sel in adv_selectors:
+                                fields = {f["Field"]: f.get("Equals", []) for f in sel.get("FieldSelectors", [])}
+                                if "eventCategory" in fields and "Data" in fields.get("eventCategory", []):
+                                    res_type = fields.get("resources.type", [])
+                                    if "AWS::S3::Object" in res_type:
+                                        read_only = fields.get("readOnly", [])
+                                        if not read_only:
+                                            has_write_events = True
+                                            has_read_events = True
+                                        elif "false" in read_only:
+                                            has_write_events = True
+                                        elif "true" in read_only:
+                                            has_read_events = True
+
+                        # Check basic event selectors
+                        basic_selectors = event_selectors.get("EventSelectors", [])
+                        for sel in basic_selectors:
+                            for dr in sel.get("DataResources", []):
+                                if dr.get("Type") == "AWS::S3::Object":
+                                    rw_type = sel.get("ReadWriteType", "All")
+                                    if rw_type in ("WriteOnly", "All"):
+                                        has_write_events = True
+                                    if rw_type in ("ReadOnly", "All"):
+                                        has_read_events = True
+
+                        results.append(CheckResult(
+                            check_id="cloudtrail_s3_object_write_events",
+                            check_title="CloudTrail logs S3 object-level write events",
+                            service="cloudtrail", severity="medium",
+                            status="PASS" if has_write_events else "FAIL",
+                            resource_id=trail_arn, resource_name=trail_name,
+                            status_extended=f"Trail {trail_name} S3 write data events: {'enabled' if has_write_events else 'disabled'}",
+                            remediation="Enable S3 data event logging for write events on the CloudTrail trail",
+                            compliance_frameworks=["CIS-AWS-6.0", "NIST-800-53"],
+                        ).to_dict())
+
+                        results.append(CheckResult(
+                            check_id="cloudtrail_s3_object_read_events",
+                            check_title="CloudTrail logs S3 object-level read events",
+                            service="cloudtrail", severity="medium",
+                            status="PASS" if has_read_events else "FAIL",
+                            resource_id=trail_arn, resource_name=trail_name,
+                            status_extended=f"Trail {trail_name} S3 read data events: {'enabled' if has_read_events else 'disabled'}",
+                            remediation="Enable S3 data event logging for read events on the CloudTrail trail",
+                            compliance_frameworks=["CIS-AWS-6.0", "NIST-800-53"],
+                        ).to_dict())
+                    except ClientError:
+                        pass
 
                     # Check CloudWatch Logs integration
                     cw_log_group = trail.get("CloudWatchLogsLogGroupArn")
@@ -1839,4 +1985,37 @@ class AWSScanner:
                 ).to_dict())
             except Exception as e:
                 logger.warning(f"Macie checks in {region} failed: {e}")
+        return results
+
+    def _check_securityhub(self) -> list[dict]:
+        """AWS Security Hub checks."""
+        results = []
+        session = self._get_session()
+        for region in self.regions:
+            try:
+                sh = session.client("securityhub", region_name=region)
+                hub = sh.describe_hub()
+                is_enabled = "HubArn" in hub
+                results.append(CheckResult(
+                    check_id="securityhub_enabled",
+                    check_title="AWS Security Hub is enabled",
+                    service="securityhub", severity="medium",
+                    status="PASS" if is_enabled else "FAIL",
+                    region=region, resource_id=hub.get("HubArn", "securityhub"),
+                    status_extended=f"Security Hub {'is enabled' if is_enabled else 'is not enabled'} in {region}",
+                    remediation="Enable AWS Security Hub: aws securityhub enable-security-hub --enable-default-standards",
+                    compliance_frameworks=["CIS-AWS-6.0", "NIST-800-53", "SOC2"],
+                ).to_dict())
+            except ClientError:
+                results.append(CheckResult(
+                    check_id="securityhub_enabled",
+                    check_title="AWS Security Hub is enabled",
+                    service="securityhub", severity="medium", status="FAIL",
+                    region=region, resource_id="securityhub",
+                    status_extended=f"Security Hub is not enabled in {region}",
+                    remediation="Enable AWS Security Hub: aws securityhub enable-security-hub --enable-default-standards",
+                    compliance_frameworks=["CIS-AWS-6.0", "NIST-800-53", "SOC2"],
+                ).to_dict())
+            except Exception as e:
+                logger.warning(f"SecurityHub checks in {region} failed: {e}")
         return results

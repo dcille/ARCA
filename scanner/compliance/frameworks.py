@@ -1786,6 +1786,367 @@ FRAMEWORKS = {
         ],
     },
     # ═══════════════════════════════════════════════════════════════════
+    # CIS Amazon Web Services Foundations Benchmark v6.0
+    # ═══════════════════════════════════════════════════════════════════
+    "CIS-AWS-6.0": {
+        "name": "CIS Amazon Web Services Foundations Benchmark v6.0",
+        "description": "CIS Benchmark v6.0 for AWS providing prescriptive guidance for configuring security options across IAM, Storage, Logging, Monitoring, and Networking.",
+        "category": "cis",
+        "controls": [
+            # ───────────────────────────────────────────────────────────
+            # Section 2: Identity and Access Management
+            # ───────────────────────────────────────────────────────────
+            {
+                "id": "2.1",
+                "title": "Maintain current contact details",
+                "description": "Ensure contact email and telephone details for AWS accounts are current and map to more than one individual in your organization.",
+                "checks": {},
+            },
+            {
+                "id": "2.2",
+                "title": "Ensure security contact information is registered",
+                "description": "AWS provides the option of specifying contact information for the account's security team. It is recommended that this information be provided.",
+                "checks": {},
+            },
+            {
+                "id": "2.3",
+                "title": "Ensure no 'root' user account access key exists",
+                "description": "It is recommended that all access keys associated with the root user account be deleted to limit vectors by which the account can be compromised.",
+                "checks": {"aws": ["iam_no_root_access_key"]},
+            },
+            {
+                "id": "2.4",
+                "title": "Ensure MFA is enabled for the 'root' user account",
+                "description": "Multi-factor Authentication (MFA) adds an extra layer of protection on top of a username and password for the root account.",
+                "checks": {"aws": ["iam_root_mfa_enabled"]},
+            },
+            {
+                "id": "2.5",
+                "title": "Ensure hardware MFA is enabled for the 'root' user account",
+                "description": "A hardware MFA has a smaller attack surface than a virtual MFA. It is recommended that the root account be protected with a hardware MFA device.",
+                "checks": {"aws": ["iam_root_mfa_enabled"]},
+            },
+            {
+                "id": "2.6",
+                "title": "Eliminate use of the 'root' user for administrative and daily tasks",
+                "description": "The root user has unrestricted access. Use of it is inconsistent with the principles of least privilege and separation of duties.",
+                "checks": {},
+            },
+            {
+                "id": "2.7",
+                "title": "Ensure IAM password policy requires minimum length of 14 or greater",
+                "description": "IAM password policies can enforce minimum password length. It is recommended that the password policy require a minimum length of 14.",
+                "checks": {"aws": ["iam_password_policy_strong", "iam_password_policy_exists"]},
+            },
+            {
+                "id": "2.8",
+                "title": "Ensure IAM password policy prevents password reuse",
+                "description": "IAM password policies can prevent reuse of a given password by the same user. It is recommended to prevent reuse of the last 24 passwords.",
+                "checks": {"aws": ["iam_password_policy_reuse_prevention"]},
+            },
+            {
+                "id": "2.9",
+                "title": "Ensure MFA is enabled for all IAM users that have a console password",
+                "description": "Multi-Factor Authentication adds an extra layer of authentication assurance. It is recommended that MFA be enabled for all accounts with a console password.",
+                "checks": {"aws": ["iam_user_mfa_enabled"]},
+            },
+            {
+                "id": "2.10",
+                "title": "Do not create access keys during initial setup for IAM users with a console password",
+                "description": "AWS console defaults to no check boxes selected when creating a new IAM user. Require programmatic access to be created as a separate step.",
+                "checks": {},
+            },
+            {
+                "id": "2.11",
+                "title": "Ensure credentials unused for 45 days or more are disabled",
+                "description": "It is recommended that all credentials unused for 45 days or more be deactivated or removed to reduce the window of opportunity for compromise.",
+                "checks": {"aws": ["iam_user_unused_credentials_45days"]},
+            },
+            {
+                "id": "2.12",
+                "title": "Ensure there is only one active access key for any single IAM user",
+                "description": "One of the best ways to protect your account is to not allow users to have multiple access keys.",
+                "checks": {"aws": ["iam_user_single_active_access_key"]},
+            },
+            {
+                "id": "2.13",
+                "title": "Ensure access keys are rotated every 90 days or less",
+                "description": "Access keys should be rotated regularly to reduce the window of opportunity for a compromised key.",
+                "checks": {"aws": ["iam_access_key_rotation"]},
+            },
+            {
+                "id": "2.14",
+                "title": "Ensure IAM users receive permissions only through groups",
+                "description": "Assigning IAM policies solely through groups unifies permissions management into a single, flexible layer consistent with organizational roles.",
+                "checks": {"aws": ["iam_user_no_inline_policies", "iam_user_no_attached_policies"]},
+            },
+            {
+                "id": "2.15",
+                "title": "Ensure IAM policies that allow full '*:*' administrative privileges are not attached",
+                "description": "It is recommended to grant least privilege — only the permissions required to perform a task — instead of full administrative privileges.",
+                "checks": {"aws": ["iam_no_star_policies"]},
+            },
+            {
+                "id": "2.16",
+                "title": "Ensure a support role has been created to manage incidents with AWS Support",
+                "description": "Create an IAM Role with the AWSSupportAccess policy to allow authorized users to manage incidents with AWS Support.",
+                "checks": {"aws": ["iam_support_role_created"]},
+            },
+            {
+                "id": "2.17",
+                "title": "Ensure IAM instance roles are used for AWS resource access from instances",
+                "description": "AWS IAM roles reduce the risks associated with sharing and rotating credentials that can be used outside AWS.",
+                "checks": {},
+            },
+            {
+                "id": "2.18",
+                "title": "Ensure that all expired SSL/TLS certificates stored in AWS IAM are removed",
+                "description": "Removing expired SSL/TLS certificates eliminates the risk that an invalid certificate will be deployed accidentally to a resource.",
+                "checks": {"aws": ["iam_ssl_certificate_expiry"]},
+            },
+            {
+                "id": "2.19",
+                "title": "Ensure that IAM External Access Analyzer is enabled for all regions",
+                "description": "Enable the IAM External Access Analyzer to identify resources shared with external entities and unintended access.",
+                "checks": {"aws": ["iam_access_analyzer_enabled"]},
+            },
+            {
+                "id": "2.20",
+                "title": "Ensure IAM users are managed centrally via identity federation or AWS Organizations",
+                "description": "In multi-account environments, IAM user centralization facilitates greater user control and reduces complexity.",
+                "checks": {},
+            },
+            {
+                "id": "2.21",
+                "title": "Ensure access to AWSCloudShellFullAccess is restricted",
+                "description": "AWSCloudShellFullAccess provides full access to CloudShell including file upload/download capability. Access should be restricted.",
+                "checks": {"aws": ["iam_cloudshell_fullaccess_restricted"]},
+            },
+            # ───────────────────────────────────────────────────────────
+            # Section 3: Storage
+            # ───────────────────────────────────────────────────────────
+            {
+                "id": "3.1",
+                "title": "Ensure S3 Bucket Policy is set to deny HTTP requests",
+                "description": "Amazon S3 buckets should require requests to use TLS/SSL (HTTPS) to enforce encryption in transit.",
+                "checks": {"aws": ["s3_bucket_ssl_required"]},
+            },
+            {
+                "id": "3.2",
+                "title": "Ensure that encryption-at-rest is enabled for RDS instances",
+                "description": "RDS instances should use encryption to protect data at rest from unauthorized access.",
+                "checks": {"aws": ["rds_encryption_enabled"]},
+            },
+            {
+                "id": "3.3",
+                "title": "Ensure that encryption is enabled for EFS file systems",
+                "description": "EFS data should be encrypted at rest using AWS KMS to reduce the risk of a data breach via direct access to the storage device.",
+                "checks": {"aws": ["efs_encryption_enabled"]},
+            },
+            # ───────────────────────────────────────────────────────────
+            # Section 4: Logging
+            # ───────────────────────────────────────────────────────────
+            {
+                "id": "4.1",
+                "title": "Ensure CloudTrail is enabled in all regions",
+                "description": "CloudTrail provides a history of AWS API calls. Ensure a multi-region trail exists that logs all management events.",
+                "checks": {"aws": ["cloudtrail_enabled", "cloudtrail_multiregion"]},
+            },
+            {
+                "id": "4.2",
+                "title": "Ensure CloudTrail log file validation is enabled",
+                "description": "CloudTrail log file validation creates a digitally signed digest file for integrity verification of delivered logs.",
+                "checks": {"aws": ["cloudtrail_log_validation"]},
+            },
+            {
+                "id": "4.3",
+                "title": "Ensure AWS Config is enabled in all regions",
+                "description": "AWS Config performs configuration management of supported resources and delivers log files. It should be enabled in all regions.",
+                "checks": {"aws": ["config_recorder_enabled"]},
+            },
+            {
+                "id": "4.4",
+                "title": "Ensure that server access logging is enabled on the CloudTrail S3 bucket",
+                "description": "Server access logging generates a log that contains access records for each request to the S3 bucket used by CloudTrail.",
+                "checks": {"aws": ["cloudtrail_s3_bucket_logging"]},
+            },
+            {
+                "id": "4.5",
+                "title": "Ensure CloudTrail logs are encrypted at rest using KMS CMKs",
+                "description": "CloudTrail logs can be configured to use server side encryption with KMS customer-created master keys for additional confidentiality.",
+                "checks": {"aws": ["cloudtrail_encrypted"]},
+            },
+            {
+                "id": "4.6",
+                "title": "Ensure rotation for customer-created symmetric CMKs is enabled",
+                "description": "Automated key rotation retains all prior backing keys for transparent decryption. CMK key rotation should be enabled for symmetric keys.",
+                "checks": {"aws": ["kms_key_rotation_enabled"]},
+            },
+            {
+                "id": "4.7",
+                "title": "Ensure VPC flow logging is enabled in all VPCs",
+                "description": "VPC Flow Logs capture information about IP traffic going to and from network interfaces in VPCs for anomaly detection and security analysis.",
+                "checks": {"aws": ["vpc_flow_logs_enabled"]},
+            },
+            {
+                "id": "4.8",
+                "title": "Ensure that object-level logging for write events is enabled for S3 buckets",
+                "description": "S3 object-level API operations (PutObject, DeleteObject) are data events. Enable object-level logging for write events on S3 buckets.",
+                "checks": {"aws": ["cloudtrail_s3_object_write_events"]},
+            },
+            {
+                "id": "4.9",
+                "title": "Ensure that object-level logging for read events is enabled for S3 buckets",
+                "description": "S3 object-level API operations (GetObject) are data events. Enable object-level logging for read events on S3 buckets.",
+                "checks": {"aws": ["cloudtrail_s3_object_read_events"]},
+            },
+            # ───────────────────────────────────────────────────────────
+            # Section 5: Monitoring
+            # ───────────────────────────────────────────────────────────
+            {
+                "id": "5.1",
+                "title": "Ensure unauthorized API calls are monitored",
+                "description": "Establish a metric filter and alarm for unauthorized API calls to reduce time to detect malicious activity.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.2",
+                "title": "Ensure management console sign-in without MFA is monitored",
+                "description": "Establish a metric filter and alarm for console logins not protected by multi-factor authentication.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.3",
+                "title": "Ensure usage of the 'root' account is monitored",
+                "description": "Establish a metric filter and alarm for root login attempts to detect unauthorized use of the root account.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.4",
+                "title": "Ensure IAM policy changes are monitored",
+                "description": "Establish a metric filter and alarm for changes made to Identity and Access Management (IAM) policies.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.5",
+                "title": "Ensure CloudTrail configuration changes are monitored",
+                "description": "Establish a metric filter and alarm to detect changes to CloudTrail's configurations.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.6",
+                "title": "Ensure AWS Management Console authentication failures are monitored",
+                "description": "Establish a metric filter and alarm for failed console authentication attempts.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.7",
+                "title": "Ensure disabling or scheduled deletion of customer created CMKs is monitored",
+                "description": "Establish a metric filter and alarm for customer-created CMKs that have changed state to disabled or scheduled for deletion.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.8",
+                "title": "Ensure S3 bucket policy changes are monitored",
+                "description": "Establish a metric filter and alarm for changes to S3 bucket policies to reduce time to detect and correct permissive policies.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.9",
+                "title": "Ensure AWS Config configuration changes are monitored",
+                "description": "Establish a metric filter and alarm for detecting changes to AWS Config's configurations.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.10",
+                "title": "Ensure security group changes are monitored",
+                "description": "Establish a metric filter and alarm to detect changes to security groups to prevent unintentional exposure of resources.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.11",
+                "title": "Ensure Network Access Control List (NACL) changes are monitored",
+                "description": "Establish a metric filter and alarm for any changes made to NACLs to prevent unintended exposure of AWS resources.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.12",
+                "title": "Ensure changes to network gateways are monitored",
+                "description": "Establish a metric filter and alarm for changes to network gateways to ensure all ingress/egress traffic traverses a controlled path.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.13",
+                "title": "Ensure route table changes are monitored",
+                "description": "Establish a metric filter and alarm for changes to route tables to prevent accidental or intentional modifications.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.14",
+                "title": "Ensure VPC changes are monitored",
+                "description": "Establish a metric filter and alarm for changes made to VPCs to ensure VPC traffic flow is not negatively impacted.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.15",
+                "title": "Ensure AWS Organizations changes are monitored",
+                "description": "Establish a metric filter and alarm for changes made to AWS Organizations in the master account.",
+                "checks": {"aws": ["cloudtrail_integrated_cloudwatch"]},
+            },
+            {
+                "id": "5.16",
+                "title": "Ensure AWS Security Hub is enabled",
+                "description": "Security Hub collects security data from AWS accounts and services, helping analyze security trends and identify priority issues.",
+                "checks": {"aws": ["securityhub_enabled"]},
+            },
+            # ───────────────────────────────────────────────────────────
+            # Section 6: Networking
+            # ───────────────────────────────────────────────────────────
+            {
+                "id": "6.1",
+                "title": "Ensure EBS volume encryption is enabled in all regions",
+                "description": "EBS default encryption should be enabled to ensure all new EBS volumes are encrypted at rest.",
+                "checks": {"aws": ["ec2_ebs_default_encryption", "ec2_ebs_volume_encrypted"]},
+            },
+            {
+                "id": "6.2",
+                "title": "Ensure no Network ACLs allow ingress from 0.0.0.0/0 to remote server administration ports",
+                "description": "No NACL should allow unrestricted ingress access to remote server administration ports such as SSH (22) and RDP (3389).",
+                "checks": {"aws": ["vpc_no_unrestricted_nacl"]},
+            },
+            {
+                "id": "6.3",
+                "title": "Ensure no security groups allow ingress from 0.0.0.0/0 to remote server administration ports",
+                "description": "No security group should allow unrestricted ingress access from 0.0.0.0/0 to remote server administration ports.",
+                "checks": {"aws": ["ec2_sg_no_wide_open_ports"]},
+            },
+            {
+                "id": "6.4",
+                "title": "Ensure no security groups allow ingress from ::/0 to remote server administration ports",
+                "description": "No security group should allow unrestricted IPv6 ingress access from ::/0 to remote server administration ports.",
+                "checks": {"aws": ["ec2_sg_no_ipv6_wide_open"]},
+            },
+            {
+                "id": "6.5",
+                "title": "Ensure the default security group of every VPC restricts all traffic",
+                "description": "The default security group should restrict all traffic, both inbound and outbound, to encourage least privilege security groups.",
+                "checks": {"aws": ["vpc_default_sg_restricts_all", "ec2_default_sg_no_traffic"]},
+            },
+            {
+                "id": "6.6",
+                "title": "Ensure routing tables for VPC peering are 'least access'",
+                "description": "Once a VPC peering connection is established, routing tables should be as specific as possible to minimize breach impact.",
+                "checks": {},
+            },
+            {
+                "id": "6.7",
+                "title": "Ensure that the EC2 Metadata Service only allows IMDSv2",
+                "description": "Require IMDSv2 (session-oriented) instead of IMDSv1 (request/response) to protect against SSRF attacks on EC2 instances.",
+                "checks": {"aws": ["ec2_imdsv2_required"]},
+            },
+        ],
+    },
+    # ═══════════════════════════════════════════════════════════════════
     # CIS GCP Foundations Benchmark v3.0
     # ═══════════════════════════════════════════════════════════════════
     "CIS-GCP-3.0": {
