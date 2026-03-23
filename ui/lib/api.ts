@@ -90,6 +90,10 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/dashboard/trends', undefined, { params })
   }
 
+  async getAccountDashboard(providerId: string) {
+    return this.request<any>('GET', `/api/v1/dashboard/account/${providerId}`)
+  }
+
   // Providers
   async getProviders() {
     return this.request<any[]>('GET', '/api/v1/providers')

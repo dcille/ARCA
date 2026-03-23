@@ -6,7 +6,8 @@ import Badge from '@/components/ui/Badge'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { TrashIcon, PlusIcon, BuildingOffice2Icon, UserIcon, MagnifyingGlassIcon, ChevronDownIcon, ChevronRightIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
+import { useRouter } from 'next/navigation'
+import { TrashIcon, PlusIcon, BuildingOffice2Icon, UserIcon, MagnifyingGlassIcon, ChevronDownIcon, ChevronRightIcon, PencilSquareIcon, ChartBarSquareIcon } from '@heroicons/react/24/outline'
 
 const PROVIDER_TYPES = [
   { id: 'aws', name: 'Amazon Web Services', color: 'bg-[#FF9900]' },
@@ -92,6 +93,7 @@ const SETUP_INSTRUCTIONS: Record<string, { title: string; steps: string[]; permi
 }
 
 export default function ProvidersPage() {
+  const router = useRouter()
   const [providers, setProviders] = useState<any[]>([])
   const [childAccounts, setChildAccounts] = useState<Record<string, any[]>>({})
   const [loading, setLoading] = useState(true)
@@ -420,6 +422,9 @@ export default function ProvidersPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
+                      <button onClick={() => router.push(`/darca/providers/${p.id}/dashboard`)} className="p-1.5 rounded-lg hover:bg-green-50 text-brand-gray-400 hover:text-brand-green" title="Account dashboard">
+                        <ChartBarSquareIcon className="w-4 h-4" />
+                      </button>
                       <button onClick={() => openEditModal(p)} className="p-1.5 rounded-lg hover:bg-blue-50 text-brand-gray-400 hover:text-blue-500" title="Edit provider">
                         <PencilSquareIcon className="w-4 h-4" />
                       </button>
