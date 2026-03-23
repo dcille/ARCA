@@ -47,6 +47,7 @@ const sections: NavSection[] = [
   {
     label: 'Assets',
     items: [
+      { name: 'Security Graph', href: '/darca/security-graph', icon: GlobeAltIcon },
       { name: 'Inventory', href: '/darca/inventory', icon: CubeIcon },
       { name: 'Cloud Providers', href: '/darca/providers', icon: CloudIcon },
       { name: 'Data Security', href: '/darca/dspm', icon: ServerStackIcon },

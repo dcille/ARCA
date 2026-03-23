@@ -416,6 +416,15 @@ class ApiClient {
     return this.request<any[]>('GET', '/api/v1/dspm/data-stores', undefined, { params })
   }
 
+  // Security Graph
+  async getSecurityGraph(params?: Record<string, string>) {
+    return this.request<any>('GET', '/api/v1/security-graph/graph', undefined, { params })
+  }
+
+  async getSecurityGraphStats() {
+    return this.request<any>('GET', '/api/v1/security-graph/stats')
+  }
+
   // MITRE ATT&CK
   async getMitreMatrix(params?: Record<string, string>) {
     return this.request<any>('GET', '/api/v1/mitre/matrix', undefined, { params })
