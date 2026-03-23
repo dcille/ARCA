@@ -9,10 +9,11 @@ from api.models.scan_schedule import ScanSchedule
 from api.models.notification import Notification
 from api.models.integration import Integration
 from api.models.organization import Organization
+from api.models.finding_action import FindingAction
 
 __all__ = [
     "User", "Provider", "Scan", "Finding",
     "SaaSConnection", "SaaSFinding",
     "AttackPath", "ScanSchedule", "Notification",
-    "Integration", "Organization",
+    "Integration", "Organization", "FindingAction",
 ]

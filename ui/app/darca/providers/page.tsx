@@ -17,11 +17,86 @@ const PROVIDER_TYPES = [
   { id: 'kubernetes', name: 'Kubernetes', color: 'bg-[#326CE5]' },
 ]
 
+const SETUP_INSTRUCTIONS: Record<string, { title: string; steps: string[]; permissions: string; docsUrl: string }> = {
+  aws: {
+    title: 'AWS IAM Setup',
+    steps: [
+      'Go to AWS IAM Console > Users > Create user',
+      'Attach the ReadOnlyAccess managed policy (or SecurityAudit for minimal access)',
+      'Create an Access Key under Security credentials > Access keys',
+      'Copy the Access Key ID and Secret Access Key',
+      'For Organizations: use a management account with OrganizationsReadOnlyAccess',
+    ],
+    permissions: 'Required: ReadOnlyAccess or SecurityAudit. For Organizations: OrganizationsReadOnlyAccess',
+    docsUrl: 'https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html',
+  },
+  azure: {
+    title: 'Azure App Registration Setup',
+    steps: [
+      'Go to Azure Portal > Azure Active Directory > App registrations > New registration',
+      'Note the Application (Client) ID and Directory (Tenant) ID',
+      'Go to Certificates & secrets > New client secret — copy the value',
+      'Go to the Subscription > Access control (IAM) > Add role assignment',
+      'Assign the Reader role to the App registration for the target subscription',
+    ],
+    permissions: 'Required: Reader role on the subscription. For Security Center: Security Reader',
+    docsUrl: 'https://learn.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app',
+  },
+  gcp: {
+    title: 'GCP Service Account Setup',
+    steps: [
+      'Go to GCP Console > IAM & Admin > Service Accounts > Create Service Account',
+      'Grant the Viewer role (roles/viewer) to the service account',
+      'Go to Keys > Add Key > Create new key > JSON',
+      'Download the JSON key file and paste its contents below',
+      'Note the Project ID from the GCP Console dashboard',
+    ],
+    permissions: 'Required: roles/viewer (Viewer). For GKE: roles/container.clusterViewer',
+    docsUrl: 'https://cloud.google.com/iam/docs/service-accounts-create',
+  },
+  oci: {
+    title: 'OCI API Key Setup',
+    steps: [
+      'Go to OCI Console > Identity & Security > Users > Your user > API Keys',
+      'Click Add API Key > Generate API Key Pair > Download Private Key',
+      'Note the Tenancy OCID (Administration > Tenancy details)',
+      'Note the User OCID (Profile > My profile)',
+      'Copy the fingerprint displayed after adding the key',
+    ],
+    permissions: 'Required: Inspector or Auditor group membership in IAM policies',
+    docsUrl: 'https://docs.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm',
+  },
+  alibaba: {
+    title: 'Alibaba Cloud RAM Setup',
+    steps: [
+      'Go to Alibaba Cloud Console > RAM > Users > Create User',
+      'Enable Programmatic Access to generate an AccessKey',
+      'Attach the AliyunReadOnlyAccess system policy',
+      'Copy the AccessKey ID and AccessKey Secret (shown only once)',
+    ],
+    permissions: 'Required: AliyunReadOnlyAccess or custom read-only policy',
+    docsUrl: 'https://www.alibabacloud.com/help/en/ram/user-guide/create-a-ram-user',
+  },
+  kubernetes: {
+    title: 'Kubernetes Kubeconfig Setup',
+    steps: [
+      'Run: kubectl config view --raw > kubeconfig.yaml',
+      'Ensure the context in the kubeconfig has cluster-reader or view ClusterRole',
+      'For EKS: aws eks update-kubeconfig --name <cluster>',
+      'For GKE: gcloud container clusters get-credentials <cluster>',
+      'For AKS: az aks get-credentials --resource-group <rg> --name <cluster>',
+    ],
+    permissions: 'Required: ClusterRole with get/list/watch on pods, services, namespaces, RBAC',
+    docsUrl: 'https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/',
+  },
+}
+
 export default function ProvidersPage() {
   const [providers, setProviders] = useState<any[]>([])
   const [childAccounts, setChildAccounts] = useState<Record<string, any[]>>({})
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [wizardStep, setWizardStep] = useState(0) // 0=select, 1=instructions, 2=credentials
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingProvider, setEditingProvider] = useState<any>(null)
   const [editForm, setEditForm] = useState<any>({})
@@ -292,7 +367,7 @@ export default function ProvidersPage() {
         title="Cloud Providers"
         subtitle="Manage cloud provider connections for security scanning"
         actions={
-          <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2">
+          <button onClick={() => { setShowModal(true); setWizardStep(0) }} className="btn-primary flex items-center gap-2">
             <PlusIcon className="w-4 h-4" />
             Add Provider
           </button>
@@ -308,7 +383,7 @@ export default function ProvidersPage() {
       ) : providers.length === 0 ? (
         <div className="card text-center py-12">
           <p className="text-brand-gray-400 mb-4">No cloud providers configured yet.</p>
-          <button onClick={() => setShowModal(true)} className="btn-primary">Add your first provider</button>
+          <button onClick={() => { setShowModal(true); setWizardStep(0) }} className="btn-primary">Add your first provider</button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -422,167 +497,248 @@ export default function ProvidersPage() {
         </div>
       )}
 
-      {/* Add Provider Modal */}
+      {/* Add Provider Wizard */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-brand-navy mb-4">Add Cloud Provider</h3>
+            {/* Wizard progress */}
+            <div className="flex items-center gap-2 mb-6">
+              {['Select Provider', 'Setup Guide', 'Credentials'].map((label, idx) => (
+                <div key={label} className="flex items-center gap-2 flex-1">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                    idx < wizardStep ? 'bg-brand-green text-white' :
+                    idx === wizardStep ? 'bg-brand-navy text-white' :
+                    'bg-brand-gray-200 text-brand-gray-400'
+                  }`}>
+                    {idx < wizardStep ? '\u2713' : idx + 1}
+                  </div>
+                  <span className={`text-xs font-medium ${idx === wizardStep ? 'text-brand-navy' : 'text-brand-gray-400'}`}>{label}</span>
+                  {idx < 2 && <div className="flex-1 h-px bg-brand-gray-200" />}
+                </div>
+              ))}
+            </div>
 
-            <div className="space-y-4">
+            {/* Step 0: Select Provider */}
+            {wizardStep === 0 && (
               <div>
-                <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Provider Type</label>
-                <select
-                  value={form.provider_type}
-                  onChange={(e) => setForm({ ...form, provider_type: e.target.value })}
-                  className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm"
-                >
+                <h3 className="text-lg font-semibold text-brand-navy mb-2">Select Cloud Provider</h3>
+                <p className="text-sm text-brand-gray-400 mb-4">Choose the cloud platform you want to connect for security scanning.</p>
+                <div className="grid grid-cols-2 gap-3">
                   {PROVIDER_TYPES.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
+                    <button
+                      key={t.id}
+                      onClick={() => { setForm({ ...form, provider_type: t.id }); setWizardStep(1) }}
+                      className={`p-4 rounded-lg border-2 text-left transition-all hover:shadow-md ${
+                        form.provider_type === t.id ? 'border-brand-green bg-brand-green/5' : 'border-brand-gray-200 hover:border-brand-gray-300'
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-lg ${t.color} flex items-center justify-center mb-2`}>
+                        <span className="text-white font-bold text-sm">{t.id.slice(0, 3).toUpperCase()}</span>
+                      </div>
+                      <span className="text-sm font-medium text-brand-navy">{t.name}</span>
+                    </button>
                   ))}
-                </select>
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <button onClick={() => { setShowModal(false); setWizardStep(0) }} className="flex-1 btn-outline">Cancel</button>
+                </div>
               </div>
+            )}
 
-              {form.provider_type !== 'kubernetes' && (
+            {/* Step 1: Setup Instructions */}
+            {wizardStep === 1 && (() => {
+              const instructions = SETUP_INSTRUCTIONS[form.provider_type]
+              return (
                 <div>
-                  <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Account Type</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: 'single', label: 'Single Account', desc: 'Scan a single account or subscription' },
-                      { id: 'organization', label: 'Organization', desc: 'Management/root account with child accounts' },
-                    ].map((at) => (
-                      <button
-                        key={at.id}
-                        onClick={() => setForm({ ...form, account_type: at.id })}
-                        className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                          form.account_type === at.id
-                            ? 'border-brand-green bg-brand-green/5'
-                            : 'border-brand-gray-200 hover:border-brand-gray-300'
-                        }`}
-                      >
-                        <span className="text-sm font-medium text-brand-navy">{at.label}</span>
-                        <p className="text-xs text-brand-gray-400 mt-0.5">{at.desc}</p>
-                      </button>
+                  <h3 className="text-lg font-semibold text-brand-navy mb-2">{instructions?.title || 'Setup Guide'}</h3>
+                  <p className="text-sm text-brand-gray-400 mb-4">Follow these steps to prepare your credentials before connecting.</p>
+
+                  <div className="space-y-3 mb-4">
+                    {instructions?.steps.map((step, idx) => (
+                      <div key={idx} className="flex gap-3 items-start">
+                        <div className="w-6 h-6 rounded-full bg-brand-navy/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-xs font-bold text-brand-navy">{idx + 1}</span>
+                        </div>
+                        <p className="text-sm text-brand-gray-700">{step}</p>
+                      </div>
                     ))}
                   </div>
-                </div>
-              )}
 
+                  {instructions?.permissions && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                      <p className="text-xs font-semibold text-amber-700 mb-1">Required Permissions</p>
+                      <p className="text-xs text-amber-600">{instructions.permissions}</p>
+                    </div>
+                  )}
+
+                  {instructions?.docsUrl && (
+                    <a
+                      href={instructions.docsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm text-brand-green hover:underline mb-4"
+                    >
+                      View official documentation &rarr;
+                    </a>
+                  )}
+
+                  <div className="flex gap-3 mt-6">
+                    <button onClick={() => setWizardStep(0)} className="flex-1 btn-outline">Back</button>
+                    <button onClick={() => setWizardStep(2)} className="flex-1 btn-primary">I have my credentials</button>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Step 2: Credentials */}
+            {wizardStep === 2 && (
               <div>
-                <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Alias</label>
-                <input
-                  type="text"
-                  value={form.alias}
-                  onChange={(e) => setForm({ ...form, alias: e.target.value })}
-                  className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm"
-                  placeholder="e.g., Production AWS"
-                />
-              </div>
+                <h3 className="text-lg font-semibold text-brand-navy mb-4">Enter Credentials</h3>
 
-              {form.provider_type === 'aws' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Access Key ID</label>
-                    <input type="text" value={form.access_key_id} onChange={(e) => setForm({ ...form, access_key_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Secret Access Key</label>
-                    <input type="password" value={form.secret_access_key} onChange={(e) => setForm({ ...form, secret_access_key: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Region</label>
-                    <input type="text" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} placeholder="us-east-1" className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
-                  </div>
-                </>
-              )}
+                <div className="space-y-4">
+                  {form.provider_type !== 'kubernetes' && (
+                    <div>
+                      <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Account Type</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { id: 'single', label: 'Single Account', desc: 'Scan a single account or subscription' },
+                          { id: 'organization', label: 'Organization', desc: 'Management/root account with child accounts' },
+                        ].map((at) => (
+                          <button
+                            key={at.id}
+                            onClick={() => setForm({ ...form, account_type: at.id })}
+                            className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                              form.account_type === at.id
+                                ? 'border-brand-green bg-brand-green/5'
+                                : 'border-brand-gray-200 hover:border-brand-gray-300'
+                            }`}
+                          >
+                            <span className="text-sm font-medium text-brand-navy">{at.label}</span>
+                            <p className="text-xs text-brand-gray-400 mt-0.5">{at.desc}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-              {form.provider_type === 'azure' && (
-                <>
                   <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Subscription ID</label>
-                    <input type="text" value={form.subscription_id} onChange={(e) => setForm({ ...form, subscription_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Alias</label>
+                    <input
+                      type="text"
+                      value={form.alias}
+                      onChange={(e) => setForm({ ...form, alias: e.target.value })}
+                      className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm"
+                      placeholder="e.g., Production AWS"
+                    />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Tenant ID</label>
-                    <input type="text" value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Client ID</label>
-                    <input type="text" value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Client Secret</label>
-                    <input type="password" value={form.client_secret} onChange={(e) => setForm({ ...form, client_secret: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
-                  </div>
-                </>
-              )}
 
-              {form.provider_type === 'gcp' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Project ID</label>
-                    <input type="text" value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Service Account Key (JSON)</label>
-                    <textarea value={form.service_account_key} onChange={(e) => setForm({ ...form, service_account_key: e.target.value })} rows={4} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm font-mono" placeholder='{"type": "service_account", ...}' />
-                  </div>
-                </>
-              )}
+                  {form.provider_type === 'aws' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Access Key ID</label>
+                        <input type="text" value={form.access_key_id} onChange={(e) => setForm({ ...form, access_key_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Secret Access Key</label>
+                        <input type="password" value={form.secret_access_key} onChange={(e) => setForm({ ...form, secret_access_key: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Region</label>
+                        <input type="text" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} placeholder="us-east-1" className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                    </>
+                  )}
 
-              {form.provider_type === 'oci' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Tenancy OCID</label>
-                    <input type="text" value={form.tenancy_ocid} onChange={(e) => setForm({ ...form, tenancy_ocid: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="ocid1.tenancy.oc1.." />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">User OCID</label>
-                    <input type="text" value={form.user_ocid} onChange={(e) => setForm({ ...form, user_ocid: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="ocid1.user.oc1.." />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">API Key Fingerprint</label>
-                    <input type="text" value={form.fingerprint} onChange={(e) => setForm({ ...form, fingerprint: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="aa:bb:cc:..." />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Private Key (PEM)</label>
-                    <textarea value={form.private_key} onChange={(e) => setForm({ ...form, private_key: e.target.value })} rows={4} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm font-mono" placeholder="-----BEGIN RSA PRIVATE KEY-----" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Region</label>
-                    <input type="text" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} placeholder="us-ashburn-1" className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
-                  </div>
-                </>
-              )}
+                  {form.provider_type === 'azure' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Subscription ID</label>
+                        <input type="text" value={form.subscription_id} onChange={(e) => setForm({ ...form, subscription_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Tenant ID</label>
+                        <input type="text" value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Client ID</label>
+                        <input type="text" value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Client Secret</label>
+                        <input type="password" value={form.client_secret} onChange={(e) => setForm({ ...form, client_secret: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                    </>
+                  )}
 
-              {form.provider_type === 'alibaba' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Access Key ID</label>
-                    <input type="text" value={form.alibaba_access_key_id} onChange={(e) => setForm({ ...form, alibaba_access_key_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Access Key Secret</label>
-                    <input type="password" value={form.alibaba_access_key_secret} onChange={(e) => setForm({ ...form, alibaba_access_key_secret: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Region</label>
-                    <input type="text" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} placeholder="cn-hangzhou" className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
-                  </div>
-                </>
-              )}
+                  {form.provider_type === 'gcp' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Project ID</label>
+                        <input type="text" value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Service Account Key (JSON)</label>
+                        <textarea value={form.service_account_key} onChange={(e) => setForm({ ...form, service_account_key: e.target.value })} rows={4} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm font-mono" placeholder='{"type": "service_account", ...}' />
+                      </div>
+                    </>
+                  )}
 
-              {form.provider_type === 'kubernetes' && (
-                <div>
-                  <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Kubeconfig (YAML)</label>
-                  <textarea value={form.kubeconfig} onChange={(e) => setForm({ ...form, kubeconfig: e.target.value })} rows={6} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm font-mono" placeholder="apiVersion: v1..." />
+                  {form.provider_type === 'oci' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Tenancy OCID</label>
+                        <input type="text" value={form.tenancy_ocid} onChange={(e) => setForm({ ...form, tenancy_ocid: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="ocid1.tenancy.oc1.." />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">User OCID</label>
+                        <input type="text" value={form.user_ocid} onChange={(e) => setForm({ ...form, user_ocid: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="ocid1.user.oc1.." />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">API Key Fingerprint</label>
+                        <input type="text" value={form.fingerprint} onChange={(e) => setForm({ ...form, fingerprint: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="aa:bb:cc:..." />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Private Key (PEM)</label>
+                        <textarea value={form.private_key} onChange={(e) => setForm({ ...form, private_key: e.target.value })} rows={4} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm font-mono" placeholder="-----BEGIN RSA PRIVATE KEY-----" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Region</label>
+                        <input type="text" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} placeholder="us-ashburn-1" className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                    </>
+                  )}
+
+                  {form.provider_type === 'alibaba' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Access Key ID</label>
+                        <input type="text" value={form.alibaba_access_key_id} onChange={(e) => setForm({ ...form, alibaba_access_key_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Access Key Secret</label>
+                        <input type="password" value={form.alibaba_access_key_secret} onChange={(e) => setForm({ ...form, alibaba_access_key_secret: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Region</label>
+                        <input type="text" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} placeholder="cn-hangzhou" className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                    </>
+                  )}
+
+                  {form.provider_type === 'kubernetes' && (
+                    <div>
+                      <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Kubeconfig (YAML)</label>
+                      <textarea value={form.kubeconfig} onChange={(e) => setForm({ ...form, kubeconfig: e.target.value })} rows={6} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm font-mono" placeholder="apiVersion: v1..." />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowModal(false)} className="flex-1 btn-outline">Cancel</button>
-              <button onClick={handleCreate} disabled={!form.alias} className="flex-1 btn-primary disabled:opacity-50">Add Provider</button>
-            </div>
+                <div className="flex gap-3 mt-6">
+                  <button onClick={() => setWizardStep(1)} className="flex-1 btn-outline">Back</button>
+                  <button onClick={handleCreate} disabled={!form.alias} className="flex-1 btn-primary disabled:opacity-50">Add Provider</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

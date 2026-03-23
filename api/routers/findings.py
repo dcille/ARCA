@@ -1,5 +1,7 @@
 """Findings router."""
-from fastapi import APIRouter, Depends, Query
+import os
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional
@@ -7,10 +9,13 @@ from typing import Optional
 from api.database import get_db
 from api.models.user import User
 from api.models.finding import Finding
+from api.models.finding_action import FindingAction
 from api.models.scan import Scan
 from api.models.provider import Provider
 from api.schemas.finding import FindingResponse
 from api.services.auth_service import get_current_user
+
+EVIDENCE_UPLOAD_DIR = os.environ.get("EVIDENCE_UPLOAD_DIR", "/app/data/evidence")
 
 router = APIRouter()
 
@@ -123,3 +128,149 @@ async def findings_stats(
         "status_breakdown": status_breakdown,
         "by_service": by_service,
     }
+
+
+@router.post("/{finding_id}/exception")
+async def create_exception(
+    finding_id: str,
+    reason: str = Form(...),
+    evidence: Optional[UploadFile] = File(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create an exception for a finding with optional evidence upload."""
+    # Verify finding belongs to user
+    result = await db.execute(
+        select(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Finding.id == finding_id, Scan.user_id == current_user.id)
+    )
+    finding = result.scalar_one_or_none()
+    if not finding:
+        raise HTTPException(status_code=404, detail="Finding not found")
+
+    evidence_file_name = None
+    evidence_file_path = None
+    if evidence:
+        os.makedirs(EVIDENCE_UPLOAD_DIR, exist_ok=True)
+        ext = os.path.splitext(evidence.filename or "")[1]
+        safe_name = f"{uuid.uuid4()}{ext}"
+        file_path = os.path.join(EVIDENCE_UPLOAD_DIR, safe_name)
+        content = await evidence.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+        evidence_file_name = evidence.filename
+        evidence_file_path = file_path
+
+    action = FindingAction(
+        finding_id=finding_id,
+        user_id=current_user.id,
+        action_type="exception",
+        reason=reason,
+        evidence_file_name=evidence_file_name,
+        evidence_file_path=evidence_file_path,
+    )
+    db.add(action)
+
+    # Update finding status to EXCEPTION
+    finding.status = "EXCEPTION"
+    await db.commit()
+
+    return {
+        "id": action.id,
+        "finding_id": finding_id,
+        "action_type": "exception",
+        "reason": reason,
+        "evidence_file_name": evidence_file_name,
+        "created_at": action.created_at.isoformat(),
+    }
+
+
+@router.post("/{finding_id}/remediate")
+async def mark_remediated(
+    finding_id: str,
+    reason: str = Form(...),
+    evidence: Optional[UploadFile] = File(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Mark a finding as manually remediated with explanation."""
+    result = await db.execute(
+        select(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Finding.id == finding_id, Scan.user_id == current_user.id)
+    )
+    finding = result.scalar_one_or_none()
+    if not finding:
+        raise HTTPException(status_code=404, detail="Finding not found")
+
+    evidence_file_name = None
+    evidence_file_path = None
+    if evidence:
+        os.makedirs(EVIDENCE_UPLOAD_DIR, exist_ok=True)
+        ext = os.path.splitext(evidence.filename or "")[1]
+        safe_name = f"{uuid.uuid4()}{ext}"
+        file_path = os.path.join(EVIDENCE_UPLOAD_DIR, safe_name)
+        content = await evidence.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+        evidence_file_name = evidence.filename
+        evidence_file_path = file_path
+
+    action = FindingAction(
+        finding_id=finding_id,
+        user_id=current_user.id,
+        action_type="remediated",
+        reason=reason,
+        evidence_file_name=evidence_file_name,
+        evidence_file_path=evidence_file_path,
+    )
+    db.add(action)
+
+    # Update finding status to REMEDIATED
+    finding.status = "REMEDIATED"
+    await db.commit()
+
+    return {
+        "id": action.id,
+        "finding_id": finding_id,
+        "action_type": "remediated",
+        "reason": reason,
+        "evidence_file_name": evidence_file_name,
+        "created_at": action.created_at.isoformat(),
+    }
+
+
+@router.get("/{finding_id}/actions")
+async def get_finding_actions(
+    finding_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all actions (exceptions, remediations) for a finding."""
+    # Verify finding belongs to user
+    result = await db.execute(
+        select(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Finding.id == finding_id, Scan.user_id == current_user.id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Finding not found")
+
+    result = await db.execute(
+        select(FindingAction)
+        .where(FindingAction.finding_id == finding_id)
+        .order_by(FindingAction.created_at.desc())
+    )
+    actions = result.scalars().all()
+
+    return [
+        {
+            "id": a.id,
+            "action_type": a.action_type,
+            "reason": a.reason,
+            "evidence_file_name": a.evidence_file_name,
+            "created_at": a.created_at.isoformat(),
+        }
+        for a in actions
+    ]

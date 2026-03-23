@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useState, useMemo } from 'react'
+import { Fragment, useEffect, useState, useMemo, useRef } from 'react'
 import Header from '@/components/layout/Header'
 import Badge from '@/components/ui/Badge'
 import { api } from '@/lib/api'
@@ -66,9 +66,124 @@ function parseComplianceFrameworks(raw?: string | null): string[] {
   }
 }
 
-function ExpandedRow({ item }: { item: any }) {
+function ActionModal({
+  type,
+  findingId,
+  onClose,
+  onSuccess,
+}: {
+  type: 'exception' | 'remediated'
+  findingId: string
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [reason, setReason] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const handleSubmit = async () => {
+    if (!reason.trim()) {
+      setError('Please provide a reason.')
+      return
+    }
+    setSubmitting(true)
+    setError('')
+    try {
+      if (type === 'exception') {
+        await api.createFindingException(findingId, reason, file || undefined)
+      } else {
+        await api.markFindingRemediated(findingId, reason, file || undefined)
+      }
+      onSuccess()
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit action')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6">
+        <h3 className="text-lg font-semibold text-brand-navy mb-1">
+          {type === 'exception' ? 'Create Exception' : 'Mark as Remediated'}
+        </h3>
+        <p className="text-sm text-brand-gray-400 mb-4">
+          {type === 'exception'
+            ? 'Provide a justification for why this finding is not applicable or accepted.'
+            : 'Explain how this finding was remediated manually.'}
+        </p>
+
+        <label className="block text-sm font-medium text-brand-gray-700 mb-1">
+          {type === 'exception' ? 'Justification' : 'Remediation explanation'}
+        </label>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={4}
+          className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none mb-3"
+          placeholder={
+            type === 'exception'
+              ? 'e.g., This resource is in a development environment with no production data...'
+              : 'e.g., Updated the security group to restrict access to port 22 from corporate CIDR only...'
+          }
+        />
+
+        <label className="block text-sm font-medium text-brand-gray-700 mb-1">
+          Evidence (optional)
+        </label>
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="px-3 py-1.5 border border-brand-gray-300 rounded-lg text-sm text-brand-gray-600 hover:bg-brand-gray-50"
+          >
+            {file ? file.name : 'Upload file...'}
+          </button>
+          {file && (
+            <button onClick={() => setFile(null)} className="text-xs text-red-500 hover:underline">
+              Remove
+            </button>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+          />
+        </div>
+
+        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-brand-gray-600 hover:bg-brand-gray-100 rounded-lg"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${
+              type === 'exception'
+                ? 'bg-amber-500 hover:bg-amber-600'
+                : 'bg-brand-green hover:bg-green-600'
+            } disabled:opacity-50`}
+          >
+            {submitting ? 'Submitting...' : type === 'exception' ? 'Create Exception' : 'Mark Remediated'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ExpandedRow({ item, onActionComplete }: { item: any; onActionComplete: () => void }) {
   const frameworks = useMemo(() => parseComplianceFrameworks(item.compliance_frameworks), [item.compliance_frameworks])
   const evidence = useMemo(() => parseEvidenceLog(item.evidence_log), [item.evidence_log])
+  const [actionModal, setActionModal] = useState<'exception' | 'remediated' | null>(null)
 
   return (
     <tr>
@@ -201,8 +316,61 @@ function ExpandedRow({ item }: { item: any }) {
                 </div>
               </div>
             )}
+
+            {/* Finding Actions */}
+            {item.status === 'FAIL' && (
+              <div className="md:col-span-2 border-t border-brand-gray-200 pt-4">
+                <h4 className="text-xs font-semibold text-brand-gray-500 uppercase tracking-wider mb-3">
+                  Actions
+                </h4>
+                <div className="flex gap-3">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setActionModal('exception') }}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-100 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                    </svg>
+                    Create Exception
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setActionModal('remediated') }}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm font-medium hover:bg-green-100 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                    Mark Remediated
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(item.status === 'EXCEPTION' || item.status === 'REMEDIATED') && (
+              <div className="md:col-span-2 border-t border-brand-gray-200 pt-4">
+                <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium ${
+                  item.status === 'EXCEPTION'
+                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                    : 'bg-green-50 text-green-700 border border-green-200'
+                }`}>
+                  {item.status === 'EXCEPTION' ? 'Exception Applied' : 'Manually Remediated'}
+                </div>
+              </div>
+            )}
           </div>
         </div>
+
+        {actionModal && (
+          <ActionModal
+            type={actionModal}
+            findingId={item.id}
+            onClose={() => setActionModal(null)}
+            onSuccess={() => {
+              setActionModal(null)
+              onActionComplete()
+            }}
+          />
+        )}
       </td>
     </tr>
   )
@@ -409,7 +577,7 @@ export default function FindingsPage() {
                             <span className="text-brand-gray-400">{formatDate(item.created_at)}</span>
                           </td>
                         </tr>
-                        {isExpanded && <ExpandedRow item={item} />}
+                        {isExpanded && <ExpandedRow item={item} onActionComplete={loadFindings} />}
                       </Fragment>
                     )
                   })

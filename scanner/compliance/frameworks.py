@@ -4136,3 +4136,29 @@ def get_framework_controls(framework_id: str) -> list[dict]:
     if not fw:
         return []
     return fw.get("controls", [])
+
+
+def get_checks_for_framework_by_provider(framework_id: str, provider_key: str) -> list[str]:
+    """Return check_ids for a specific provider within a framework."""
+    fw = FRAMEWORKS.get(framework_id)
+    if not fw:
+        return []
+    check_ids: set[str] = set()
+    for control in fw.get("controls", []):
+        checks = control.get("checks", {})
+        if isinstance(checks, dict):
+            check_ids.update(checks.get(provider_key, []))
+    return sorted(check_ids)
+
+
+def get_framework_providers(framework_id: str) -> list[str]:
+    """Return list of provider keys that a framework has checks for."""
+    fw = FRAMEWORKS.get(framework_id)
+    if not fw:
+        return []
+    providers: set[str] = set()
+    for control in fw.get("controls", []):
+        checks = control.get("checks", {})
+        if isinstance(checks, dict):
+            providers.update(checks.keys())
+    return sorted(providers)
