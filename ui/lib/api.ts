@@ -90,6 +90,10 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/dashboard/trends', undefined, { params })
   }
 
+  async getAccountDashboard(providerId: string) {
+    return this.request<any>('GET', `/api/v1/dashboard/account/${providerId}`)
+  }
+
   // Providers
   async getProviders() {
     return this.request<any[]>('GET', '/api/v1/providers')
@@ -126,14 +130,68 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/findings/stats', undefined, { params })
   }
 
-  // Compliance
-  async getComplianceFrameworks() {
-    return this.request<any[]>('GET', '/api/v1/compliance/frameworks')
+  async createFindingException(findingId: string, reason: string, evidence?: File) {
+    const formData = new FormData()
+    formData.append('reason', reason)
+    if (evidence) formData.append('evidence', evidence)
+
+    const token = this.getToken()
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    const response = await fetch(`/api/v1/findings/${findingId}/exception`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      throw new Error(error.detail || `Request failed: ${response.status}`)
+    }
+    return response.json()
   }
 
-  async getComplianceSummary(framework?: string) {
-    const params = framework ? { framework } : undefined
-    return this.request<any>('GET', '/api/v1/compliance/summary', undefined, { params })
+  async markFindingRemediated(findingId: string, reason: string, evidence?: File) {
+    const formData = new FormData()
+    formData.append('reason', reason)
+    if (evidence) formData.append('evidence', evidence)
+
+    const token = this.getToken()
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    const response = await fetch(`/api/v1/findings/${findingId}/remediate`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      throw new Error(error.detail || `Request failed: ${response.status}`)
+    }
+    return response.json()
+  }
+
+  async getFindingActions(findingId: string) {
+    return this.request<any[]>('GET', `/api/v1/findings/${findingId}/actions`)
+  }
+
+  // Compliance
+  async getComplianceAccounts() {
+    return this.request<any[]>('GET', '/api/v1/compliance/accounts')
+  }
+
+  async getComplianceFrameworks(providerType?: string) {
+    const params = providerType ? { provider_type: providerType } : undefined
+    return this.request<any[]>('GET', '/api/v1/compliance/frameworks', undefined, { params })
+  }
+
+  async getComplianceSummary(framework?: string, providerId?: string, providerType?: string) {
+    const params: Record<string, string> = {}
+    if (framework) params.framework = framework
+    if (providerId) params.provider_id = providerId
+    if (providerType) params.provider_type = providerType
+    return this.request<any>('GET', '/api/v1/compliance/summary', undefined, { params: Object.keys(params).length ? params : undefined })
   }
 
   async getComplianceFrameworkChecks(frameworkId: string, params?: Record<string, string>) {
@@ -144,12 +202,16 @@ class ApiClient {
     return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/stats`)
   }
 
-  async getComplianceFrameworkLibrary(frameworkId: string) {
-    return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/library`)
+  async getComplianceFrameworkLibrary(frameworkId: string, providerType?: string) {
+    const params = providerType ? { provider_type: providerType } : undefined
+    return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/library`, undefined, { params })
   }
 
-  async getComplianceFrameworkControls(frameworkId: string) {
-    return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/controls`)
+  async getComplianceFrameworkControls(frameworkId: string, providerId?: string, providerType?: string) {
+    const params: Record<string, string> = {}
+    if (providerId) params.provider_id = providerId
+    if (providerType) params.provider_type = providerType
+    return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/controls`, undefined, { params: Object.keys(params).length ? params : undefined })
   }
 
   async updateProvider(id: string, data: any) {
@@ -337,6 +399,30 @@ class ApiClient {
     return this.request<any[]>('GET', '/api/v1/inventory/resources/findings', undefined, {
       params: { resource_id: resourceId },
     })
+  }
+
+  // DSPM
+  async getDSPMOverview() {
+    return this.request<any>('GET', '/api/v1/dspm/overview')
+  }
+
+  async getDSPMChecks(providerType?: string) {
+    const params = providerType ? { provider_type: providerType } : undefined
+    return this.request<any[]>('GET', '/api/v1/dspm/checks', undefined, { params })
+  }
+
+  async getDSPMDataStores(providerType?: string) {
+    const params = providerType ? { provider_type: providerType } : undefined
+    return this.request<any[]>('GET', '/api/v1/dspm/data-stores', undefined, { params })
+  }
+
+  // Security Graph
+  async getSecurityGraph(params?: Record<string, string>) {
+    return this.request<any>('GET', '/api/v1/security-graph/graph', undefined, { params })
+  }
+
+  async getSecurityGraphStats() {
+    return this.request<any>('GET', '/api/v1/security-graph/stats')
   }
 
   // MITRE ATT&CK

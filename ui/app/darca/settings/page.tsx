@@ -346,7 +346,7 @@ export default function SettingsPage() {
 
           {/* Create Organization Modal */}
           {showCreateOrg && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="modal-backdrop">
               <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
                 <h3 className="text-lg font-semibold text-brand-navy mb-4">Create Organization</h3>
                 <div className="space-y-4">
@@ -390,7 +390,7 @@ export default function SettingsPage() {
 
           {/* Invite Member Modal */}
           {showInvite && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="modal-backdrop">
               <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
                 <h3 className="text-lg font-semibold text-brand-navy mb-4">Invite Team Member</h3>
                 <div className="space-y-4">

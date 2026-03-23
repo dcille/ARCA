@@ -28,6 +28,8 @@ export function getStatusColor(status: string): string {
     failed: 'bg-status-fail text-white',
     connected: 'bg-status-pass text-white',
     error: 'bg-status-fail text-white',
+    exception: 'bg-amber-500 text-white',
+    remediated: 'bg-emerald-500 text-white',
   }
   return map[status?.toLowerCase()] || 'bg-brand-gray-400 text-white'
 }

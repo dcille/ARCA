@@ -455,7 +455,7 @@ export default function SaaSSecurityPage() {
 
       {/* Add Connection Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-backdrop">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold text-brand-navy mb-4">Add SaaS Connection</h3>
 

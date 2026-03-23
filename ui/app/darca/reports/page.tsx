@@ -87,7 +87,7 @@ export default function ReportsPage() {
             <select
               value={filters.provider_type}
               onChange={(e) => setFilters({ ...filters, provider_type: e.target.value, account_id: '' })}
-              className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+              className="w-full select-field"
             >
               <option value="">All Providers</option>
               {uniqueProviderTypes.map(pt => (
@@ -101,7 +101,7 @@ export default function ReportsPage() {
             <select
               value={filters.account_id}
               onChange={(e) => setFilters({ ...filters, account_id: e.target.value })}
-              className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+              className="w-full select-field"
             >
               <option value="">All Accounts</option>
               {accountsForType.map(p => (
@@ -117,7 +117,7 @@ export default function ReportsPage() {
             <select
               value={filters.severity}
               onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
-              className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+              className="w-full select-field"
             >
               <option value="">All Severities</option>
               <option value="critical">Critical</option>
@@ -134,7 +134,7 @@ export default function ReportsPage() {
               placeholder="e.g., iam, s3, network"
               value={filters.service}
               onChange={(e) => setFilters({ ...filters, service: e.target.value })}
-              className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+              className="w-full select-field"
             />
           </div>
 

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://darca:darca@postgres:5432/darca"
     REDIS_URL: str = "redis://valkey:6379/0"
 
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://ui:3000"]
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://ui:3000", "*"]
 
     CELERY_BROKER_URL: str = "redis://valkey:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://valkey:6379/1"

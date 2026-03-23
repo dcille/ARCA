@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Header from '@/components/layout/Header'
 import { api } from '@/lib/api'
 import { formatPercent } from '@/lib/utils'
-import { XMarkIcon, ChevronDownIcon, ChevronRightIcon, BookOpenIcon, FunnelIcon, CheckIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, ChevronDownIcon, ChevronRightIcon, BookOpenIcon, FunnelIcon, CheckIcon, CloudIcon, ServerIcon } from '@heroicons/react/24/outline'
 
 const SEVERITY_COLORS: Record<string, string> = {
   critical: 'bg-red-100 text-red-800',
@@ -32,7 +32,16 @@ const PROVIDER_LABELS: Record<string, string> = {
   gcp: 'GCP',
   oci: 'OCI',
   alibaba: 'Alibaba',
+  kubernetes: 'Kubernetes',
   k8s: 'Kubernetes',
+  servicenow: 'ServiceNow',
+  m365: 'Microsoft 365',
+  salesforce: 'Salesforce',
+  snowflake: 'Snowflake',
+  cloudflare: 'Cloudflare',
+  github: 'GitHub',
+  google_workspace: 'Google Workspace',
+  openstack: 'OpenStack',
 }
 
 const PROVIDER_COLORS: Record<string, string> = {
@@ -41,13 +50,27 @@ const PROVIDER_COLORS: Record<string, string> = {
   gcp: 'bg-[#4285F4]/10 text-[#4285F4] border-[#4285F4]/30',
   oci: 'bg-[#C74634]/10 text-[#C74634] border-[#C74634]/30',
   alibaba: 'bg-[#FF6A00]/10 text-[#FF6A00] border-[#FF6A00]/30',
+  kubernetes: 'bg-[#326CE5]/10 text-[#326CE5] border-[#326CE5]/30',
   k8s: 'bg-[#326CE5]/10 text-[#326CE5] border-[#326CE5]/30',
+  servicenow: 'bg-[#81B5A1]/10 text-[#81B5A1] border-[#81B5A1]/30',
+  m365: 'bg-[#D83B01]/10 text-[#D83B01] border-[#D83B01]/30',
+  salesforce: 'bg-[#00A1E0]/10 text-[#00A1E0] border-[#00A1E0]/30',
+  snowflake: 'bg-[#29B5E8]/10 text-[#29B5E8] border-[#29B5E8]/30',
+  cloudflare: 'bg-[#F38020]/10 text-[#F38020] border-[#F38020]/30',
+  github: 'bg-[#333]/10 text-[#333] border-[#333]/30',
+  google_workspace: 'bg-[#4285F4]/10 text-[#4285F4] border-[#4285F4]/30',
+  openstack: 'bg-[#ED1944]/10 text-[#ED1944] border-[#ED1944]/30',
 }
 
 export default function CompliancePage() {
   const [frameworks, setFrameworks] = useState<any[]>([])
   const [summaries, setSummaries] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
+
+  // Account/provider filter state
+  const [accounts, setAccounts] = useState<any[]>([])
+  const [selectedAccount, setSelectedAccount] = useState<any>(null) // null = all accounts
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false)
 
   // Framework filter state
   const [selectedFrameworkIds, setSelectedFrameworkIds] = useState<Set<string>>(new Set())
@@ -65,18 +88,28 @@ export default function CompliancePage() {
   const [libraryData, setLibraryData] = useState<any>(null)
   const [libraryLoading, setLibraryLoading] = useState(false)
 
+  // Load accounts on mount
+  useEffect(() => {
+    api.getComplianceAccounts().then(setAccounts).catch(console.error)
+  }, [])
+
+  // Load frameworks and summaries when account filter changes
   useEffect(() => {
     const load = async () => {
+      setLoading(true)
+      setSelectedFramework(null)
+      setControlsData(null)
       try {
-        const fws = await api.getComplianceFrameworks()
+        const providerType = selectedAccount?.provider_type || undefined
+        const fws = await api.getComplianceFrameworks(providerType)
         setFrameworks(fws)
-        // All frameworks selected by default
         setSelectedFrameworkIds(new Set(fws.map((fw: any) => fw.id)))
 
+        const providerId = selectedAccount?.id || undefined
         const sums: Record<string, any> = {}
         for (const fw of fws) {
           try {
-            sums[fw.id] = await api.getComplianceSummary(fw.id)
+            sums[fw.id] = await api.getComplianceSummary(fw.id, providerId, providerType)
           } catch {
             sums[fw.id] = { total_checks: 0, passed: 0, failed: 0, pass_rate: 0 }
           }
@@ -89,12 +122,14 @@ export default function CompliancePage() {
       }
     }
     load()
-  }, [])
+  }, [selectedAccount])
 
   const loadFrameworkControls = async (frameworkId: string) => {
     setDetailLoading(true)
     try {
-      const data = await api.getComplianceFrameworkControls(frameworkId)
+      const providerId = selectedAccount?.id || undefined
+      const providerType = selectedAccount?.provider_type || undefined
+      const data = await api.getComplianceFrameworkControls(frameworkId, providerId, providerType)
       setControlsData(data)
     } catch (err) {
       console.error(err)
@@ -129,7 +164,8 @@ export default function CompliancePage() {
   const loadCheckLibrary = async (frameworkId: string) => {
     setLibraryLoading(true)
     try {
-      const data = await api.getComplianceFrameworkLibrary(frameworkId)
+      const providerType = selectedAccount?.provider_type || undefined
+      const data = await api.getComplianceFrameworkLibrary(frameworkId, providerType)
       setLibraryData(data)
     } catch (err) {
       console.error(err)
@@ -179,7 +215,116 @@ export default function CompliancePage() {
 
   return (
     <div>
-      <Header title="Compliance" subtitle="Compliance framework assessment results" />
+      <Header title="Compliance" subtitle="Compliance framework assessment results" breadcrumbs={[{ label: 'Posture', href: '/darca/overview' }, { label: 'Compliance' }]} />
+
+      {/* Account / Provider Filter Bar */}
+      {!loading && (
+        <div className="mb-4 flex items-center gap-3">
+          <div className="relative">
+            <button
+              onClick={() => setShowAccountDropdown(!showAccountDropdown)}
+              className={`inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${
+                selectedAccount
+                  ? 'border-brand-green bg-brand-green/5 text-brand-green'
+                  : 'border-brand-gray-300 text-brand-gray-700 hover:bg-brand-gray-50'
+              }`}
+            >
+              {selectedAccount ? (
+                <ServerIcon className="w-4 h-4" />
+              ) : (
+                <CloudIcon className="w-4 h-4" />
+              )}
+              {selectedAccount
+                ? `${PROVIDER_LABELS[selectedAccount.provider_type] || selectedAccount.provider_type} — ${selectedAccount.alias}`
+                : 'All Accounts'}
+              <ChevronDownIcon className="w-3 h-3" />
+            </button>
+
+            {showAccountDropdown && (
+              <div className="absolute z-50 mt-1 w-80 bg-white border border-brand-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+                <button
+                  onClick={() => { setSelectedAccount(null); setShowAccountDropdown(false) }}
+                  className={`w-full text-left px-4 py-3 hover:bg-brand-gray-50 border-b border-brand-gray-100 ${
+                    !selectedAccount ? 'bg-brand-green/5 text-brand-green font-medium' : 'text-brand-gray-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <CloudIcon className="w-4 h-4" />
+                    <span className="text-sm">All Accounts</span>
+                  </div>
+                  <p className="text-[10px] text-brand-gray-400 mt-0.5 ml-6">Show all frameworks and results across all accounts</p>
+                </button>
+
+                {accounts.filter(a => a.type === 'cloud').length > 0 && (
+                  <div className="px-3 py-1.5 bg-brand-gray-50 border-b border-brand-gray-100">
+                    <span className="text-[10px] font-semibold text-brand-gray-400 uppercase tracking-wider">Cloud Providers</span>
+                  </div>
+                )}
+                {accounts.filter(a => a.type === 'cloud').map((account) => (
+                  <button
+                    key={account.id}
+                    onClick={() => { setSelectedAccount(account); setShowAccountDropdown(false) }}
+                    className={`w-full text-left px-4 py-2.5 hover:bg-brand-gray-50 border-b border-brand-gray-100 last:border-b-0 ${
+                      selectedAccount?.id === account.id ? 'bg-brand-green/5' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                        PROVIDER_COLORS[account.provider_type] || 'bg-gray-100 text-gray-500 border-gray-200'
+                      }`}>
+                        {PROVIDER_LABELS[account.provider_type] || account.provider_type.toUpperCase()}
+                      </span>
+                      <span className="text-sm font-medium text-brand-navy">{account.alias}</span>
+                    </div>
+                    {account.account_id && (
+                      <p className="text-[10px] text-brand-gray-400 mt-0.5 ml-1">{account.account_id}</p>
+                    )}
+                  </button>
+                ))}
+
+                {accounts.filter(a => a.type === 'saas').length > 0 && (
+                  <div className="px-3 py-1.5 bg-brand-gray-50 border-b border-brand-gray-100">
+                    <span className="text-[10px] font-semibold text-brand-gray-400 uppercase tracking-wider">SaaS Connections</span>
+                  </div>
+                )}
+                {accounts.filter(a => a.type === 'saas').map((account) => (
+                  <button
+                    key={account.id}
+                    onClick={() => { setSelectedAccount(account); setShowAccountDropdown(false) }}
+                    className={`w-full text-left px-4 py-2.5 hover:bg-brand-gray-50 border-b border-brand-gray-100 last:border-b-0 ${
+                      selectedAccount?.id === account.id ? 'bg-brand-green/5' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                        PROVIDER_COLORS[account.provider_type] || 'bg-gray-100 text-gray-500 border-gray-200'
+                      }`}>
+                        {PROVIDER_LABELS[account.provider_type] || account.provider_type.toUpperCase()}
+                      </span>
+                      <span className="text-sm font-medium text-brand-navy">{account.alias}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {selectedAccount && (
+            <button
+              onClick={() => setSelectedAccount(null)}
+              className="text-xs text-brand-gray-400 hover:text-red-500 flex items-center gap-1"
+            >
+              <XMarkIcon className="w-3 h-3" />
+              Clear filter
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Close account dropdown when clicking outside */}
+      {showAccountDropdown && (
+        <div className="fixed inset-0 z-40" onClick={() => setShowAccountDropdown(false)} />
+      )}
 
       {/* Framework Filter Bar */}
       {!loading && frameworks.length > 0 && (
@@ -270,6 +415,20 @@ export default function CompliancePage() {
                       <p className="text-[10px] text-brand-gray-400 mt-1">
                         {fw.total_controls} controls &middot; {fw.total_checks} checks
                       </p>
+                    )}
+                    {fw.providers && fw.providers.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {fw.providers.map((p: string) => (
+                          <span
+                            key={p}
+                            className={`text-[8px] font-bold px-1 py-0.5 rounded border ${
+                              PROVIDER_COLORS[p] || 'bg-gray-100 text-gray-500 border-gray-200'
+                            }`}
+                          >
+                            {PROVIDER_LABELS[p] || p.toUpperCase()}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>

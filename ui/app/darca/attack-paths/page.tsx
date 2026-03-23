@@ -433,7 +433,7 @@ export default function AttackPathsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <Header title="Attack Paths" subtitle="Graph-based analysis of exploitable attack chains across your cloud environment" />
+        <Header title="Attack Paths" subtitle="Graph-based analysis of exploitable attack chains across your cloud environment" breadcrumbs={[{ label: 'Posture', href: '/darca/overview' }, { label: 'Attack Paths' }]} />
         <button
           onClick={handleAnalyze}
           disabled={analyzing}
@@ -516,7 +516,7 @@ export default function AttackPathsPage() {
         <select
           value={filters.severity}
           onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
-          className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+          className="select-field"
         >
           <option value="">All Severities</option>
           <option value="critical">Critical</option>
@@ -528,7 +528,7 @@ export default function AttackPathsPage() {
         <select
           value={filters.category}
           onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-          className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+          className="select-field"
         >
           <option value="">All Categories</option>
           <option value="privilege_escalation">Privilege Escalation</option>

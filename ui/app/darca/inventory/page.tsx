@@ -308,7 +308,7 @@ export default function InventoryPage() {
 
   return (
     <div>
-      <Header title="Asset Inventory" subtitle="Discovered cloud resources and their security posture" />
+      <Header title="Asset Inventory" subtitle="Discovered cloud resources and their security posture" breadcrumbs={[{ label: 'Assets', href: '/darca/inventory' }, { label: 'Inventory' }]} />
 
       {/* Summary Stats */}
       {summary && (
@@ -359,7 +359,7 @@ export default function InventoryPage() {
           <select
             value={filters.provider_type}
             onChange={(e) => setFilters({ ...filters, provider_type: e.target.value })}
-            className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+            className="input-field"
           >
             <option value="">All Providers</option>
             <option value="aws">AWS</option>
@@ -374,12 +374,12 @@ export default function InventoryPage() {
             placeholder="Service filter"
             value={filters.service}
             onChange={(e) => setFilters({ ...filters, service: e.target.value })}
-            className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+            className="input-field"
           />
           <select
             value={filters.status}
             onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-            className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+            className="input-field"
           >
             <option value="">All Status</option>
             <option value="at_risk">At Risk</option>

@@ -164,6 +164,7 @@ export default function ScansPage() {
       <Header
         title="Scans"
         subtitle="Manage and monitor security scans"
+        breadcrumbs={[{ label: 'Scans' }]}
         actions={
           <button onClick={() => setShowModal(true)} className="btn-primary">
             New Scan
@@ -172,11 +173,11 @@ export default function ScansPage() {
       />
 
       {/* Filters */}
-      <div className="flex gap-4 mb-6">
+      <div className="flex flex-wrap gap-3 mb-6">
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
-          className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+          className="select-field"
         >
           <option value="">All Types</option>
           <option value="cloud">Cloud</option>
@@ -186,7 +187,7 @@ export default function ScansPage() {
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+          className="select-field"
         >
           <option value="">All Statuses</option>
           <option value="pending">Pending</option>
@@ -286,7 +287,7 @@ export default function ScansPage() {
 
       {/* Schedule Modal */}
       {showScheduleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-backdrop">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold text-brand-navy mb-4">Create Scan Schedule</h3>
             <div className="space-y-4">
@@ -363,7 +364,7 @@ export default function ScansPage() {
 
       {/* New Scan Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-backdrop">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold text-brand-navy mb-4">Start New Scan</h3>
 

@@ -12,7 +12,7 @@ from api.database import engine, Base
 from api.routers import (
     auth, providers, scans, findings, compliance, saas, dashboard,
     attack_paths, reports, inventory, schedules, notifications, integrations,
-    organizations, mitre,
+    organizations, mitre, dspm, security_graph,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,10 +43,14 @@ app = FastAPI(
     redirect_slashes=True,
 )
 
+cors_origins = settings.CORS_ORIGINS
+if "*" in cors_origins:
+    cors_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=True if "*" not in cors_origins else False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -66,6 +70,8 @@ app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["
 app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["Integrations"])
 app.include_router(organizations.router, prefix="/api/v1/organizations", tags=["Organizations"])
 app.include_router(mitre.router, prefix="/api/v1/mitre", tags=["MITRE ATT&CK"])
+app.include_router(dspm.router, prefix="/api/v1/dspm", tags=["DSPM"])
+app.include_router(security_graph.router, prefix="/api/v1/security-graph", tags=["Security Graph"])
 
 
 @app.get("/api/v1/health")

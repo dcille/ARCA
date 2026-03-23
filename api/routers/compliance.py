@@ -9,10 +9,14 @@ from api.models.user import User
 from api.models.finding import Finding
 from api.models.scan import Scan
 from api.services.auth_service import get_current_user
+from api.models.provider import Provider
+from api.models.saas_connection import SaaSConnection
 from scanner.compliance.frameworks import (
     FRAMEWORKS,
     get_all_checks_for_framework,
+    get_checks_for_framework_by_provider,
     get_framework_controls,
+    get_framework_providers,
 )
 
 router = APIRouter()
@@ -39,6 +43,8 @@ async def _per_check_summary(
     db: AsyncSession,
     user_id: str,
     framework_id: str,
+    provider_id: Optional[str] = None,
+    provider_type: Optional[str] = None,
 ) -> dict:
     """Calculate compliance summary using per-unique-check aggregation.
 
@@ -50,7 +56,11 @@ async def _per_check_summary(
     Pass rate = passed_checks / (passed_checks + failed_checks), excluding NOT_EVALUATED.
     Total checks = number of unique check_ids the framework defines.
     """
-    all_check_ids = get_all_checks_for_framework(framework_id)
+    # When filtering by provider_type, only use that provider's checks
+    if provider_type:
+        all_check_ids = get_checks_for_framework_by_provider(framework_id, provider_type)
+    else:
+        all_check_ids = get_all_checks_for_framework(framework_id)
 
     # Query: for each check_id, get fail_count
     fw_filter = _build_fw_filter(framework_id)
@@ -65,6 +75,9 @@ async def _per_check_summary(
     )
     if fw_filter is not None:
         query = query.where(fw_filter)
+    # Filter by specific provider account
+    if provider_id:
+        query = query.where(Finding.provider_id == provider_id)
     query = query.group_by(Finding.check_id)
 
     result = await db.execute(query)
@@ -102,17 +115,69 @@ async def _per_check_summary(
     }
 
 
+@router.get("/accounts")
+async def list_compliance_accounts(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return all cloud providers and SaaS connections for the compliance filter."""
+    # Cloud providers
+    result = await db.execute(
+        select(Provider.id, Provider.provider_type, Provider.alias, Provider.account_id)
+        .where(Provider.user_id == current_user.id)
+    )
+    providers = [
+        {
+            "id": r.id,
+            "type": "cloud",
+            "provider_type": r.provider_type,
+            "alias": r.alias,
+            "account_id": r.account_id,
+        }
+        for r in result.all()
+    ]
+
+    # SaaS connections
+    result = await db.execute(
+        select(SaaSConnection.id, SaaSConnection.provider_type, SaaSConnection.alias)
+        .where(SaaSConnection.user_id == current_user.id)
+    )
+    saas = [
+        {
+            "id": r.id,
+            "type": "saas",
+            "provider_type": r.provider_type,
+            "alias": r.alias,
+            "account_id": None,
+        }
+        for r in result.all()
+    ]
+
+    return providers + saas
+
+
 @router.get("/frameworks")
-async def list_frameworks():
+async def list_frameworks(
+    provider_type: Optional[str] = None,
+):
+    """List frameworks, optionally filtering to those relevant to a provider_type."""
     results = []
     for fw_id, fw in FRAMEWORKS.items():
-        total_checks = len(get_all_checks_for_framework(fw_id))
+        fw_providers = get_framework_providers(fw_id)
+        # If filtering by provider, skip frameworks that don't cover it
+        if provider_type and provider_type not in fw_providers:
+            continue
+        if provider_type:
+            total_checks = len(get_checks_for_framework_by_provider(fw_id, provider_type))
+        else:
+            total_checks = len(get_all_checks_for_framework(fw_id))
         controls = get_framework_controls(fw_id)
         results.append({
             "id": fw_id,
             "name": fw["name"],
             "description": fw["description"],
             "category": fw.get("category", ""),
+            "providers": fw_providers,
             "total_controls": len(controls),
             "total_checks": total_checks,
         })
@@ -122,11 +187,13 @@ async def list_frameworks():
 @router.get("/summary")
 async def compliance_summary(
     framework: Optional[str] = None,
+    provider_id: Optional[str] = None,
+    provider_type: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if framework:
-        return await _per_check_summary(db, current_user.id, framework)
+        return await _per_check_summary(db, current_user.id, framework, provider_id, provider_type)
 
     # Overall summary across all frameworks
     query = (
@@ -137,8 +204,10 @@ async def compliance_summary(
         )
         .join(Scan, Finding.scan_id == Scan.id)
         .where(Scan.user_id == current_user.id)
-        .group_by(Finding.check_id)
     )
+    if provider_id:
+        query = query.where(Finding.provider_id == provider_id)
+    query = query.group_by(Finding.check_id)
     result = await db.execute(query)
     rows = result.all()
 
@@ -267,6 +336,7 @@ async def framework_stats(
 @router.get("/frameworks/{framework_id}/library")
 async def framework_check_library(
     framework_id: str,
+    provider_type: Optional[str] = None,
     current_user: User = Depends(get_current_user),
 ):
     """Return the full control-level check library for a framework."""
@@ -280,12 +350,15 @@ async def framework_check_library(
     all_check_ids = get_all_checks_for_framework(framework_id)
 
     controls_out = []
+    total_filtered_checks = 0
     for ctrl in controls:
         checks_map = ctrl.get("checks", {})
         # Build per-provider check details
         provider_checks = {}
         if isinstance(checks_map, dict):
             for provider, cids in checks_map.items():
+                if provider_type and provider != provider_type:
+                    continue
                 provider_checks[provider] = [
                     {
                         "check_id": cid,
@@ -294,6 +367,10 @@ async def framework_check_library(
                     }
                     for cid in cids
                 ]
+                total_filtered_checks += len(cids)
+
+        if provider_type and not provider_checks:
+            continue
 
         controls_out.append({
             "id": ctrl.get("id", ""),
@@ -306,8 +383,8 @@ async def framework_check_library(
         "framework": _get_fw_meta(framework_id),
         "framework_description": fw.get("description", ""),
         "category": fw.get("category", ""),
-        "total_controls": len(controls),
-        "total_checks": len(all_check_ids),
+        "total_controls": len(controls_out),
+        "total_checks": total_filtered_checks if provider_type else len(all_check_ids),
         "controls": controls_out,
     }
 
@@ -315,6 +392,8 @@ async def framework_check_library(
 @router.get("/frameworks/{framework_id}/controls")
 async def framework_controls_with_results(
     framework_id: str,
+    provider_id: Optional[str] = None,
+    provider_type: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -336,6 +415,8 @@ async def framework_controls_with_results(
     )
     if fw_filter is not None:
         query = query.where(fw_filter)
+    if provider_id:
+        query = query.where(Finding.provider_id == provider_id)
     result = await db.execute(query)
     all_findings = result.scalars().all()
 
@@ -356,7 +437,7 @@ async def framework_controls_with_results(
         else:
             check_statuses[cid] = "NOT_EVALUATED"
 
-    summary = await _per_check_summary(db, current_user.id, framework_id)
+    summary = await _per_check_summary(db, current_user.id, framework_id, provider_id, provider_type)
 
     controls_out = []
     for ctrl in controls:
@@ -368,6 +449,9 @@ async def framework_controls_with_results(
 
         if isinstance(checks_map, dict):
             for provider, cids in checks_map.items():
+                # When filtering by provider_type, only include matching provider checks
+                if provider_type and provider != provider_type:
+                    continue
                 provider_checks[provider] = []
                 for cid in cids:
                     status = check_statuses.get(cid, "NOT_EVALUATED")
@@ -398,6 +482,10 @@ async def framework_controls_with_results(
         else:
             ctrl_status = "NOT_EVALUATED"
 
+        # Skip controls with no checks after provider filtering
+        if provider_type and not provider_checks:
+            continue
+
         controls_out.append({
             "id": ctrl.get("id", ""),
             "title": ctrl.get("title", ""),
@@ -412,6 +500,6 @@ async def framework_controls_with_results(
     return {
         "framework": _get_fw_meta(framework_id),
         "summary": summary,
-        "total_controls": len(controls),
+        "total_controls": len(controls_out),
         "controls": controls_out,
     }

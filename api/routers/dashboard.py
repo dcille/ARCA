@@ -1,7 +1,8 @@
 """Dashboard router."""
 from datetime import datetime, timedelta
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, case
 
@@ -152,4 +153,182 @@ async def dashboard_trends(
     return {
         "scan_history": scan_history,
         "findings_trend": list(findings_by_date.values()),
+    }
+
+
+@router.get("/account/{provider_id}")
+async def account_dashboard(
+    provider_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Per-account dashboard with posture, inventory, frameworks, findings, MITRE, attack paths, trends."""
+
+    # Verify provider belongs to user
+    result = await db.execute(
+        select(Provider).where(Provider.id == provider_id, Provider.user_id == current_user.id)
+    )
+    provider = result.scalar_one_or_none()
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    # ── General Posture ──────────────────────────────────────────
+    findings_q = (
+        select(Finding.severity, Finding.status, func.count(Finding.id))
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id, Finding.provider_id == provider_id)
+        .group_by(Finding.severity, Finding.status)
+    )
+    findings_rows = (await db.execute(findings_q)).all()
+
+    severity_breakdown = {}
+    total = 0
+    passed = 0
+    for severity, status, count in findings_rows:
+        severity_breakdown[severity] = severity_breakdown.get(severity, 0) + count
+        total += count
+        if status == "PASS":
+            passed += count
+
+    pass_rate = round((passed / total * 100) if total > 0 else 0, 1)
+
+    # ── Inventory Summary ────────────────────────────────────────
+    services_q = (
+        select(Finding.service, func.count(func.distinct(Finding.resource_id)))
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id, Finding.provider_id == provider_id)
+        .group_by(Finding.service)
+        .order_by(func.count(func.distinct(Finding.resource_id)).desc())
+    )
+    services_rows = (await db.execute(services_q)).all()
+    inventory = [{"service": s, "resource_count": c} for s, c in services_rows]
+
+    # ── Applicable Frameworks ────────────────────────────────────
+    from scanner.compliance.frameworks import FRAMEWORKS, get_framework_providers, get_checks_for_framework_by_provider
+    applicable_frameworks = []
+    for fw_id, fw in FRAMEWORKS.items():
+        fw_providers = get_framework_providers(fw_id)
+        if provider.provider_type in fw_providers:
+            checks = get_checks_for_framework_by_provider(fw_id, provider.provider_type)
+            applicable_frameworks.append({
+                "id": fw_id,
+                "name": fw["name"],
+                "total_checks": len(checks),
+            })
+
+    # ── Top Findings ─────────────────────────────────────────────
+    top_findings_q = (
+        select(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id, Finding.provider_id == provider_id, Finding.status == "FAIL")
+        .order_by(
+            case(
+                (Finding.severity == "critical", 0),
+                (Finding.severity == "high", 1),
+                (Finding.severity == "medium", 2),
+                (Finding.severity == "low", 3),
+                else_=4,
+            )
+        )
+        .limit(10)
+    )
+    top_findings_rows = (await db.execute(top_findings_q)).scalars().all()
+    top_findings = [
+        {
+            "id": f.id,
+            "check_title": f.check_title,
+            "severity": f.severity,
+            "service": f.service,
+            "resource_id": f.resource_id,
+            "resource_name": f.resource_name,
+        }
+        for f in top_findings_rows
+    ]
+
+    # ── MITRE ATT&CK Summary ────────────────────────────────────
+    from scanner.mitre.attack_mapping import MITRE_TECHNIQUES, CHECK_TO_MITRE
+    mitre_hits: dict[str, int] = {}
+    for f in top_findings_rows:
+        for tid in CHECK_TO_MITRE.get(f.check_id, []):
+            mitre_hits[tid] = mitre_hits.get(tid, 0) + 1
+
+    mitre_summary = [
+        {"id": tid, "name": MITRE_TECHNIQUES.get(tid, {}).get("name", tid), "finding_count": count}
+        for tid, count in sorted(mitre_hits.items(), key=lambda x: -x[1])[:10]
+    ]
+
+    # ── Scan History Trends ──────────────────────────────────────
+    since = datetime.utcnow() - timedelta(days=30)
+    scans_q = (
+        select(Scan)
+        .where(Scan.user_id == current_user.id, Scan.provider_id == provider_id, Scan.status == "completed", Scan.created_at >= since)
+        .order_by(Scan.created_at.asc())
+    )
+    scans_rows = (await db.execute(scans_q)).scalars().all()
+    scan_trends = [
+        {
+            "date": s.created_at.strftime("%Y-%m-%d") if s.created_at else "",
+            "total_checks": s.total_checks or 0,
+            "passed": s.passed_checks or 0,
+            "failed": s.failed_checks or 0,
+            "pass_rate": round(((s.passed_checks or 0) / (s.total_checks or 1)) * 100, 1),
+        }
+        for s in scans_rows
+    ]
+
+    # ── AI Security Summary ──────────────────────────────────────
+    critical_count = severity_breakdown.get("critical", 0)
+    high_count = severity_breakdown.get("high", 0)
+    medium_count = severity_breakdown.get("medium", 0)
+    failed_count = total - passed
+
+    risk_level = "Critical" if critical_count > 0 else "High" if high_count > 5 else "Medium" if high_count > 0 else "Low"
+
+    top_services_at_risk = [f["service"] for f in top_findings[:5]]
+    unique_services = list(dict.fromkeys(top_services_at_risk))
+
+    recommendations = []
+    if critical_count > 0:
+        recommendations.append(f"URGENT: Address {critical_count} critical finding(s) immediately — these represent active exploitability or data exposure risks.")
+    if high_count > 0:
+        recommendations.append(f"Prioritize remediation of {high_count} high-severity finding(s) within the next sprint cycle.")
+    if unique_services:
+        recommendations.append(f"Focus security hardening on: {', '.join(unique_services[:3])} — these services have the most failed checks.")
+    if pass_rate < 70:
+        recommendations.append(f"Overall posture is below acceptable threshold ({pass_rate}%). Consider a comprehensive security review.")
+    if len(applicable_frameworks) > 0:
+        recommendations.append(f"This account maps to {len(applicable_frameworks)} compliance framework(s). Run compliance assessments regularly.")
+    if not recommendations:
+        recommendations.append("Security posture is healthy. Continue monitoring and maintain current configurations.")
+
+    ai_summary = {
+        "risk_level": risk_level,
+        "summary": f"This {provider.provider_type.upper()} account ({provider.alias}) has {total} total findings with a {pass_rate}% pass rate. "
+                   f"There are {critical_count} critical, {high_count} high, and {medium_count} medium severity issues. "
+                   f"{'Immediate action is required.' if critical_count > 0 else 'The posture is generally acceptable but can be improved.' if failed_count > 0 else 'All checks are passing.'}",
+        "recommendations": recommendations,
+    }
+
+    return {
+        "provider": {
+            "id": provider.id,
+            "provider_type": provider.provider_type,
+            "alias": provider.alias,
+            "account_id": provider.account_id,
+            "region": provider.region,
+            "status": provider.status,
+        },
+        "posture": {
+            "total_findings": total,
+            "passed": passed,
+            "failed": failed_count,
+            "pass_rate": pass_rate,
+            "severity_breakdown": severity_breakdown,
+        },
+        "inventory": inventory,
+        "applicable_frameworks": applicable_frameworks,
+        "top_findings": top_findings,
+        "mitre_summary": mitre_summary,
+        "scan_trends": scan_trends,
+        "ai_summary": ai_summary,
     }
