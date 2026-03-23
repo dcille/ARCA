@@ -1,6 +1,6 @@
 """GCP Security Scanner — comprehensive CIS/NIST/CCM-aligned checks.
 
-Implements 60+ security checks across GCP services following CIS GCP Foundations
+Implements 80+ security checks across GCP services following CIS GCP Foundations
 Benchmark v3.0, NIST 800-53, SOC 2, and CSA CCM v4.1 frameworks.
 """
 import logging
@@ -61,7 +61,7 @@ class GCPScanner:
         return results
 
     # ------------------------------------------------------------------
-    # IAM checks (8)
+    # IAM checks (15)
     # ------------------------------------------------------------------
 
     def _check_iam(self) -> list[dict]:
@@ -298,12 +298,208 @@ class GCPScanner:
             except Exception as e:
                 logger.warning(f"GCP API keys check failed: {e}")
 
+            # 9. gcp_iam_sa_user_role — SA has iam.serviceAccountUser role (CIS 1.6)
+            has_sa_user_role = False
+            for binding in policy.bindings:
+                if binding.role == "roles/iam.serviceAccountUser":
+                    has_sa_user_role = True
+                    for member in binding.members:
+                        results.append(CheckResult(
+                            check_id="gcp_iam_sa_user_role",
+                            check_title="Service Account User role is not assigned at project level",
+                            service="iam", severity="high", status="FAIL",
+                            resource_id=f"projects/{self.project_id}",
+                            status_extended=f"Member {member} has roles/iam.serviceAccountUser at project level",
+                            remediation="Remove roles/iam.serviceAccountUser at project level; grant it on specific service accounts instead",
+                            compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                        ).to_dict())
+            if not has_sa_user_role:
+                results.append(CheckResult(
+                    check_id="gcp_iam_sa_user_role",
+                    check_title="Service Account User role is not assigned at project level",
+                    service="iam", severity="high", status="PASS",
+                    resource_id=f"projects/{self.project_id}",
+                    status_extended="No member has roles/iam.serviceAccountUser at project level",
+                    remediation="Remove roles/iam.serviceAccountUser at project level; grant it on specific service accounts instead",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+            # 10. gcp_iam_sa_token_creator_role — SA Token Creator role at project level (CIS 1.7)
+            has_sa_token_creator_role = False
+            for binding in policy.bindings:
+                if binding.role == "roles/iam.serviceAccountTokenCreator":
+                    has_sa_token_creator_role = True
+                    for member in binding.members:
+                        results.append(CheckResult(
+                            check_id="gcp_iam_sa_token_creator_role",
+                            check_title="Service Account Token Creator role is not assigned at project level",
+                            service="iam", severity="high", status="FAIL",
+                            resource_id=f"projects/{self.project_id}",
+                            status_extended=f"Member {member} has roles/iam.serviceAccountTokenCreator at project level",
+                            remediation="Remove roles/iam.serviceAccountTokenCreator at project level; grant it on specific service accounts instead",
+                            compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                        ).to_dict())
+            if not has_sa_token_creator_role:
+                results.append(CheckResult(
+                    check_id="gcp_iam_sa_token_creator_role",
+                    check_title="Service Account Token Creator role is not assigned at project level",
+                    service="iam", severity="high", status="PASS",
+                    resource_id=f"projects/{self.project_id}",
+                    status_extended="No member has roles/iam.serviceAccountTokenCreator at project level",
+                    remediation="Remove roles/iam.serviceAccountTokenCreator at project level; grant it on specific service accounts instead",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+            # 11. gcp_iam_kms_separation_of_duties — KMS admin and CryptoKey Encrypter/Decrypter (CIS 1.12)
+            kms_admin_members = set()
+            kms_encrypter_members = set()
+            for binding in policy.bindings:
+                if binding.role == "roles/cloudkms.admin":
+                    kms_admin_members.update(binding.members)
+                if binding.role == "roles/cloudkms.cryptoKeyEncrypterDecrypter":
+                    kms_encrypter_members.update(binding.members)
+            kms_overlap = kms_admin_members & kms_encrypter_members
+            if kms_overlap:
+                for member in kms_overlap:
+                    results.append(CheckResult(
+                        check_id="gcp_iam_kms_separation_of_duties",
+                        check_title="KMS admin and CryptoKey Encrypter/Decrypter roles are separated",
+                        service="iam", severity="high", status="FAIL",
+                        resource_id=f"projects/{self.project_id}",
+                        status_extended=f"Member {member} has both cloudkms.admin and cloudkms.cryptoKeyEncrypterDecrypter roles",
+                        remediation="Ensure no member has both roles/cloudkms.admin and roles/cloudkms.cryptoKeyEncrypterDecrypter",
+                        compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                    ).to_dict())
+            else:
+                results.append(CheckResult(
+                    check_id="gcp_iam_kms_separation_of_duties",
+                    check_title="KMS admin and CryptoKey Encrypter/Decrypter roles are separated",
+                    service="iam", severity="high", status="PASS",
+                    resource_id=f"projects/{self.project_id}",
+                    status_extended="No member has both cloudkms.admin and cloudkms.cryptoKeyEncrypterDecrypter roles",
+                    remediation="Ensure no member has both roles/cloudkms.admin and roles/cloudkms.cryptoKeyEncrypterDecrypter",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+            # 12. gcp_iam_api_keys_exist — Check if API keys are being used (CIS 1.13)
+            try:
+                from googleapiclient.discovery import build as _build_api
+                api_keys_svc2 = _build_api("apikeys", "v2", credentials=credentials)
+                api_keys2 = api_keys_svc2.projects().locations().keys().list(
+                    parent=f"projects/{self.project_id}/locations/global"
+                ).execute()
+                api_key_list = api_keys2.get("keys", [])
+                has_api_keys = len(api_key_list) > 0
+                results.append(CheckResult(
+                    check_id="gcp_iam_api_keys_exist",
+                    check_title="API keys are not used (prefer OAuth or service accounts)",
+                    service="iam", severity="low", status="FAIL" if has_api_keys else "PASS",
+                    resource_id=f"projects/{self.project_id}",
+                    status_extended=f"Project has {len(api_key_list)} API key(s) — consider using OAuth or service accounts instead",
+                    remediation="Eliminate API key usage and use OAuth 2.0 or service account credentials instead",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 13. gcp_iam_api_keys_rotated — API keys rotated within 90 days (CIS 1.16)
+                api_key_rotation_fail = False
+                for api_key in api_key_list:
+                    create_time_str = api_key.get("createTime", "")
+                    if create_time_str:
+                        try:
+                            create_time = datetime.fromisoformat(create_time_str.replace("Z", "+00:00"))
+                            if create_time < ninety_days_ago:
+                                api_key_rotation_fail = True
+                                results.append(CheckResult(
+                                    check_id="gcp_iam_api_keys_rotated",
+                                    check_title="API keys are rotated within 90 days",
+                                    service="iam", severity="medium", status="FAIL",
+                                    resource_id=api_key.get("name", ""),
+                                    resource_name=api_key.get("displayName", ""),
+                                    status_extended=f"API key {api_key.get('displayName', 'unknown')} created {create_time_str}, older than 90 days",
+                                    remediation="Rotate API keys every 90 days or less",
+                                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                                ).to_dict())
+                        except (ValueError, TypeError):
+                            pass
+                if not api_key_rotation_fail:
+                    results.append(CheckResult(
+                        check_id="gcp_iam_api_keys_rotated",
+                        check_title="API keys are rotated within 90 days",
+                        service="iam", severity="medium", status="PASS",
+                        resource_id=f"projects/{self.project_id}",
+                        status_extended="All API keys are within the 90-day rotation window",
+                        remediation="Rotate API keys every 90 days or less",
+                        compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                    ).to_dict())
+            except Exception as e:
+                logger.warning(f"GCP API keys existence/rotation check failed: {e}")
+
+            # 14. gcp_iam_essential_contacts — Essential Contacts configured (CIS 1.17)
+            try:
+                from googleapiclient.discovery import build as _build_ec
+                ec_svc = _build_ec("essentialcontacts", "v1", credentials=credentials)
+                contacts = ec_svc.projects().contacts().list(
+                    parent=f"projects/{self.project_id}"
+                ).execute()
+                contact_list = contacts.get("contacts", [])
+                has_contacts = len(contact_list) > 0
+                results.append(CheckResult(
+                    check_id="gcp_iam_essential_contacts",
+                    check_title="Essential Contacts are configured for the project",
+                    service="iam", severity="medium",
+                    status="PASS" if has_contacts else "FAIL",
+                    resource_id=f"projects/{self.project_id}",
+                    status_extended=f"Essential Contacts configured: {len(contact_list)} contact(s)",
+                    remediation="Configure Essential Contacts to receive important Google Cloud notifications",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+            except Exception as e:
+                logger.warning(f"GCP Essential Contacts check failed: {e}")
+
+            # 15. gcp_iam_secrets_in_functions — No secrets in Cloud Functions env vars (CIS 1.18)
+            try:
+                from googleapiclient.discovery import build as _build_cf
+                cf_svc = _build_cf("cloudfunctions", "v1", credentials=credentials)
+                functions = cf_svc.projects().locations().functions().list(
+                    parent=f"projects/{self.project_id}/locations/-"
+                ).execute()
+                suspicious_keys = {"SECRET", "PASSWORD", "API_KEY", "TOKEN", "PRIVATE_KEY", "CREDENTIALS"}
+                secrets_found = False
+                for func in functions.get("functions", []):
+                    env_vars = func.get("environmentVariables", {})
+                    func_name = func.get("name", "").split("/")[-1]
+                    for var_name in env_vars:
+                        if any(s in var_name.upper() for s in suspicious_keys):
+                            secrets_found = True
+                            results.append(CheckResult(
+                                check_id="gcp_iam_secrets_in_functions",
+                                check_title="Cloud Functions do not contain secrets in environment variables",
+                                service="iam", severity="high", status="FAIL",
+                                resource_id=func.get("name", ""),
+                                resource_name=func_name,
+                                status_extended=f"Function {func_name} has suspicious env var: {var_name}",
+                                remediation="Use Secret Manager to store secrets instead of Cloud Function environment variables",
+                                compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                            ).to_dict())
+                if not secrets_found:
+                    results.append(CheckResult(
+                        check_id="gcp_iam_secrets_in_functions",
+                        check_title="Cloud Functions do not contain secrets in environment variables",
+                        service="iam", severity="high", status="PASS",
+                        resource_id=f"projects/{self.project_id}",
+                        status_extended="No suspicious secret-like environment variables found in Cloud Functions",
+                        remediation="Use Secret Manager to store secrets instead of Cloud Function environment variables",
+                        compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                    ).to_dict())
+            except Exception as e:
+                logger.warning(f"GCP Cloud Functions secrets check failed: {e}")
+
         except Exception as e:
             logger.warning(f"GCP IAM checks failed: {e}")
         return results
 
     # ------------------------------------------------------------------
-    # Compute checks (8)
+    # Compute checks (10)
     # ------------------------------------------------------------------
 
     def _check_compute(self) -> list[dict]:
@@ -448,6 +644,38 @@ class GCPScanner:
                         resource_id=res_id, resource_name=name,
                         status_extended=f"Instance {name} Confidential Computing: {confidential}",
                         remediation="Enable Confidential Computing to encrypt data in use with AMD SEV",
+                        compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                    ).to_dict())
+
+                    # 9. gcp_compute_no_full_api_access — VM does not use full API access scope (CIS 4.2)
+                    has_full_access = any(
+                        "https://www.googleapis.com/auth/cloud-platform" in (sa.scopes or [])
+                        for sa in (instance.service_accounts or [])
+                    )
+                    results.append(CheckResult(
+                        check_id="gcp_compute_no_full_api_access",
+                        check_title="VM instance does not use full API access scope",
+                        service="compute", severity="high",
+                        status="FAIL" if has_full_access else "PASS",
+                        resource_id=res_id, resource_name=name,
+                        status_extended=f"Instance {name} full API access scope: {has_full_access}",
+                        remediation="Use minimum necessary API scopes instead of full cloud-platform access",
+                        compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                    ).to_dict())
+
+                    # 10. gcp_compute_block_project_ssh — VM blocks project-wide SSH keys (CIS 4.3)
+                    block_ssh = any(
+                        item.key == "block-project-ssh-keys" and item.value.lower() == "true"
+                        for item in (instance.metadata.items or []) if instance.metadata
+                    )
+                    results.append(CheckResult(
+                        check_id="gcp_compute_block_project_ssh",
+                        check_title="VM instance blocks project-wide SSH keys",
+                        service="compute", severity="medium",
+                        status="PASS" if block_ssh else "FAIL",
+                        resource_id=res_id, resource_name=name,
+                        status_extended=f"Instance {name} blocks project-wide SSH keys: {block_ssh}",
+                        remediation="Set block-project-ssh-keys metadata to true to prevent project-wide SSH key access",
                         compliance_frameworks=_DEFAULT_FRAMEWORKS,
                     ).to_dict())
 
@@ -714,7 +942,7 @@ class GCPScanner:
         return results
 
     # ------------------------------------------------------------------
-    # Logging checks (6)
+    # Logging checks (16)
     # ------------------------------------------------------------------
 
     def _check_logging(self) -> list[dict]:
@@ -789,8 +1017,175 @@ class GCPScanner:
                     remediation="Create log-based metrics for IAM changes, network changes, and other critical operations",
                     compliance_frameworks=_DEFAULT_FRAMEWORKS,
                 ).to_dict())
+                # 3a. gcp_logging_ownership_changes — Log metric filter for ownership changes (CIS 2.4)
+                has_ownership_filter = any("roles/owner" in f for f in metric_filters)
+                results.append(CheckResult(
+                    check_id="gcp_logging_ownership_changes",
+                    check_title="Log metric filter exists for project ownership changes",
+                    service="logging", severity="medium",
+                    status="PASS" if has_ownership_filter else "FAIL",
+                    resource_id=f"projects/{self.project_id}",
+                    status_extended=f"Metric filter for ownership changes: {has_ownership_filter}",
+                    remediation="Create a log metric filter for project ownership assignments/changes",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 3b. gcp_logging_audit_config_changes — Log metric filter for audit config changes (CIS 2.5)
+                has_audit_config_filter = any("auditConfigDeltas" in f for f in metric_filters)
+                results.append(CheckResult(
+                    check_id="gcp_logging_audit_config_changes",
+                    check_title="Log metric filter exists for audit configuration changes",
+                    service="logging", severity="medium",
+                    status="PASS" if has_audit_config_filter else "FAIL",
+                    resource_id=f"projects/{self.project_id}",
+                    status_extended=f"Metric filter for audit config changes: {has_audit_config_filter}",
+                    remediation="Create a log metric filter for audit configuration changes",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 3c. gcp_logging_custom_role_changes — Log metric filter for custom role changes (CIS 2.6)
+                has_custom_role_filter = any("iam_role" in f for f in metric_filters)
+                results.append(CheckResult(
+                    check_id="gcp_logging_custom_role_changes",
+                    check_title="Log metric filter exists for custom role changes",
+                    service="logging", severity="medium",
+                    status="PASS" if has_custom_role_filter else "FAIL",
+                    resource_id=f"projects/{self.project_id}",
+                    status_extended=f"Metric filter for custom role changes: {has_custom_role_filter}",
+                    remediation="Create a log metric filter for custom role creation, deletion, and updates",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 3d. gcp_logging_firewall_changes — Log metric filter for firewall rule changes (CIS 2.7)
+                has_firewall_filter = any("gce_firewall_rule" in f for f in metric_filters)
+                results.append(CheckResult(
+                    check_id="gcp_logging_firewall_changes",
+                    check_title="Log metric filter exists for VPC firewall rule changes",
+                    service="logging", severity="medium",
+                    status="PASS" if has_firewall_filter else "FAIL",
+                    resource_id=f"projects/{self.project_id}",
+                    status_extended=f"Metric filter for firewall rule changes: {has_firewall_filter}",
+                    remediation="Create a log metric filter for VPC firewall rule changes",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 3e. gcp_logging_route_changes — Log metric filter for route changes (CIS 2.8)
+                has_route_filter = any("gce_route" in f for f in metric_filters)
+                results.append(CheckResult(
+                    check_id="gcp_logging_route_changes",
+                    check_title="Log metric filter exists for VPC network route changes",
+                    service="logging", severity="medium",
+                    status="PASS" if has_route_filter else "FAIL",
+                    resource_id=f"projects/{self.project_id}",
+                    status_extended=f"Metric filter for route changes: {has_route_filter}",
+                    remediation="Create a log metric filter for VPC network route changes",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 3f. gcp_logging_vpc_changes — Log metric filter for VPC network changes (CIS 2.9)
+                has_vpc_filter = any("gce_network" in f for f in metric_filters)
+                results.append(CheckResult(
+                    check_id="gcp_logging_vpc_changes",
+                    check_title="Log metric filter exists for VPC network changes",
+                    service="logging", severity="medium",
+                    status="PASS" if has_vpc_filter else "FAIL",
+                    resource_id=f"projects/{self.project_id}",
+                    status_extended=f"Metric filter for VPC network changes: {has_vpc_filter}",
+                    remediation="Create a log metric filter for VPC network creation, deletion, and patching",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 3g. gcp_logging_storage_iam_changes — Log metric filter for Cloud Storage IAM changes (CIS 2.10)
+                has_storage_iam_filter = any("storage.setIamPermissions" in f for f in metric_filters)
+                results.append(CheckResult(
+                    check_id="gcp_logging_storage_iam_changes",
+                    check_title="Log metric filter exists for Cloud Storage IAM permission changes",
+                    service="logging", severity="medium",
+                    status="PASS" if has_storage_iam_filter else "FAIL",
+                    resource_id=f"projects/{self.project_id}",
+                    status_extended=f"Metric filter for Storage IAM changes: {has_storage_iam_filter}",
+                    remediation="Create a log metric filter for Cloud Storage IAM permission changes",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 3h. gcp_logging_sql_config_changes — Log metric filter for SQL instance config changes (CIS 2.11)
+                has_sql_config_filter = any("cloudsql.instances" in f for f in metric_filters)
+                results.append(CheckResult(
+                    check_id="gcp_logging_sql_config_changes",
+                    check_title="Log metric filter exists for SQL instance configuration changes",
+                    service="logging", severity="medium",
+                    status="PASS" if has_sql_config_filter else "FAIL",
+                    resource_id=f"projects/{self.project_id}",
+                    status_extended=f"Metric filter for SQL config changes: {has_sql_config_filter}",
+                    remediation="Create a log metric filter for Cloud SQL instance configuration changes",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
             except Exception as e:
                 logger.warning(f"GCP metric filters check failed: {e}")
+
+            # 3i. gcp_logging_cloud_asset_inventory — Cloud Asset Inventory enabled (CIS 2.14)
+            try:
+                from googleapiclient.discovery import build as _build_cai
+                cai_svc = _build_cai("cloudasset", "v1", credentials=credentials)
+                feeds = cai_svc.feeds().list(
+                    parent=f"projects/{self.project_id}"
+                ).execute()
+                feed_list = feeds.get("feeds", [])
+                has_cai = len(feed_list) > 0
+                results.append(CheckResult(
+                    check_id="gcp_logging_cloud_asset_inventory",
+                    check_title="Cloud Asset Inventory is enabled",
+                    service="logging", severity="medium",
+                    status="PASS" if has_cai else "FAIL",
+                    resource_id=f"projects/{self.project_id}",
+                    status_extended=f"Cloud Asset Inventory feeds configured: {len(feed_list)}",
+                    remediation="Enable Cloud Asset Inventory to track and monitor resource changes",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+            except Exception as e:
+                logger.warning(f"GCP Cloud Asset Inventory check failed: {e}")
+
+            # 3j. gcp_logging_lb_logging — Load balancer logging enabled (CIS 2.17)
+            try:
+                from googleapiclient.discovery import build as _build_lb
+                compute_svc = _build_lb("compute", "v1", credentials=credentials)
+                backend_services = compute_svc.backendServices().aggregatedList(
+                    project=self.project_id
+                ).execute()
+                lb_logging_fail = False
+                for scope, scoped_list in backend_services.get("items", {}).items():
+                    for bs in scoped_list.get("backendServices", []):
+                        bs_name = bs.get("name", "")
+                        log_config = bs.get("logConfig", {})
+                        logging_enabled = log_config.get("enable", False)
+                        if not logging_enabled:
+                            lb_logging_fail = True
+                            results.append(CheckResult(
+                                check_id="gcp_logging_lb_logging",
+                                check_title="Load balancer logging is enabled",
+                                service="logging", severity="medium",
+                                status="FAIL",
+                                resource_id=bs.get("selfLink", bs_name),
+                                resource_name=bs_name,
+                                status_extended=f"Backend service {bs_name} logging: disabled",
+                                remediation="Enable logging on all load balancer backend services",
+                                compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                            ).to_dict())
+                        else:
+                            results.append(CheckResult(
+                                check_id="gcp_logging_lb_logging",
+                                check_title="Load balancer logging is enabled",
+                                service="logging", severity="medium",
+                                status="PASS",
+                                resource_id=bs.get("selfLink", bs_name),
+                                resource_name=bs_name,
+                                status_extended=f"Backend service {bs_name} logging: enabled",
+                                remediation="Enable logging on all load balancer backend services",
+                                compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                            ).to_dict())
+            except Exception as e:
+                logger.warning(f"GCP load balancer logging check failed: {e}")
 
             # 4. gcp_logging_bucket_retention
             try:
@@ -1107,7 +1502,7 @@ class GCPScanner:
         return results
 
     # ------------------------------------------------------------------
-    # Networking checks (6)
+    # Networking checks (9)
     # ------------------------------------------------------------------
 
     def _check_networking(self) -> list[dict]:
@@ -1233,12 +1628,115 @@ class GCPScanner:
             except Exception as e:
                 logger.warning(f"GCP network flow logs check failed: {e}")
 
+            # 7. gcp_network_no_default_network — Ensure default network is not present (CIS 3.1)
+            try:
+                networks_client = compute_v1.NetworksClient(credentials=credentials)
+                networks = networks_client.list(project=self.project_id)
+                has_default_network = False
+                for network in networks:
+                    if network.name == "default":
+                        has_default_network = True
+                        results.append(CheckResult(
+                            check_id="gcp_network_no_default_network",
+                            check_title="Default network does not exist in the project",
+                            service="networking", severity="medium",
+                            status="FAIL",
+                            resource_id=network.self_link or f"projects/{self.project_id}/global/networks/default",
+                            resource_name="default",
+                            status_extended="Default network exists in the project",
+                            remediation="Delete the default network and create custom VPC networks with specific subnets",
+                            compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                        ).to_dict())
+                        break
+                if not has_default_network:
+                    results.append(CheckResult(
+                        check_id="gcp_network_no_default_network",
+                        check_title="Default network does not exist in the project",
+                        service="networking", severity="medium",
+                        status="PASS",
+                        resource_id=f"projects/{self.project_id}",
+                        status_extended="No default network found in the project",
+                        remediation="Delete the default network and create custom VPC networks with specific subnets",
+                        compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                    ).to_dict())
+            except Exception as e:
+                logger.warning(f"GCP default network check failed: {e}")
+
+            # 8. gcp_network_no_legacy_network — No legacy networks (CIS 3.2)
+            try:
+                networks_client = compute_v1.NetworksClient(credentials=credentials)
+                networks = networks_client.list(project=self.project_id)
+                legacy_found = False
+                for network in networks:
+                    # Legacy networks have autoCreateSubnetworks=False and no subnet_mode (IPv4Range set instead)
+                    is_legacy = hasattr(network, "i_pv4_range") and network.i_pv4_range
+                    if is_legacy:
+                        legacy_found = True
+                        results.append(CheckResult(
+                            check_id="gcp_network_no_legacy_network",
+                            check_title="No legacy networks exist in the project",
+                            service="networking", severity="medium",
+                            status="FAIL",
+                            resource_id=network.self_link or network.name,
+                            resource_name=network.name,
+                            status_extended=f"Legacy network {network.name} exists in the project",
+                            remediation="Delete legacy networks and use VPC networks with custom or auto subnets",
+                            compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                        ).to_dict())
+                if not legacy_found:
+                    results.append(CheckResult(
+                        check_id="gcp_network_no_legacy_network",
+                        check_title="No legacy networks exist in the project",
+                        service="networking", severity="medium",
+                        status="PASS",
+                        resource_id=f"projects/{self.project_id}",
+                        status_extended="No legacy networks found in the project",
+                        remediation="Delete legacy networks and use VPC networks with custom or auto subnets",
+                        compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                    ).to_dict())
+            except Exception as e:
+                logger.warning(f"GCP legacy network check failed: {e}")
+
+            # 9. gcp_network_ssl_policy — SSL policies use restricted/modern profiles (CIS 3.9)
+            try:
+                ssl_policies_client = compute_v1.SslPoliciesClient(credentials=credentials)
+                ssl_policies = ssl_policies_client.list(project=self.project_id)
+                ssl_policy_found = False
+                for ssl_policy in ssl_policies:
+                    ssl_policy_found = True
+                    min_tls = ssl_policy.min_tls_version if hasattr(ssl_policy, "min_tls_version") else ""
+                    is_secure = min_tls in ("TLS_1_2", "TLS_1_3")
+                    results.append(CheckResult(
+                        check_id="gcp_network_ssl_policy",
+                        check_title="SSL policy uses TLS 1.2 or higher",
+                        service="networking", severity="high",
+                        status="PASS" if is_secure else "FAIL",
+                        resource_id=ssl_policy.self_link or ssl_policy.name,
+                        resource_name=ssl_policy.name,
+                        status_extended=f"SSL policy {ssl_policy.name} minTlsVersion: {min_tls}",
+                        remediation="Configure SSL policies to use TLS 1.2 or higher with RESTRICTED or MODERN profile",
+                        compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                    ).to_dict())
+                if not ssl_policy_found:
+                    results.append(CheckResult(
+                        check_id="gcp_network_ssl_policy",
+                        check_title="SSL policy uses TLS 1.2 or higher",
+                        service="networking", severity="high",
+                        status="FAIL",
+                        resource_id=f"projects/{self.project_id}",
+                        status_extended="No SSL policies configured — default GCP SSL policy may allow older TLS versions",
+                        remediation="Create an SSL policy with TLS 1.2 or higher and RESTRICTED or MODERN profile",
+                        compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                    ).to_dict())
+            except Exception as e:
+                logger.warning(f"GCP SSL policy check failed: {e}")
+
         except Exception as e:
             logger.warning(f"GCP networking checks failed: {e}")
         return results
 
     # ------------------------------------------------------------------
-    # BigQuery checks (4)
+    # BigQuery checks (5)
     # ------------------------------------------------------------------
 
     def _check_bigquery(self) -> list[dict]:
@@ -1306,7 +1804,23 @@ class GCPScanner:
                         compliance_frameworks=_DEFAULT_FRAMEWORKS,
                     ).to_dict())
 
-            # 4. gcp_bigquery_audit_logging — check if BigQuery data access audit logs are enabled
+                # 4. gcp_bigquery_classification — Dataset has data classification labels (CIS 7.4)
+                labels = dataset.labels or {}
+                classification_keywords = {"classification", "data_classification", "data-classification",
+                                           "sensitivity", "data_sensitivity", "data-sensitivity"}
+                has_classification = any(k.lower() in classification_keywords for k in labels)
+                results.append(CheckResult(
+                    check_id="gcp_bigquery_classification",
+                    check_title="BigQuery dataset has data classification labels",
+                    service="bigquery", severity="low",
+                    status="PASS" if has_classification else "FAIL",
+                    resource_id=full_id, resource_name=ds_id,
+                    status_extended=f"BigQuery dataset {ds_id} has classification label: {has_classification}",
+                    remediation="Add a data classification label (e.g., 'classification') to the BigQuery dataset",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+            # 5. gcp_bigquery_audit_logging — check if BigQuery data access audit logs are enabled
             try:
                 from googleapiclient.discovery import build
                 crm_service = build("cloudresourcemanager", "v1", credentials=credentials)

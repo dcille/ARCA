@@ -48,6 +48,7 @@ DATA_STORE_TYPES = {
         {"service": "elasticache", "label": "Amazon ElastiCache", "type": "cache"},
         {"service": "secretsmanager", "label": "AWS Secrets Manager", "type": "secrets"},
         {"service": "elasticsearch", "label": "Amazon OpenSearch", "type": "search_engine"},
+        {"service": "kms", "label": "AWS KMS", "type": "key_management"},
     ],
     "azure": [
         {"service": "azure_blob", "label": "Azure Blob Storage", "type": "object_storage"},
@@ -62,6 +63,9 @@ DATA_STORE_TYPES = {
         {"service": "bigquery", "label": "BigQuery", "type": "data_warehouse"},
         {"service": "firestore", "label": "Firestore", "type": "nosql_db"},
         {"service": "secretmanager", "label": "Secret Manager", "type": "secrets"},
+        {"service": "pubsub", "label": "Pub/Sub", "type": "message_queue"},
+        {"service": "kms", "label": "Cloud KMS", "type": "key_management"},
+        {"service": "dataproc", "label": "Dataproc", "type": "data_processing"},
     ],
 }
 
@@ -232,3 +236,158 @@ def get_dspm_data_stores(provider: str) -> list[dict]:
 def get_all_dspm_check_ids() -> list[str]:
     """Return all DSPM check IDs."""
     return [c["check_id"] for c in DSPM_CHECKS]
+
+
+# ═══════════════════════════════════════════════════════════════════
+# PROVIDER CHECK → DSPM MAPPING
+# Maps actual scanner check_ids to DSPM categories so DSPM can
+# surface ALL data-related findings from provider scans.
+# ═══════════════════════════════════════════════════════════════════
+
+PROVIDER_DATA_CHECK_MAPPING: dict[str, dict] = {
+    # ── AWS Data Checks ─────────────────────────────────────────
+    # S3
+    "s3_bucket_public_access": {"category": "access", "data_store": "s3", "provider": "aws"},
+    "s3_bucket_versioning": {"category": "retention", "data_store": "s3", "provider": "aws"},
+    "s3_bucket_encryption": {"category": "encryption", "data_store": "s3", "provider": "aws"},
+    "s3_bucket_logging": {"category": "logging", "data_store": "s3", "provider": "aws"},
+    "s3_bucket_mfa_delete": {"category": "backup", "data_store": "s3", "provider": "aws"},
+    "s3_bucket_ssl_requests": {"category": "encryption", "data_store": "s3", "provider": "aws"},
+    "s3_bucket_policy_public": {"category": "access", "data_store": "s3", "provider": "aws"},
+    "s3_bucket_acl_public": {"category": "access", "data_store": "s3", "provider": "aws"},
+    "s3_bucket_lifecycle": {"category": "retention", "data_store": "s3", "provider": "aws"},
+    "s3_bucket_cross_region": {"category": "backup", "data_store": "s3", "provider": "aws"},
+    # RDS
+    "rds_encryption": {"category": "encryption", "data_store": "rds", "provider": "aws"},
+    "rds_public": {"category": "access", "data_store": "rds", "provider": "aws"},
+    "rds_multi_az": {"category": "backup", "data_store": "rds", "provider": "aws"},
+    "rds_backup_enabled": {"category": "backup", "data_store": "rds", "provider": "aws"},
+    "rds_deletion_protection": {"category": "backup", "data_store": "rds", "provider": "aws"},
+    "rds_auto_minor_upgrade": {"category": "access", "data_store": "rds", "provider": "aws"},
+    "rds_iam_auth": {"category": "access", "data_store": "rds", "provider": "aws"},
+    "rds_audit_logging": {"category": "logging", "data_store": "rds", "provider": "aws"},
+    # DynamoDB
+    "dynamodb_table_encrypted": {"category": "encryption", "data_store": "dynamodb", "provider": "aws"},
+    "dynamodb_pitr_enabled": {"category": "backup", "data_store": "dynamodb", "provider": "aws"},
+    "dynamodb_deletion_protection": {"category": "backup", "data_store": "dynamodb", "provider": "aws"},
+    # EFS
+    "efs_encryption": {"category": "encryption", "data_store": "efs", "provider": "aws"},
+    # ElastiCache
+    "elasticache_encryption_at_rest": {"category": "encryption", "data_store": "elasticache", "provider": "aws"},
+    "elasticache_encryption_in_transit": {"category": "encryption", "data_store": "elasticache", "provider": "aws"},
+    # Redshift
+    "redshift_encryption": {"category": "encryption", "data_store": "redshift", "provider": "aws"},
+    "redshift_public": {"category": "access", "data_store": "redshift", "provider": "aws"},
+    "redshift_audit_logging": {"category": "logging", "data_store": "redshift", "provider": "aws"},
+    # Secrets Manager
+    "secretsmanager_rotation": {"category": "access", "data_store": "secretsmanager", "provider": "aws"},
+    # OpenSearch
+    "opensearch_encryption": {"category": "encryption", "data_store": "elasticsearch", "provider": "aws"},
+    "opensearch_public": {"category": "access", "data_store": "elasticsearch", "provider": "aws"},
+    "opensearch_logging": {"category": "logging", "data_store": "elasticsearch", "provider": "aws"},
+
+    # ── Azure Data Checks ───────────────────────────────────────
+    # Storage
+    "azure_storage_encryption": {"category": "encryption", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_https_only": {"category": "encryption", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_public_access": {"category": "access", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_blob_public_access": {"category": "access", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_soft_delete": {"category": "backup", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_logging": {"category": "logging", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_cmk": {"category": "encryption", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_network_rules": {"category": "access", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_min_tls": {"category": "encryption", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_private_endpoint": {"category": "access", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_immutable_blob": {"category": "retention", "data_store": "azure_blob", "provider": "azure"},
+    # SQL
+    "azure_sql_tde_enabled": {"category": "encryption", "data_store": "azure_sql", "provider": "azure"},
+    "azure_sql_auditing": {"category": "logging", "data_store": "azure_sql", "provider": "azure"},
+    "azure_sql_threat_detection": {"category": "logging", "data_store": "azure_sql", "provider": "azure"},
+    "azure_sql_public_access": {"category": "access", "data_store": "azure_sql", "provider": "azure"},
+    "azure_sql_firewall_rules": {"category": "access", "data_store": "azure_sql", "provider": "azure"},
+    "azure_sql_ad_admin": {"category": "access", "data_store": "azure_sql", "provider": "azure"},
+    "azure_sql_min_tls": {"category": "encryption", "data_store": "azure_sql", "provider": "azure"},
+    "azure_sql_cmk": {"category": "encryption", "data_store": "azure_sql", "provider": "azure"},
+    "azure_sql_va_enabled": {"category": "logging", "data_store": "azure_sql", "provider": "azure"},
+    "azure_sql_geo_backup": {"category": "backup", "data_store": "azure_sql", "provider": "azure"},
+    # Cosmos DB
+    "azure_cosmosdb_encryption": {"category": "encryption", "data_store": "cosmosdb", "provider": "azure"},
+    "azure_cosmosdb_firewall": {"category": "access", "data_store": "cosmosdb", "provider": "azure"},
+    "azure_cosmosdb_private_endpoint": {"category": "access", "data_store": "cosmosdb", "provider": "azure"},
+    "azure_cosmosdb_backup": {"category": "backup", "data_store": "cosmosdb", "provider": "azure"},
+    # Key Vault
+    "azure_keyvault_soft_delete": {"category": "backup", "data_store": "keyvault", "provider": "azure"},
+    "azure_keyvault_purge_protection": {"category": "backup", "data_store": "keyvault", "provider": "azure"},
+    "azure_keyvault_private_endpoint": {"category": "access", "data_store": "keyvault", "provider": "azure"},
+    "azure_keyvault_logging": {"category": "logging", "data_store": "keyvault", "provider": "azure"},
+    "azure_keyvault_rbac": {"category": "access", "data_store": "keyvault", "provider": "azure"},
+    "azure_keyvault_key_rotation": {"category": "encryption", "data_store": "keyvault", "provider": "azure"},
+    "azure_keyvault_key_expiry": {"category": "encryption", "data_store": "keyvault", "provider": "azure"},
+    "azure_keyvault_secret_expiry": {"category": "access", "data_store": "keyvault", "provider": "azure"},
+    "azure_keyvault_network_acl": {"category": "access", "data_store": "keyvault", "provider": "azure"},
+
+    # ── GCP Data Checks ─────────────────────────────────────────
+    # Cloud Storage
+    "gcp_storage_no_public_access": {"category": "access", "data_store": "gcs", "provider": "gcp"},
+    "gcp_storage_uniform_access": {"category": "access", "data_store": "gcs", "provider": "gcp"},
+    "gcp_storage_versioning": {"category": "retention", "data_store": "gcs", "provider": "gcp"},
+    "gcp_storage_logging_enabled": {"category": "logging", "data_store": "gcs", "provider": "gcp"},
+    "gcp_storage_retention_policy": {"category": "retention", "data_store": "gcs", "provider": "gcp"},
+    "gcp_storage_cmek_encryption": {"category": "encryption", "data_store": "gcs", "provider": "gcp"},
+    # Cloud SQL
+    "gcp_sql_no_public_ip": {"category": "access", "data_store": "cloudsql", "provider": "gcp"},
+    "gcp_sql_ssl_required": {"category": "encryption", "data_store": "cloudsql", "provider": "gcp"},
+    "gcp_sql_backup_enabled": {"category": "backup", "data_store": "cloudsql", "provider": "gcp"},
+    "gcp_sql_pitr_enabled": {"category": "backup", "data_store": "cloudsql", "provider": "gcp"},
+    "gcp_sql_no_public_networks": {"category": "access", "data_store": "cloudsql", "provider": "gcp"},
+    "gcp_sql_cmek_encryption": {"category": "encryption", "data_store": "cloudsql", "provider": "gcp"},
+    "gcp_sql_audit_logging": {"category": "logging", "data_store": "cloudsql", "provider": "gcp"},
+    "gcp_sql_auto_storage_increase": {"category": "backup", "data_store": "cloudsql", "provider": "gcp"},
+    # BigQuery
+    "gcp_bigquery_dataset_no_public": {"category": "access", "data_store": "bigquery", "provider": "gcp"},
+    "gcp_bigquery_cmek_encryption": {"category": "encryption", "data_store": "bigquery", "provider": "gcp"},
+    "gcp_bigquery_table_encrypted": {"category": "encryption", "data_store": "bigquery", "provider": "gcp"},
+    "gcp_bigquery_audit_logging": {"category": "logging", "data_store": "bigquery", "provider": "gcp"},
+    "gcp_bigquery_classification": {"category": "classification", "data_store": "bigquery", "provider": "gcp"},
+    # Pub/Sub (data in transit)
+    "gcp_pubsub_no_public_access": {"category": "access", "data_store": "pubsub", "provider": "gcp"},
+    "gcp_pubsub_encrypted": {"category": "encryption", "data_store": "pubsub", "provider": "gcp"},
+    # KMS (key management for data)
+    "gcp_kms_key_rotation": {"category": "encryption", "data_store": "kms", "provider": "gcp"},
+    "gcp_kms_no_public_access": {"category": "access", "data_store": "kms", "provider": "gcp"},
+    # Dataproc (data processing)
+    "gcp_dataproc_encrypted": {"category": "encryption", "data_store": "dataproc", "provider": "gcp"},
+    # Firestore
+    "gcp_firestore_cmek": {"category": "encryption", "data_store": "firestore", "provider": "gcp"},
+    # Secret Manager
+    "gcp_secretmanager_rotation": {"category": "access", "data_store": "secretmanager", "provider": "gcp"},
+}
+
+
+def get_data_check_ids() -> set[str]:
+    """Return all check_ids that are data-related across all providers."""
+    return set(PROVIDER_DATA_CHECK_MAPPING.keys())
+
+
+def get_data_checks_for_provider(provider: str) -> dict[str, dict]:
+    """Return data check mappings for a specific provider."""
+    return {
+        cid: info for cid, info in PROVIDER_DATA_CHECK_MAPPING.items()
+        if info["provider"] == provider
+    }
+
+
+def get_data_checks_by_category(category: str) -> dict[str, dict]:
+    """Return data check mappings for a specific DSPM category."""
+    return {
+        cid: info for cid, info in PROVIDER_DATA_CHECK_MAPPING.items()
+        if info["category"] == category
+    }
+
+
+def get_data_checks_by_store(data_store: str) -> dict[str, dict]:
+    """Return data check mappings for a specific data store type."""
+    return {
+        cid: info for cid, info in PROVIDER_DATA_CHECK_MAPPING.items()
+        if info["data_store"] == data_store
+    }

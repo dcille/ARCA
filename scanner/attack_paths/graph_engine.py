@@ -255,6 +255,32 @@ SCENARIO_TEMPLATES = [
         "category": "data_exfiltration",
         "builder": "_build_encryption_gap_path",
     },
+    # ── Data Exfiltration: Public Data Store Access ────────────────
+    {
+        "match_services": {"s3", "storage", "bigquery", "rds", "sql", "dynamodb",
+                           "objectstorage", "database", "gcs", "cloudsql"},
+        "match_checks": ["public", "no_public", "bucket_public", "dataset_no_public",
+                          "blob_public", "objectstorage_public"],
+        "category": "data_exfiltration",
+        "builder": "_build_data_public_exposure_path",
+    },
+    # ── Data Security: Unencrypted Data Stores ─────────────────────
+    {
+        "match_services": {"s3", "rds", "dynamodb", "storage", "sql", "bigquery",
+                           "efs", "elasticache", "objectstorage", "database",
+                           "gcs", "cloudsql", "kms", "keyvault", "dataproc"},
+        "match_checks": ["encrypt", "cmek", "cmk", "tde", "kms", "ssl_required"],
+        "category": "data_exfiltration",
+        "builder": "_build_data_encryption_weakness_path",
+    },
+    # ── Data Security: Missing Data Access Logging ─────────────────
+    {
+        "match_services": {"s3", "rds", "storage", "sql", "bigquery", "database",
+                           "objectstorage", "keyvault", "cloudsql", "gcs"},
+        "match_checks": ["logging", "audit", "access_log"],
+        "category": "detection_evasion",
+        "builder": "_build_data_logging_gap_path",
+    },
 ]
 
 
@@ -1412,6 +1438,187 @@ class AttackPathAnalyzer:
                 "Enable backup and deletion protection on MySQL databases",
                 "Enable CMK encryption on databases and file storage",
                 "Use private endpoints for Autonomous Databases",
+            ],
+        )
+
+    def _build_data_public_exposure_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Public data stores → data exfiltration path (DSPM-specific)."""
+        data_services = {"s3", "storage", "bigquery", "rds", "sql", "dynamodb",
+                         "objectstorage", "database", "gcs", "cloudsql",
+                         "azure_blob", "azure_sql", "cosmosdb"}
+        data_findings = [f for f in findings
+                         if f["service"].lower() in data_services
+                         and any(k in f["check_id"].lower() for k in ["public", "no_public"])
+                         and f.get("status") == "FAIL"]
+        if not data_findings:
+            return None
+
+        nodes, edges, affected = [], [], []
+        internet = GraphNode(id="data-internet", node_type=NodeType.INTERNET,
+                             label="Internet / Anonymous User", service="external")
+        nodes.append(internet)
+
+        for f in data_findings[:5]:
+            n = GraphNode(id=f"pub-data-{_make_id()}", node_type=NodeType.DATA_STORE,
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(internet.id, n.id, EdgeType.EXPOSES,
+                                   "publicly accessible data store"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        exfil = GraphNode(id=f"exfil-{_make_id()}", node_type=NodeType.SERVICE,
+                          label="Data Exfiltration", service="external",
+                          severity="critical")
+        nodes.append(exfil)
+        for n in nodes[1:-1]:
+            edges.append(GraphEdge(n.id, exfil.id, EdgeType.HAS_ACCESS,
+                                   "data can be downloaded"))
+
+        return AttackPath(
+            id=_make_id(),
+            title="Publicly Exposed Data Stores",
+            description="Data stores with public access enabled allow anyone on the internet "
+                        "to access potentially sensitive data without authentication. This is "
+                        "a critical data security risk that could lead to data breaches.",
+            severity=self._max_severity([f["severity"] for f in data_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Internet / Anonymous User",
+            target="Sensitive Data Stores",
+            category="data_exfiltration",
+            techniques=["Collection: Data from Cloud Storage Object",
+                         "Exfiltration: Transfer Data to Cloud Account",
+                         "Initial Access: Exploit Public-Facing Application"],
+            affected_resources=affected,
+            remediation=[
+                "Disable public access on all data storage services",
+                "Implement bucket/container-level access policies",
+                "Use private endpoints for database access",
+                "Enable Cloud DLP/Macie/Purview for sensitive data discovery",
+                "Apply data classification tags to all data stores",
+            ],
+        )
+
+    def _build_data_encryption_weakness_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Unencrypted data stores → data exposure path (DSPM-specific)."""
+        data_services = {"s3", "rds", "dynamodb", "storage", "sql", "bigquery",
+                         "efs", "elasticache", "objectstorage", "database",
+                         "gcs", "cloudsql", "kms", "keyvault", "dataproc",
+                         "azure_blob", "azure_sql", "cosmosdb"}
+        enc_findings = [f for f in findings
+                        if f["service"].lower() in data_services
+                        and any(k in f["check_id"].lower() for k in ["encrypt", "cmek", "cmk", "tde", "kms", "ssl"])
+                        and f.get("status") == "FAIL"]
+        if not enc_findings:
+            return None
+
+        nodes, edges, affected = [], [], []
+        insider = GraphNode(id="data-insider", node_type=NodeType.IDENTITY,
+                            label="Insider / Compromised Credential", service="IAM")
+        nodes.append(insider)
+
+        for f in enc_findings[:5]:
+            n = GraphNode(id=f"unenc-data-{_make_id()}", node_type=NodeType.DATA_STORE,
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(insider.id, n.id, EdgeType.HAS_ACCESS,
+                                   "reads unencrypted/weakly encrypted data"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        exfil = GraphNode(id=f"data-theft-{_make_id()}", node_type=NodeType.SERVICE,
+                          label="Plaintext Data Exposure", service="external",
+                          severity="critical")
+        nodes.append(exfil)
+        for n in nodes[1:-1]:
+            edges.append(GraphEdge(n.id, exfil.id, EdgeType.STORES_DATA,
+                                   "data accessible in plaintext"))
+
+        return AttackPath(
+            id=_make_id(),
+            title="Data Encryption Gaps Enable Data Theft",
+            description="Data stores lacking proper encryption (at rest or in transit) allow "
+                        "an attacker with access to read sensitive data in plaintext. Missing "
+                        "customer-managed keys (CMEK) reduce control over data protection.",
+            severity=self._max_severity([f["severity"] for f in enc_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Insider / Compromised Credential",
+            target="Unencrypted Data",
+            category="data_exfiltration",
+            techniques=["Collection: Data from Cloud Storage Object",
+                         "Collection: Data from Information Repositories",
+                         "Credential Access: Unsecured Credentials"],
+            affected_resources=affected,
+            remediation=[
+                "Enable encryption at rest on all data stores with CMEK",
+                "Enforce TLS/SSL for all database connections",
+                "Implement KMS key rotation policies",
+                "Use customer-managed keys for sensitive data",
+                "Enable encryption in transit for cache and messaging services",
+            ],
+        )
+
+    def _build_data_logging_gap_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Missing data access logging → undetected data access (DSPM-specific)."""
+        data_services = {"s3", "rds", "storage", "sql", "bigquery", "database",
+                         "objectstorage", "keyvault", "cloudsql", "gcs",
+                         "azure_blob", "azure_sql"}
+        log_findings = [f for f in findings
+                        if f["service"].lower() in data_services
+                        and any(k in f["check_id"].lower() for k in ["logging", "audit", "access_log"])
+                        and f.get("status") == "FAIL"]
+        if not log_findings:
+            return None
+
+        nodes, edges, affected = [], [], []
+        attacker = GraphNode(id="data-stealth", node_type=NodeType.IDENTITY,
+                             label="Threat Actor", service="external")
+        nodes.append(attacker)
+
+        for f in log_findings[:4]:
+            n = GraphNode(id=f"unlogged-{_make_id()}", node_type=NodeType.DATA_STORE,
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(attacker.id, n.id, EdgeType.HAS_ACCESS,
+                                   "accesses data store without audit trail"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        target = GraphNode(id=f"unaudited-{_make_id()}", node_type=NodeType.SERVICE,
+                           label="Undetected Data Access", service="audit",
+                           severity="high")
+        nodes.append(target)
+        for n in nodes[1:-1]:
+            edges.append(GraphEdge(n.id, target.id, EdgeType.LATERAL_MOVE,
+                                   "no audit trail for data access"))
+
+        return AttackPath(
+            id=_make_id(),
+            title="Data Access Without Audit Logging",
+            description="Data stores without access logging enabled allow attackers to access "
+                        "and exfiltrate data without leaving an audit trail, making incident "
+                        "response and forensics impossible.",
+            severity=self._max_severity([f["severity"] for f in log_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Threat Actor",
+            target="Undetected Data Access",
+            category="detection_evasion",
+            techniques=["Defense Evasion: Impair Defenses - Disable Cloud Logs",
+                         "Collection: Data from Cloud Storage",
+                         "Exfiltration: Automated Exfiltration"],
+            affected_resources=affected,
+            remediation=[
+                "Enable access logging on all S3 buckets and storage accounts",
+                "Enable database audit logging for all SQL instances",
+                "Enable BigQuery audit logging via Data Access audit logs",
+                "Configure Key Vault diagnostic logging",
+                "Set up alerts for unusual data access patterns",
             ],
         )
 
