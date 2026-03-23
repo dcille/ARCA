@@ -4,7 +4,33 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import { api } from '@/lib/api'
-import { ArrowLeftIcon } from '@heroicons/react/24/outline'
+import Link from 'next/link'
+import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline'
+
+const SERVICE_ICONS: Record<string, string> = {
+  // AWS
+  S3: '🪣', IAM: '🔑', EC2: '🖥️', RDS: '🛢️', Lambda: '⚡', CloudTrail: '📋', KMS: '🔐',
+  VPC: '🌐', ECS: '🐳', EKS: '☸️', GuardDuty: '🛡️', SNS: '📨', SQS: '📬', DynamoDB: '📊',
+  EFS: '📁', ElastiCache: '💾', CloudWatch: '📈', Config: '⚙️', SecretsManager: '🔏',
+  Elasticsearch: '🔍',
+  // Azure
+  Identity: '🆔', Storage: '📦', Network: '🌐', Compute: '💻', Database: '🛢️',
+  'Key Vault': '🔐', Monitor: '📈', 'App Service': '🌍', AKS: '☸️', Policy: '📜',
+  Backup: '💿', Defender: '🛡️', SQL: '🛢️',
+  // GCP
+  'Cloud SQL': '🛢️', GKE: '☸️', 'Cloud Storage': '📦', Logging: '📋', Networking: '🌐',
+  // Generic
+  Pods: '📦', RBAC: '🔑', Namespaces: '📂', 'Network Policies': '🔒',
+}
+
+function getServiceIcon(service: string): string {
+  if (SERVICE_ICONS[service]) return SERVICE_ICONS[service]
+  const lower = service.toLowerCase()
+  for (const [key, icon] of Object.entries(SERVICE_ICONS)) {
+    if (lower.includes(key.toLowerCase())) return icon
+  }
+  return '☁️'
+}
 
 const RISK_COLORS: Record<string, string> = {
   Critical: 'bg-red-600 text-white',
@@ -138,14 +164,22 @@ export default function AccountDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Inventory Summary */}
         <div className="card">
-          <h3 className="text-sm font-semibold text-brand-navy mb-3">Inventory Summary</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-brand-navy">Inventory Summary</h3>
+            <Link href="/darca/inventory" className="text-xs text-brand-green hover:underline flex items-center gap-1">
+              Full inventory <ArrowRightIcon className="w-3 h-3" />
+            </Link>
+          </div>
           {inventory.length === 0 ? (
             <p className="text-sm text-brand-gray-400">No resources discovered yet.</p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {inventory.map((item: any) => (
                 <div key={item.service} className="flex items-center justify-between py-1.5 px-2 bg-brand-gray-50 rounded">
-                  <span className="text-sm text-brand-gray-700 font-medium">{item.service}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{getServiceIcon(item.service)}</span>
+                    <span className="text-sm text-brand-gray-700 font-medium">{item.service}</span>
+                  </div>
                   <span className="text-sm font-bold text-brand-navy">{item.resource_count}</span>
                 </div>
               ))}
@@ -155,18 +189,31 @@ export default function AccountDashboard() {
 
         {/* Applicable Frameworks */}
         <div className="card">
-          <h3 className="text-sm font-semibold text-brand-navy mb-3">Applicable Frameworks</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-brand-navy">Applicable Frameworks</h3>
+            <Link href="/darca/compliance" className="text-xs text-brand-green hover:underline flex items-center gap-1">
+              All frameworks <ArrowRightIcon className="w-3 h-3" />
+            </Link>
+          </div>
           {applicable_frameworks.length === 0 ? (
             <p className="text-sm text-brand-gray-400">No frameworks map to this provider.</p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {applicable_frameworks.map((fw: any) => (
-                <div key={fw.id} className="flex items-center justify-between py-1.5 px-2 bg-brand-gray-50 rounded">
-                  <div>
-                    <span className="text-sm text-brand-gray-700 font-medium">{fw.name}</span>
+                <Link
+                  key={fw.id}
+                  href={`/darca/compliance?framework=${encodeURIComponent(fw.id)}&provider=${encodeURIComponent(provider.provider_type)}`}
+                  className="flex items-center justify-between py-1.5 px-2 bg-brand-gray-50 rounded hover:bg-brand-gray-100 transition-colors group"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs">📋</span>
+                    <span className="text-sm text-brand-gray-700 font-medium group-hover:text-brand-navy">{fw.name}</span>
                   </div>
-                  <span className="text-xs text-brand-gray-400">{fw.total_checks} checks</span>
-                </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-brand-gray-400">{fw.total_checks} checks</span>
+                    <ArrowRightIcon className="w-3 h-3 text-brand-gray-300 group-hover:text-brand-green" />
+                  </div>
+                </Link>
               ))}
             </div>
           )}
@@ -176,13 +223,22 @@ export default function AccountDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Top Findings */}
         <div className="card">
-          <h3 className="text-sm font-semibold text-brand-navy mb-3">Top Failed Findings</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-brand-navy">Top Failed Findings</h3>
+            <Link href={`/darca/findings?status=FAIL&provider_id=${providerId}`} className="text-xs text-brand-green hover:underline flex items-center gap-1">
+              View all <ArrowRightIcon className="w-3 h-3" />
+            </Link>
+          </div>
           {top_findings.length === 0 ? (
             <p className="text-sm text-brand-gray-400">No failed findings.</p>
           ) : (
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {top_findings.map((f: any) => (
-                <div key={f.id} className={`border rounded-lg px-3 py-2 ${SEVERITY_BG[f.severity] || 'bg-gray-50 border-gray-200'}`}>
+                <Link
+                  key={f.id}
+                  href={`/darca/findings?status=FAIL&provider_id=${providerId}&severity=${f.severity}`}
+                  className={`block border rounded-lg px-3 py-2 hover:shadow-sm transition-shadow ${SEVERITY_BG[f.severity] || 'bg-gray-50 border-gray-200'}`}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-brand-gray-700 font-medium truncate">{f.check_title}</p>
@@ -190,7 +246,7 @@ export default function AccountDashboard() {
                     </div>
                     <span className={`text-xs font-bold uppercase ${SEVERITY_COLORS[f.severity]}`}>{f.severity}</span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}

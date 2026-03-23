@@ -16,6 +16,7 @@ import {
   MapIcon,
   ArrowTrendingUpIcon,
   ArrowRightIcon,
+  ServerIcon,
 } from '@heroicons/react/24/outline'
 
 function SecurityScoreRing({ score }: { score: number }) {
@@ -67,6 +68,7 @@ export default function OverviewPage() {
   const [data, setData] = useState<any>(null)
   const [attackSummary, setAttackSummary] = useState<any>(null)
   const [trends, setTrends] = useState<any>(null)
+  const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -74,11 +76,13 @@ export default function OverviewPage() {
       api.getDashboardOverview(),
       api.getAttackPathsSummary().catch(() => null),
       api.getDashboardTrends(30).catch(() => null),
+      api.getProviders().catch(() => []),
     ])
-      .then(([dashData, atkData, trendsData]) => {
+      .then(([dashData, atkData, trendsData, provData]) => {
         setData(dashData)
         setAttackSummary(atkData)
         setTrends(trendsData)
+        setProviders(Array.isArray(provData) ? provData : [])
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -223,16 +227,21 @@ export default function OverviewPage() {
               </Link>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              {['critical', 'high', 'medium', 'low'].map((sev) => {
-                const count = attackSummary.by_severity?.[sev] || 0
+              {[
+                { key: 'critical', field: 'critical_paths' },
+                { key: 'high', field: 'high_paths' },
+                { key: 'medium', field: 'medium_paths' },
+                { key: 'low', field: 'low_paths' },
+              ].map(({ key, field }) => {
+                const count = attackSummary[field] || 0
                 return (
-                  <div key={sev} className="text-center p-4 rounded-xl bg-brand-gray-50 border border-brand-gray-100">
+                  <div key={key} className="text-center p-4 rounded-xl bg-brand-gray-50 border border-brand-gray-100">
                     <p className={`text-3xl font-bold tabular-nums ${
-                      sev === 'critical' ? 'text-severity-critical' :
-                      sev === 'high' ? 'text-severity-high' :
-                      sev === 'medium' ? 'text-severity-medium' : 'text-severity-low'
+                      key === 'critical' ? 'text-severity-critical' :
+                      key === 'high' ? 'text-severity-high' :
+                      key === 'medium' ? 'text-severity-medium' : 'text-severity-low'
                     }`}>{count}</p>
-                    <p className="text-xs text-brand-gray-400 uppercase font-semibold mt-1">{sev}</p>
+                    <p className="text-xs text-brand-gray-400 uppercase font-semibold mt-1">{key}</p>
                   </div>
                 )
               })}
@@ -316,6 +325,54 @@ export default function OverviewPage() {
             <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-severity-high" /> High</span>
             <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-severity-medium" /> Medium</span>
             <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-severity-low" /> Low</span>
+          </div>
+        </div>
+      )}
+
+      {/* Cloud Accounts */}
+      {providers.length > 0 && (
+        <div className="card-static mb-8 animate-fade-in" style={{ animationDelay: '0.42s', opacity: 0 }}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-brand-navy">Cloud Accounts</h3>
+            <Link href="/darca/providers" className="text-xs text-brand-green hover:underline flex items-center gap-1">
+              Manage <ArrowRightIcon className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {providers.map((p: any) => {
+              const providerIcons: Record<string, string> = {
+                aws: '/icons/aws.svg',
+                azure: '/icons/azure.svg',
+                gcp: '/icons/gcp.svg',
+                oci: '/icons/oci.svg',
+                alibaba: '/icons/alibaba.svg',
+                kubernetes: '/icons/k8s.svg',
+              }
+              const providerColors: Record<string, string> = {
+                aws: 'border-l-orange-400',
+                azure: 'border-l-blue-500',
+                gcp: 'border-l-red-400',
+                oci: 'border-l-red-600',
+                alibaba: 'border-l-orange-500',
+                kubernetes: 'border-l-blue-600',
+              }
+              return (
+                <Link
+                  key={p.id}
+                  href={`/darca/providers/${p.id}/dashboard`}
+                  className={`flex items-center gap-3 p-3 rounded-lg bg-brand-gray-50 border border-brand-gray-100 border-l-4 ${providerColors[p.provider_type] || 'border-l-brand-gray-300'} hover:shadow-md hover:bg-white transition-all group`}
+                >
+                  <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-white shadow-sm">
+                    <span className="text-xs font-bold text-brand-navy uppercase">{p.provider_type.slice(0, 3)}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-brand-navy truncate">{p.alias}</p>
+                    <p className="text-xs text-brand-gray-400">{p.provider_type.toUpperCase()}{p.account_id ? ` · ${p.account_id}` : ''}</p>
+                  </div>
+                  <ArrowRightIcon className="w-4 h-4 text-brand-gray-300 group-hover:text-brand-green transition-colors" />
+                </Link>
+              )
+            })}
           </div>
         </div>
       )}

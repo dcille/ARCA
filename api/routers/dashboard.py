@@ -247,9 +247,16 @@ async def account_dashboard(
 
     # ── MITRE ATT&CK Summary ────────────────────────────────────
     from scanner.mitre.attack_mapping import MITRE_TECHNIQUES, CHECK_TO_MITRE
+    # Use ALL failed findings for MITRE mapping, not just top 10
+    all_failed_q = (
+        select(Finding.check_id)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id, Finding.provider_id == provider_id, Finding.status == "FAIL")
+    )
+    all_failed_rows = (await db.execute(all_failed_q)).all()
     mitre_hits: dict[str, int] = {}
-    for f in top_findings_rows:
-        for tid in CHECK_TO_MITRE.get(f.check_id, []):
+    for (check_id,) in all_failed_rows:
+        for tid in CHECK_TO_MITRE.get(check_id, []):
             mitre_hits[tid] = mitre_hits.get(tid, 0) + 1
 
     mitre_summary = [

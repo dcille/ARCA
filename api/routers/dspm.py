@@ -38,16 +38,32 @@ async def dspm_overview(
         for store in provider_stores:
             data_services.add(store["service"])
 
-    # Count findings by data service
+    # Map scanner service names to DSPM data store service names
+    _SERVICE_ALIAS = {
+        "s3": ["s3"], "rds": ["rds"], "dynamodb": ["dynamodb"],
+        "redshift": ["redshift"], "efs": ["efs"], "elasticache": ["elasticache"],
+        "secretsmanager": ["secretsmanager", "secrets_manager"],
+        "elasticsearch": ["elasticsearch", "opensearch"],
+        "azure_blob": ["storage", "azure_blob"], "azure_sql": ["sql", "azure_sql", "database"],
+        "cosmosdb": ["cosmosdb", "cosmos"], "azure_files": ["azure_files"],
+        "keyvault": ["keyvault", "key_vault", "key vault"],
+        "gcs": ["gcs", "cloud_storage", "cloud storage", "storage"],
+        "cloudsql": ["cloudsql", "cloud_sql", "cloud sql"],
+        "bigquery": ["bigquery"], "firestore": ["firestore"],
+        "secretmanager": ["secretmanager", "secret_manager"],
+    }
+
+    # Count findings by data service (including aliases)
     findings_q = await db.execute(
-        select(Finding.service, Finding.status, func.count(Finding.id))
+        select(Finding.service, Finding.status, Finding.check_id, func.count(Finding.id))
         .join(Scan, Finding.scan_id == Scan.id)
         .where(Scan.user_id == current_user.id)
-        .group_by(Finding.service, Finding.status)
+        .group_by(Finding.service, Finding.status, Finding.check_id)
     )
     service_findings: dict[str, dict] = {}
-    for service, status, count in findings_q.all():
+    for service, status, check_id, count in findings_q.all():
         svc_lower = service.lower()
+        # Direct match
         if svc_lower not in service_findings:
             service_findings[svc_lower] = {"pass": 0, "fail": 0, "total": 0}
         if status == "PASS":
@@ -55,6 +71,17 @@ async def dspm_overview(
         else:
             service_findings[svc_lower]["fail"] += count
         service_findings[svc_lower]["total"] += count
+
+        # Also map to DSPM service aliases
+        for dspm_svc, aliases in _SERVICE_ALIAS.items():
+            if svc_lower in aliases and dspm_svc != svc_lower:
+                if dspm_svc not in service_findings:
+                    service_findings[dspm_svc] = {"pass": 0, "fail": 0, "total": 0}
+                if status == "PASS":
+                    service_findings[dspm_svc]["pass"] += count
+                else:
+                    service_findings[dspm_svc]["fail"] += count
+                service_findings[dspm_svc]["total"] += count
 
     # Build data store inventory across all providers
     data_inventory = []

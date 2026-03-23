@@ -200,6 +200,376 @@ FRAMEWORKS = {
         ],
     },
 
+    "CIS-Azure-4.0": {
+        "name": "CIS Microsoft Azure Foundations Benchmark v4.0",
+        "description": "CIS Benchmark v4.0 for Microsoft Azure covering Identity, Networking, Compute, Security, Storage, Management, and Analytics services",
+        "category": "cis",
+        "controls": [
+            # ── 2: Analytics Services ─────────────────────────────────────
+            {
+                "id": "2.1.1",
+                "title": "Ensure Azure Databricks is deployed in a customer-managed VNet",
+                "description": "Use private endpoints and customer-managed VNet injection for Azure Databricks workspaces.",
+                "checks": {"azure": ["azure_private_endpoints_used"]},
+            },
+            # ── 3: Compute Services ──────────────────────────────────────
+            {
+                "id": "3.1.1",
+                "title": "Ensure only MFA enabled identities can access privileged Virtual Machines",
+                "description": "Virtual Machines with administrative access should require MFA-enabled identities.",
+                "checks": {"azure": ["azure_iam_mfa_enabled_all_users"]},
+            },
+            # ── 5.1: Security Defaults (Per-User MFA) ───────────────────
+            {
+                "id": "5.1.1",
+                "title": "Ensure security defaults is enabled in Microsoft Entra ID",
+                "description": "Enable security defaults to provide baseline identity protection including MFA enrollment.",
+                "checks": {"azure": ["azure_iam_mfa_enabled_all_users"]},
+            },
+            # ── 5.2: Conditional Access ──────────────────────────────────
+            {
+                "id": "5.2.1",
+                "title": "Ensure trusted locations are defined",
+                "description": "Define trusted locations for conditional access policies to limit access from known networks.",
+                "checks": {"azure": []},
+            },
+            # ── 5.3: Periodic Identity Reviews ──────────────────────────
+            {
+                "id": "5.3.1",
+                "title": "Ensure Azure admin accounts are not used for daily operations",
+                "description": "Restrict admin accounts to administrative tasks only, using separate accounts for daily work.",
+                "checks": {"azure": ["azure_iam_owner_count"]},
+            },
+            # ── 5.4–5.28: Identity Services ─────────────────────────────
+            {
+                "id": "5.4",
+                "title": "Ensure that 'Restrict non-admin users from creating tenants' is set to 'Yes'",
+                "description": "Require administrators or delegated users to create new tenants.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.5",
+                "title": "Ensure that 'Number of methods required to reset' is set to '2'",
+                "description": "Require two forms of identification for self-service password reset.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.6",
+                "title": "Ensure that account 'Lockout threshold' is less than or equal to '10'",
+                "description": "Protect against brute-force attacks by limiting failed login attempts.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.7",
+                "title": "Ensure that account 'Lockout duration in seconds' is >= 60",
+                "description": "Set lockout duration to at least 60 seconds to reduce brute-force effectiveness.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.8",
+                "title": "Ensure that a 'Custom banned password list' is set to 'Enforce'",
+                "description": "Configure custom banned password list for enhanced password security.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.9",
+                "title": "Ensure 'Number of days before users re-confirm auth info' is not 0",
+                "description": "Require periodic re-confirmation of authentication information.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.10",
+                "title": "Ensure 'Notify users on password resets?' is set to 'Yes'",
+                "description": "Notify users on password resets for proactive security confirmation.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.11",
+                "title": "Ensure 'Notify all admins when other admins reset their password?' is 'Yes'",
+                "description": "Notify all Global Administrators of password reset activity by other admins.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.12",
+                "title": "Ensure 'User consent for applications' is set to 'Do not allow user consent'",
+                "description": "Require administrators to provide consent for third-party applications.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.13",
+                "title": "Ensure 'User consent for applications' allows only verified publishers",
+                "description": "Allow user consent only for apps from verified publishers with selected permissions.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.14",
+                "title": "Ensure that 'Users can register applications' is set to 'No'",
+                "description": "Restrict application registration to administrators only.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.15",
+                "title": "Ensure guest user access is restricted to own directory objects",
+                "description": "Limit guest user permissions to properties and memberships of their own directory objects.",
+                "checks": {"azure": ["azure_iam_guest_users_reviewed"]},
+            },
+            {
+                "id": "5.16",
+                "title": "Ensure guest invite restrictions are set to specific admin roles or no one",
+                "description": "Restrict invitations to users with specific admin roles or disable entirely.",
+                "checks": {"azure": ["azure_iam_guest_users_reviewed"]},
+            },
+            {
+                "id": "5.17",
+                "title": "Ensure 'Restrict access to Microsoft Entra admin center' is 'Yes'",
+                "description": "Restrict access to the Microsoft Entra ID administration center to administrators only.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.18",
+                "title": "Ensure 'Restrict user ability to access groups features in My Groups' is 'Yes'",
+                "description": "Restrict access to group web interface in the Access Panel portal.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.19",
+                "title": "Ensure 'Users can create security groups' is set to 'No'",
+                "description": "Restrict security group creation to administrators only.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.20",
+                "title": "Ensure 'Owners can manage group membership requests in My Groups' is 'No'",
+                "description": "Restrict security group management to administrators only.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.21",
+                "title": "Ensure 'Users can create Microsoft 365 groups' is set to 'No'",
+                "description": "Restrict Microsoft 365 group creation to administrators only.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.22",
+                "title": "Ensure MFA is required to register or join devices with Microsoft Entra",
+                "description": "Require multi-factor authentication when adding devices to Microsoft Entra ID.",
+                "checks": {"azure": ["azure_iam_mfa_enabled_all_users"]},
+            },
+            {
+                "id": "5.23",
+                "title": "Ensure no custom subscription administrator roles exist",
+                "description": "Follow least privilege and avoid custom roles with full administrative access.",
+                "checks": {"azure": ["azure_iam_no_custom_owner_roles"]},
+            },
+            {
+                "id": "5.24",
+                "title": "Ensure a custom role is assigned for administering resource locks",
+                "description": "Create a dedicated resource lock administrator role for managing locks.",
+                "checks": {"azure": ["azure_resource_locks_configured"]},
+            },
+            {
+                "id": "5.25",
+                "title": "Ensure Subscription leaving/entering Microsoft Entra tenant is 'Permit no one'",
+                "description": "Restrict permissions to move subscriptions in and out of Microsoft Entra tenants.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "5.26",
+                "title": "Ensure fewer than 5 users have global administrator assignment",
+                "description": "Maintain 2-4 Global Administrators for redundancy without excessive privileged access.",
+                "checks": {"azure": ["azure_iam_owner_count"]},
+            },
+            {
+                "id": "5.27",
+                "title": "Ensure there are between 2 and 3 subscription owners",
+                "description": "Limit Owner role assignments to between 2 and 3 per subscription.",
+                "checks": {"azure": ["azure_iam_owner_count", "azure_iam_contributor_count"]},
+            },
+            {
+                "id": "5.28",
+                "title": "Ensure passwordless authentication methods are considered",
+                "description": "Implement passwordless authentication (FIDO2, Windows Hello, Authenticator) for improved security.",
+                "checks": {"azure": []},
+            },
+            # ── 6: Management and Governance Services ────────────────────
+            {
+                "id": "6.1.1",
+                "title": "Ensure a Diagnostic Setting exists for Subscription Activity Logs",
+                "description": "Enable diagnostic settings for subscription activity logs with appropriate retention.",
+                "checks": {"azure": ["azure_monitor_diagnostic_settings", "azure_monitor_log_profile", "azure_monitor_log_retention_365"]},
+            },
+            {
+                "id": "6.2",
+                "title": "Ensure Resource Locks are set for mission-critical Azure resources",
+                "description": "Apply CanNotDelete or ReadOnly locks to protect critical resources from accidental changes.",
+                "checks": {"azure": ["azure_resource_locks_configured"]},
+            },
+            # ── 7: Networking Services ───────────────────────────────────
+            {
+                "id": "7.1",
+                "title": "Ensure RDP access from the Internet is evaluated and restricted",
+                "description": "Network security groups should restrict RDP (port 3389) from internet access.",
+                "checks": {"azure": ["azure_nsg_unrestricted_port_3389"]},
+            },
+            {
+                "id": "7.2",
+                "title": "Ensure SSH access from the Internet is evaluated and restricted",
+                "description": "Network security groups should restrict SSH (port 22) from internet access.",
+                "checks": {"azure": ["azure_nsg_unrestricted_port_22"]},
+            },
+            {
+                "id": "7.3",
+                "title": "Ensure UDP access from the Internet is evaluated and restricted",
+                "description": "Restrict UDP services (DNS, NTP, SNMP) from internet exposure to prevent DDoS amplification.",
+                "checks": {"azure": ["azure_nsg_default_deny_inbound"]},
+            },
+            {
+                "id": "7.4",
+                "title": "Ensure HTTP(S) access from the Internet is evaluated and restricted",
+                "description": "Restrict HTTP/HTTPS access from the internet to necessary resources only.",
+                "checks": {"azure": ["azure_nsg_default_deny_inbound"]},
+            },
+            {
+                "id": "7.5",
+                "title": "Ensure NSG flow log retention is >= 90 days",
+                "description": "Network security group flow logs should be retained for at least 90 days.",
+                "checks": {"azure": ["azure_nsg_flow_logs_enabled"]},
+            },
+            {
+                "id": "7.6",
+                "title": "Ensure Network Watcher is enabled for Azure regions in use",
+                "description": "Enable Network Watcher for all physical regions in Azure subscriptions.",
+                "checks": {"azure": ["azure_network_watcher_enabled"]},
+            },
+            {
+                "id": "7.7",
+                "title": "Ensure Public IP addresses are evaluated periodically",
+                "description": "Review all public IP addresses for necessity and ensure additional controls exist.",
+                "checks": {"azure": ["azure_vm_no_public_ip"]},
+            },
+            {
+                "id": "7.8",
+                "title": "Ensure virtual network flow log retention is >= 90 days",
+                "description": "Virtual network flow logs should be retained for at least 90 days.",
+                "checks": {"azure": ["azure_nsg_flow_logs_enabled"]},
+            },
+            {
+                "id": "7.9",
+                "title": "Ensure VPN Gateway uses Azure Active Directory authentication only",
+                "description": "Enable only Microsoft Entra ID authentication for VPN Gateway point-to-site.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "7.10",
+                "title": "Ensure Azure WAF is enabled on Azure Application Gateway",
+                "description": "Enable Web Application Firewall to protect applications from common exploits.",
+                "checks": {"azure": ["azure_appgw_waf_enabled"]},
+            },
+            {
+                "id": "7.11",
+                "title": "Ensure subnets are associated with network security groups",
+                "description": "Protect subnet resources by associating them with network security groups.",
+                "checks": {"azure": ["azure_subnet_has_nsg"]},
+            },
+            {
+                "id": "7.12",
+                "title": "Ensure SSL policy min protocol is TLSv1_2 or higher on Application Gateway",
+                "description": "Application gateways should use TLS 1.2 or higher for secure connections.",
+                "checks": {"azure": ["azure_appservice_tls_12"]},
+            },
+            {
+                "id": "7.13",
+                "title": "Ensure HTTP2 is enabled on Azure Application Gateway",
+                "description": "Enable HTTP/2 for improved performance and modern encrypted connections.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "7.14",
+                "title": "Ensure request body inspection is enabled in WAF policy",
+                "description": "Enable request body inspection to detect SQL injection and XSS in HTTP bodies.",
+                "checks": {"azure": ["azure_appgw_waf_enabled"]},
+            },
+            {
+                "id": "7.15",
+                "title": "Ensure bot protection is enabled in WAF policy on Application Gateway",
+                "description": "Enable bot protection to block requests from known malicious IP addresses.",
+                "checks": {"azure": ["azure_appgw_waf_enabled"]},
+            },
+            {
+                "id": "7.16",
+                "title": "Ensure Azure Network Security Perimeter is used for PaaS resources",
+                "description": "Use Network Security Perimeter to create logical boundaries around PaaS resources.",
+                "checks": {"azure": ["azure_private_endpoints_used"]},
+            },
+            # ── 8: Security Services ────────────────────────────────────
+            {
+                "id": "8.1.1",
+                "title": "Ensure Microsoft Defender CSPM is set to 'On'",
+                "description": "Enable Microsoft Defender for Cloud Security Posture Management.",
+                "checks": {"azure": [
+                    "azure_defender_vm", "azure_defender_sql", "azure_defender_appservice",
+                    "azure_defender_storage", "azure_defender_keyvault", "azure_defender_kubernetes",
+                    "azure_defender_containers", "azure_defender_arm", "azure_defender_dns",
+                ]},
+            },
+            {
+                "id": "8.2.1",
+                "title": "Ensure Microsoft Defender for IoT Hub is set to 'On'",
+                "description": "Enable Microsoft Defender for IoT Hub for IoT device security monitoring.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "8.3.1",
+                "title": "Ensure expiration date is set for all keys in RBAC Key Vaults",
+                "description": "Key Vault keys should have configured expiration dates for security rotation.",
+                "checks": {"azure": ["azure_keyvault_key_expiration"]},
+            },
+            {
+                "id": "8.3.2",
+                "title": "Ensure expiration date is set for all secrets in RBAC Key Vaults",
+                "description": "Key Vault secrets should have configured expiration dates.",
+                "checks": {"azure": ["azure_keyvault_secret_expiration"]},
+            },
+            {
+                "id": "8.3.3",
+                "title": "Ensure Key Vault certificates have maximum validity of 12 months",
+                "description": "Limit certificate validity to 12 months to ensure timely renewal.",
+                "checks": {"azure": ["azure_keyvault_key_expiration"]},
+            },
+            {
+                "id": "8.4.1",
+                "title": "Ensure an Azure Bastion Host exists",
+                "description": "Deploy Azure Bastion for secure RDP/SSH access without exposing ports to the internet.",
+                "checks": {"azure": []},
+            },
+            {
+                "id": "8.5",
+                "title": "Ensure Azure DDoS Network Protection is enabled on virtual networks",
+                "description": "Enable DDoS Network Protection to defend virtual network resources against DDoS attacks.",
+                "checks": {"azure": ["azure_public_ip_ddos_protection"]},
+            },
+            # ── 9: Storage Services ─────────────────────────────────────
+            {
+                "id": "9.1.1",
+                "title": "Ensure soft delete for Azure File Shares is enabled",
+                "description": "Enable soft delete for Azure File Shares to protect against accidental deletion.",
+                "checks": {"azure": ["azure_storage_soft_delete_blobs"]},
+            },
+            {
+                "id": "9.2.1",
+                "title": "Ensure soft delete for Azure Blob Storage is enabled",
+                "description": "Enable soft delete for Blob Storage to allow recovery of deleted data.",
+                "checks": {"azure": ["azure_storage_soft_delete_blobs"]},
+            },
+            {
+                "id": "9.3.1",
+                "title": "Ensure key rotation reminders are enabled for Storage Accounts",
+                "description": "Enable key rotation reminders to ensure storage account keys are rotated regularly.",
+                "checks": {"azure": ["azure_storage_cmk_encryption"]},
+            },
+        ],
+    },
+
     "CIS-GCP-2.0": {
         "name": "CIS Google Cloud Platform Foundation Benchmark v2.0",
         "description": "Center for Internet Security best-practice security configuration for Google Cloud Platform",
