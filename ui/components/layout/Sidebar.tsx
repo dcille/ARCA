@@ -33,6 +33,7 @@ const navigation = [
   { name: 'Inventory', href: '/darca/inventory', icon: CubeIcon },
   { name: 'Scans', href: '/darca/scans', icon: ShieldCheckIcon },
   { name: 'Cloud Providers', href: '/darca/providers', icon: CloudIcon },
+  { name: 'Data Security', href: '/darca/dspm', icon: ServerStackIcon },
   { name: 'SaaS Security', href: '/darca/saas-security', icon: GlobeAltIcon },
   { name: 'Reports', href: '/darca/reports', icon: DocumentArrowDownIcon },
   { name: 'Integrations', href: '/darca/integrations', icon: BoltIcon },

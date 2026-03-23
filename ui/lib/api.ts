@@ -401,6 +401,21 @@ class ApiClient {
     })
   }
 
+  // DSPM
+  async getDSPMOverview() {
+    return this.request<any>('GET', '/api/v1/dspm/overview')
+  }
+
+  async getDSPMChecks(providerType?: string) {
+    const params = providerType ? { provider_type: providerType } : undefined
+    return this.request<any[]>('GET', '/api/v1/dspm/checks', undefined, { params })
+  }
+
+  async getDSPMDataStores(providerType?: string) {
+    const params = providerType ? { provider_type: providerType } : undefined
+    return this.request<any[]>('GET', '/api/v1/dspm/data-stores', undefined, { params })
+  }
+
   // MITRE ATT&CK
   async getMitreMatrix(params?: Record<string, string>) {
     return this.request<any>('GET', '/api/v1/mitre/matrix', undefined, { params })
