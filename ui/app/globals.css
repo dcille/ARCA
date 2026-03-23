@@ -11,6 +11,8 @@
   --brand-teal: #00A3E0;
   --brand-black: #000000;
   --brand-white: #FFFFFF;
+  --sidebar-width: 16rem;
+  --sidebar-collapsed-width: 4.5rem;
 }
 
 body {
@@ -27,19 +29,25 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply bg-brand-green hover:bg-brand-green-dark text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-brand-green hover:bg-brand-green-dark text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 active:scale-[0.98];
   }
   .btn-secondary {
-    @apply bg-brand-navy hover:bg-brand-navy-dark text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-brand-navy hover:bg-brand-navy-dark text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 active:scale-[0.98];
   }
   .btn-outline {
-    @apply border-2 border-brand-green text-brand-green hover:bg-brand-green hover:text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply border-2 border-brand-green text-brand-green hover:bg-brand-green hover:text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 active:scale-[0.98];
+  }
+  .btn-ghost {
+    @apply text-brand-gray-500 hover:text-brand-gray-700 hover:bg-brand-gray-100 font-medium py-2 px-4 rounded-lg transition-all duration-200;
   }
   .card {
+    @apply bg-white rounded-xl shadow-sm border border-brand-gray-200 p-6 transition-shadow duration-200 hover:shadow-md;
+  }
+  .card-static {
     @apply bg-white rounded-xl shadow-sm border border-brand-gray-200 p-6;
   }
   .sidebar-link {
-    @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200;
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200;
   }
   .sidebar-link-active {
     @apply bg-brand-green/10 text-brand-green;
@@ -50,4 +58,93 @@ body {
   .severity-badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
+  .input-field {
+    @apply px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green/40 focus:border-brand-green outline-none transition-all duration-200 bg-white;
+  }
+  .select-field {
+    @apply px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green/40 focus:border-brand-green outline-none transition-all duration-200 bg-white appearance-none cursor-pointer;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
+.animate-slide-in-up {
+  animation: slideInUp 0.4s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out forwards;
+}
+
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.20s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.30s; }
+
+/* Scrollbar styling */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+/* Skeleton shimmer */
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Modal backdrop blur */
+.modal-backdrop {
+  @apply fixed inset-0 z-50 flex items-center justify-center;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
 }

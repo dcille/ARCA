@@ -215,7 +215,7 @@ export default function CompliancePage() {
 
   return (
     <div>
-      <Header title="Compliance" subtitle="Compliance framework assessment results" />
+      <Header title="Compliance" subtitle="Compliance framework assessment results" breadcrumbs={[{ label: 'Posture', href: '/darca/overview' }, { label: 'Compliance' }]} />
 
       {/* Account / Provider Filter Bar */}
       {!loading && (

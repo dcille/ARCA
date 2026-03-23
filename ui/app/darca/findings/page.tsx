@@ -105,8 +105,8 @@ function ActionModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6">
+    <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 animate-scale-in">
         <h3 className="text-lg font-semibold text-brand-navy mb-1">
           {type === 'exception' ? 'Create Exception' : 'Mark as Remediated'}
         </h3>
@@ -123,7 +123,7 @@ function ActionModal({
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           rows={4}
-          className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none mb-3"
+          className="w-full input-field mb-3"
           placeholder={
             type === 'exception'
               ? 'e.g., This resource is in a development environment with no production data...'
@@ -419,14 +419,18 @@ export default function FindingsPage() {
 
   return (
     <div>
-      <Header title="Cloud Findings" subtitle="Security findings from cloud provider scans" />
+      <Header
+        title="Cloud Findings"
+        subtitle="Security findings from cloud provider scans"
+        breadcrumbs={[{ label: 'Findings' }]}
+      />
 
       {/* Filters */}
-      <div className="flex gap-4 mb-6">
+      <div className="flex flex-wrap gap-3 mb-6">
         <select
           value={filters.severity}
           onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
-          className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+          className="select-field"
         >
           <option value="">All Severities</option>
           <option value="critical">Critical</option>
@@ -439,7 +443,7 @@ export default function FindingsPage() {
         <select
           value={filters.status}
           onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-          className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+          className="select-field"
         >
           <option value="">All Statuses</option>
           <option value="PASS">PASS</option>
@@ -451,7 +455,7 @@ export default function FindingsPage() {
           placeholder="Filter by service..."
           value={filters.service}
           onChange={(e) => setFilters({ ...filters, service: e.target.value })}
-          className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none"
+          className="input-field w-48"
         />
       </div>
 

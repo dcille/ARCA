@@ -504,7 +504,7 @@ export default function ProvidersPage() {
 
       {/* Add Provider Wizard */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-backdrop">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             {/* Wizard progress */}
             <div className="flex items-center gap-2 mb-6">
@@ -750,7 +750,7 @@ export default function ProvidersPage() {
 
       {/* Edit Provider Modal */}
       {showEditModal && editingProvider && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-backdrop">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold text-brand-navy mb-1">Edit Provider</h3>
             <p className="text-xs text-brand-gray-400 mb-4">
@@ -880,7 +880,7 @@ export default function ProvidersPage() {
 
       {/* Discover Accounts Modal */}
       {showDiscoverModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-backdrop">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold text-brand-navy mb-2">Discovered Accounts</h3>
             <p className="text-sm text-brand-gray-400 mb-4">

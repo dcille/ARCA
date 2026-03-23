@@ -188,6 +188,7 @@ export default function MitreAttackPage() {
       <Header
         title="MITRE ATT&CK Matrix"
         subtitle="Cloud security posture mapped to MITRE ATT&CK framework techniques"
+        breadcrumbs={[{ label: 'Posture', href: '/darca/overview' }, { label: 'MITRE ATT&CK' }]}
       />
 
       {/* Controls Bar */}
@@ -201,7 +202,7 @@ export default function MitreAttackPage() {
             <select
               value={selectedProvider}
               onChange={(e) => handleProviderChange(e.target.value)}
-              className="px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green outline-none min-w-[180px]"
+              className="select-field min-w-[180px]"
             >
               <option value="">All Providers</option>
               {providers.map((p) => (

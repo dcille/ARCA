@@ -156,7 +156,7 @@ export default function IntegrationsPage() {
 
       {/* Create Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-backdrop">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg">
             <h3 className="text-lg font-semibold text-brand-navy mb-4">Add Integration</h3>
             <div className="space-y-4">

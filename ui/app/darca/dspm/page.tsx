@@ -54,7 +54,7 @@ export default function DSPMPage() {
   if (loading) {
     return (
       <div>
-        <Header title="Data Security (DSPM)" subtitle="Data Security Posture Management" />
+        <Header title="Data Security (DSPM)" subtitle="Data Security Posture Management" breadcrumbs={[{ label: 'Assets', href: '/darca/inventory' }, { label: 'Data Security' }]} />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="card animate-pulse"><div className="h-20 bg-brand-gray-100 rounded" /></div>
@@ -70,7 +70,7 @@ export default function DSPMPage() {
 
   return (
     <div>
-      <Header title="Data Security (DSPM)" subtitle="Data Security Posture Management — data store inventory, classification, and risk" />
+      <Header title="Data Security (DSPM)" subtitle="Data Security Posture Management — data store inventory, classification, and risk" breadcrumbs={[{ label: 'Assets', href: '/darca/inventory' }, { label: 'Data Security' }]} />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
