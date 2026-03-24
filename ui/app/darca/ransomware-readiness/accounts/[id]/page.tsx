@@ -106,7 +106,7 @@ export default function AccountDetailPage() {
                 href={`/darca/ransomware-readiness/findings/${f.id}`}
                 className="flex items-center gap-3 px-6 py-3 hover:bg-brand-gray-50 transition-colors"
               >
-                <Badge severity={f.severity} />
+                <Badge type="severity" value={f.severity} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-brand-navy">{f.rule_id}: {f.rule_name}</p>
                   <p className="text-xs text-brand-gray-400">{f.domain} &middot; {f.failed_resources} affected</p>
