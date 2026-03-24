@@ -527,27 +527,35 @@ D-ARCA maps security checks to compliance frameworks at the **control level** â€
 
 ### CIS Benchmarks
 
-| Framework          | Full Name                                                      | Controls | Cloud     |
-|--------------------|----------------------------------------------------------------|----------|-----------|
-| CIS-AWS-1.5        | CIS Amazon Web Services Foundations Benchmark v1.5             | 30       | AWS       |
-| CIS-Azure-2.0      | CIS Microsoft Azure Foundations Benchmark v2.0                 | 20       | Azure     |
-| CIS-GCP-2.0        | CIS Google Cloud Platform Foundation Benchmark v2.0            | 15       | GCP       |
-| CIS-OCI-2.0        | CIS Oracle Cloud Infrastructure Foundations Benchmark v2.0     | 35       | OCI       |
-| CIS-OCI-3.1        | CIS Oracle Cloud Infrastructure Foundations Benchmark v3.1.0   | 50       | OCI       |
-| CIS-Alibaba-1.0    | CIS Alibaba Cloud Foundation Benchmark v1.0                    | 8        | Alibaba   |
-| CIS-Alibaba-2.0    | CIS Alibaba Cloud Foundation Benchmark v2.0.0                  | 85       | Alibaba   |
+| Framework          | Full Name                                                      | Controls | Platform      |
+|--------------------|----------------------------------------------------------------|----------|---------------|
+| CIS-AWS-1.5        | CIS Amazon Web Services Foundations Benchmark v1.5             | 11       | AWS           |
+| CIS-AWS-3.0        | CIS Amazon Web Services Foundations Benchmark v3.0             | 32       | AWS           |
+| CIS-AWS-6.0        | CIS Amazon Web Services Foundations Benchmark v6.0             | 56       | AWS           |
+| CIS-Azure-2.0      | CIS Microsoft Azure Foundations Benchmark v2.0                 | 12       | Azure         |
+| CIS-Azure-4.0      | CIS Microsoft Azure Foundations Benchmark v4.0                 | 58       | Azure         |
+| CIS-GCP-2.0        | CIS Google Cloud Platform Foundation Benchmark v2.0            | 6        | GCP           |
+| CIS-GCP-3.0        | CIS Google Cloud Platform Foundation Benchmark v3.0            | 64       | GCP           |
+| CIS-OCI-2.0        | CIS Oracle Cloud Infrastructure Foundations Benchmark v2.0     | 9        | OCI           |
+| CIS-OCI-3.1        | CIS Oracle Cloud Infrastructure Foundations Benchmark v3.1.0   | 50       | OCI           |
+| CIS-Alibaba-1.0    | CIS Alibaba Cloud Foundation Benchmark v1.0                    | 8        | Alibaba       |
+| CIS-Alibaba-2.0    | CIS Alibaba Cloud Foundation Benchmark v2.0.0                  | 85       | Alibaba       |
+| CIS-K8s-1.8        | CIS Kubernetes Benchmark v1.8                                  | 14       | Kubernetes    |
+| CIS-M365-3.0       | CIS Microsoft 365 Foundations Benchmark v3.0                   | 21       | Microsoft 365 |
 
 ### Regulatory & Industry Frameworks
 
-| Framework       | Full Name                                              | Controls | Scope           |
-|-----------------|--------------------------------------------------------|----------|-----------------|
-| PCI-DSS-3.2.1   | Payment Card Industry Data Security Standard v3.2.1    | 12       | Multi-cloud     |
-| HIPAA           | HIPAA Security Rule                                    | 9        | Multi-cloud     |
-| SOC2            | SOC 2 Type II (Trust Service Criteria)                 | 9        | Multi-cloud     |
-| GDPR            | General Data Protection Regulation                     | 7        | Multi-cloud     |
-| NIST-800-53     | NIST SP 800-53 Rev. 5                                  | 15       | Multi-cloud     |
-| NIST-CSF        | NIST Cybersecurity Framework                           | 5        | Multi-cloud     |
-| ISO-27001       | ISO/IEC 27001:2022 Annex A                             | 14       | Multi-cloud     |
+| Framework        | Full Name                                              | Controls | Scope           |
+|------------------|--------------------------------------------------------|----------|-----------------|
+| PCI-DSS-3.2.1    | Payment Card Industry Data Security Standard v3.2.1    | 9        | Multi-cloud     |
+| HIPAA            | HIPAA Security Rule                                    | 4        | Multi-cloud     |
+| SOC2             | SOC 2 Type II (Trust Service Criteria)                 | 5        | Multi-cloud     |
+| GDPR             | General Data Protection Regulation                     | 4        | Multi-cloud     |
+| NIST-800-53      | NIST SP 800-53 Rev. 5                                  | 7        | Multi-cloud     |
+| NIST-CSF         | NIST Cybersecurity Framework v1.1                      | 6        | Multi-cloud     |
+| ISO-27001        | ISO/IEC 27001:2022 Annex A                             | 6        | Multi-cloud     |
+| MCSB-Azure-1.0   | Microsoft Cloud Security Benchmark (MCSB) v2 - Azure  | 84       | Azure           |
+| CCM-4.1          | CSA Cloud Controls Matrix v4.1                         | 207      | Multi-cloud     |
 
 ---
 
