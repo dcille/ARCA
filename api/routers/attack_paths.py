@@ -1,5 +1,7 @@
 """Attack Paths router."""
 import json
+import uuid as uuid_mod
+from collections import Counter
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -83,7 +85,7 @@ async def analyze_attack_paths(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Run attack path analysis on existing findings."""
+    """Run attack path analysis on existing findings. Preserves history via analysis_run_id."""
     query = (
         select(Finding)
         .join(Scan, Finding.scan_id == Scan.id)
@@ -118,13 +120,10 @@ async def analyze_attack_paths(
     analyzer = AttackPathAnalyzer(findings_dicts)
     paths = analyzer.analyze()
 
-    # Clear old paths for this user (optionally scoped to scan)
-    delete_q = delete(AttackPath).where(AttackPath.user_id == current_user.id)
-    if scan_id:
-        delete_q = delete_q.where(AttackPath.scan_id == scan_id)
-    await db.execute(delete_q)
+    # Generate a unique run_id for this analysis (keeps history)
+    run_id = str(uuid_mod.uuid4())
 
-    # Save new paths
+    # Save new paths with run_id
     for p in paths:
         graph_data = {
             "nodes": [
@@ -152,6 +151,7 @@ async def analyze_attack_paths(
         db_path = AttackPath(
             user_id=current_user.id,
             scan_id=scan_id,
+            analysis_run_id=run_id,
             title=p.title,
             description=p.description,
             severity=p.severity,
@@ -174,6 +174,218 @@ async def analyze_attack_paths(
         "message": f"Analysis complete. {len(paths)} attack path(s) discovered.",
         "paths_discovered": len(paths),
         "findings_analyzed": len(findings_dicts),
+        "analysis_run_id": run_id,
+    }
+
+
+@router.get("/runs")
+async def list_analysis_runs(
+    limit: int = Query(default=20, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all analysis runs with summary stats."""
+    query = (
+        select(
+            AttackPath.analysis_run_id,
+            func.count(AttackPath.id).label("total_paths"),
+            func.avg(AttackPath.risk_score).label("avg_risk"),
+            func.min(AttackPath.created_at).label("created_at"),
+            func.count(func.nullif(AttackPath.severity != "critical", True)).label("critical_count"),
+            func.count(func.nullif(AttackPath.severity != "high", True)).label("high_count"),
+        )
+        .where(AttackPath.user_id == current_user.id)
+        .where(AttackPath.analysis_run_id.isnot(None))
+        .group_by(AttackPath.analysis_run_id)
+        .order_by(func.min(AttackPath.created_at).desc())
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    rows = result.all()
+
+    return [
+        {
+            "analysis_run_id": row.analysis_run_id,
+            "total_paths": row.total_paths,
+            "avg_risk_score": round(float(row.avg_risk or 0), 1),
+            "critical_paths": row.critical_count,
+            "high_paths": row.high_count,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
+        for row in rows
+    ]
+
+
+@router.get("/choke-points")
+async def get_choke_points(
+    analysis_run_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get the top nodes that appear most frequently across attack paths (choke points)."""
+    query = select(AttackPath).where(AttackPath.user_id == current_user.id)
+    if analysis_run_id:
+        query = query.where(AttackPath.analysis_run_id == analysis_run_id)
+    else:
+        # Get the latest run
+        sub = (
+            select(AttackPath.analysis_run_id)
+            .where(AttackPath.user_id == current_user.id)
+            .where(AttackPath.analysis_run_id.isnot(None))
+            .order_by(AttackPath.created_at.desc())
+            .limit(1)
+        )
+        sub_result = await db.execute(sub)
+        latest_run = sub_result.scalar_one_or_none()
+        if latest_run:
+            query = query.where(AttackPath.analysis_run_id == latest_run)
+
+    result = await db.execute(query)
+    paths = result.scalars().all()
+
+    if not paths:
+        return {"choke_points": [], "total_paths_analyzed": 0}
+
+    # Count node appearances across all paths
+    node_appearances: Counter = Counter()
+    node_info: dict[str, dict] = {}
+    node_connections: Counter = Counter()
+
+    for p in paths:
+        graph = None
+        try:
+            graph = json.loads(p.graph_data) if p.graph_data else None
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not graph:
+            continue
+
+        nodes = graph.get("nodes", [])
+        edges = graph.get("edges", [])
+        node_ids_in_path = {n["id"] for n in nodes}
+
+        for n in nodes:
+            nid = n["id"]
+            node_appearances[nid] += 1
+            if nid not in node_info:
+                node_info[nid] = {
+                    "id": nid,
+                    "label": n.get("label", ""),
+                    "node_type": n.get("node_type", ""),
+                    "service": n.get("service", ""),
+                }
+
+        for e in edges:
+            node_connections[e["source_id"]] += 1
+            node_connections[e["target_id"]] += 1
+
+    # Score: appearances * connections (simplified centrality)
+    choke_scores = {}
+    for nid in node_appearances:
+        choke_scores[nid] = node_appearances[nid] * (1 + node_connections.get(nid, 0) * 0.3)
+
+    # Top 10 choke points (exclude generic Internet node)
+    top = sorted(
+        [(nid, score) for nid, score in choke_scores.items() if node_info.get(nid, {}).get("node_type") != "internet"],
+        key=lambda x: x[1],
+        reverse=True,
+    )[:10]
+
+    return {
+        "choke_points": [
+            {
+                **node_info[nid],
+                "path_appearances": node_appearances[nid],
+                "connection_count": node_connections.get(nid, 0),
+                "choke_score": round(score, 2),
+            }
+            for nid, score in top
+        ],
+        "total_paths_analyzed": len(paths),
+    }
+
+
+@router.get("/compare")
+async def compare_runs(
+    run1: str = Query(..., description="First analysis_run_id"),
+    run2: str = Query(..., description="Second analysis_run_id"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Compare attack paths between two analysis runs."""
+    async def _load_run(run_id: str):
+        result = await db.execute(
+            select(AttackPath)
+            .where(AttackPath.user_id == current_user.id)
+            .where(AttackPath.analysis_run_id == run_id)
+        )
+        return result.scalars().all()
+
+    paths1 = await _load_run(run1)
+    paths2 = await _load_run(run2)
+
+    if not paths1 and not paths2:
+        raise HTTPException(status_code=404, detail="No paths found for either run")
+
+    def _path_key(p):
+        return (p.category, p.entry_point, p.target)
+
+    def _resource_set(p):
+        return set(_parse_json_field(p.affected_resources))
+
+    matched1 = set()
+    matched2 = set()
+    persistent = []
+
+    for i, p1 in enumerate(paths1):
+        key1 = _path_key(p1)
+        res1 = _resource_set(p1)
+        for j, p2 in enumerate(paths2):
+            if j in matched2:
+                continue
+            if _path_key(p2) != key1:
+                continue
+            res2 = _resource_set(p2)
+            if res1 and res2:
+                overlap = len(res1 & res2) / max(len(res1 | res2), 1)
+                if overlap < 0.5:
+                    continue
+            matched1.add(i)
+            matched2.add(j)
+            persistent.append({
+                "title": p2.title,
+                "category": p2.category,
+                "severity": p2.severity,
+                "risk_score_before": p1.risk_score,
+                "risk_score_after": p2.risk_score,
+                "risk_change": round(p2.risk_score - p1.risk_score, 1),
+            })
+            break
+
+    new_paths = [
+        {"id": p.id, "title": p.title, "severity": p.severity, "risk_score": p.risk_score, "category": p.category}
+        for j, p in enumerate(paths2) if j not in matched2
+    ]
+    resolved_paths = [
+        {"id": p.id, "title": p.title, "severity": p.severity, "risk_score": p.risk_score, "category": p.category}
+        for i, p in enumerate(paths1) if i not in matched1
+    ]
+
+    return {
+        "run1": {"analysis_run_id": run1, "total_paths": len(paths1)},
+        "run2": {"analysis_run_id": run2, "total_paths": len(paths2)},
+        "new_paths": new_paths,
+        "resolved_paths": resolved_paths,
+        "persistent_paths": persistent,
+        "summary": {
+            "new_count": len(new_paths),
+            "resolved_count": len(resolved_paths),
+            "persistent_count": len(persistent),
+            "risk_changes": [p for p in persistent if p["risk_change"] != 0],
+            "avg_risk_change": round(
+                sum(p["risk_change"] for p in persistent) / max(len(persistent), 1), 1
+            ),
+        },
     }
 
 
@@ -181,6 +393,7 @@ async def analyze_attack_paths(
 async def list_attack_paths(
     severity: Optional[str] = None,
     category: Optional[str] = None,
+    analysis_run_id: Optional[str] = None,
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -192,6 +405,21 @@ async def list_attack_paths(
         query = query.where(AttackPath.severity == severity)
     if category:
         query = query.where(AttackPath.category == category)
+    if analysis_run_id:
+        query = query.where(AttackPath.analysis_run_id == analysis_run_id)
+    else:
+        # Default: show latest run only
+        sub = (
+            select(AttackPath.analysis_run_id)
+            .where(AttackPath.user_id == current_user.id)
+            .where(AttackPath.analysis_run_id.isnot(None))
+            .order_by(AttackPath.created_at.desc())
+            .limit(1)
+        )
+        sub_result = await db.execute(sub)
+        latest_run = sub_result.scalar_one_or_none()
+        if latest_run:
+            query = query.where(AttackPath.analysis_run_id == latest_run)
 
     query = query.order_by(AttackPath.risk_score.desc()).offset(offset).limit(limit)
     result = await db.execute(query)
@@ -200,13 +428,16 @@ async def list_attack_paths(
 
 @router.get("/summary", response_model=AttackPathSummary)
 async def attack_paths_summary(
+    analysis_run_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Get summary statistics for attack paths."""
-    paths_result = await db.execute(
-        select(AttackPath).where(AttackPath.user_id == current_user.id)
-    )
+    query = select(AttackPath).where(AttackPath.user_id == current_user.id)
+    if analysis_run_id:
+        query = query.where(AttackPath.analysis_run_id == analysis_run_id)
+
+    paths_result = await db.execute(query)
     paths = paths_result.scalars().all()
 
     if not paths:

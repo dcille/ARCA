@@ -60,7 +60,13 @@ const categoryInfo: Record<string, { label: string; icon: any; color: string }> 
   lateral_movement:     { label: 'Lateral Movement',     icon: ArrowsRightLeftIcon, color: 'text-purple-600' },
   exposure:             { label: 'Exposure',             icon: GlobeAltIcon, color: 'text-blue-600' },
   detection_evasion:    { label: 'Detection Evasion',    icon: EyeSlashIcon, color: 'text-gray-600' },
+  credential_access:    { label: 'Credential Access',    icon: LockOpenIcon, color: 'text-orange-600' },
+  supply_chain:         { label: 'Supply Chain',         icon: ServerIcon, color: 'text-pink-600' },
+  ransomware:           { label: 'Ransomware',           icon: ShieldExclamationIcon, color: 'text-red-700' },
 }
+
+// MITRE technique pattern: T followed by 4 digits, optionally .3 digits
+const MITRE_TECH_REGEX = /^T\d{4}(\.\d{3})?$/
 
 // ── Graph Canvas Component ─────────────────────────────────
 function AttackPathGraph({ nodes, edges }: { nodes: GraphNode[]; edges: GraphEdge[] }) {
@@ -321,17 +327,31 @@ function PathDetailPanel({
         </div>
       </div>
 
-      {/* Techniques */}
+      {/* Techniques (MITRE ATT&CK linked) */}
       {path.techniques?.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-brand-navy mb-2">Attack Techniques</h3>
-          <div className="space-y-1">
-            {path.techniques.map((t: string, i: number) => (
-              <div key={i} className="flex items-center gap-2 text-sm text-brand-gray-600">
-                <BoltIcon className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                {t}
-              </div>
-            ))}
+          <h3 className="text-sm font-semibold text-brand-navy mb-2">Attack Techniques (MITRE ATT&CK)</h3>
+          <div className="flex flex-wrap gap-2">
+            {path.techniques.map((t: string, i: number) => {
+              const isMitre = MITRE_TECH_REGEX.test(t)
+              return isMitre ? (
+                <a
+                  key={i}
+                  href={`https://attack.mitre.org/techniques/${t.replace('.', '/')}/`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-md text-xs font-mono text-amber-800 hover:bg-amber-100 transition-colors"
+                >
+                  <BoltIcon className="w-3.5 h-3.5 text-amber-500" />
+                  {t}
+                </a>
+              ) : (
+                <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-brand-gray-100 rounded-md text-xs text-brand-gray-600">
+                  <BoltIcon className="w-3.5 h-3.5 text-amber-500" />
+                  {t}
+                </span>
+              )
+            })}
           </div>
         </div>
       )}
@@ -380,6 +400,8 @@ export default function AttackPathsPage() {
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeResult, setAnalyzeResult] = useState<{ message: string; paths_discovered: number } | null>(null)
   const [filters, setFilters] = useState({ severity: '', category: '' })
+  const [chokePoints, setChokePoints] = useState<any>(null)
+  const [showChoke, setShowChoke] = useState(false)
 
   const loadData = async () => {
     setLoading(true)
@@ -419,6 +441,15 @@ export default function AttackPathsPage() {
     }
   }
 
+  const handleShowChoke = async () => {
+    if (showChoke) { setShowChoke(false); return }
+    try {
+      const data = await api.getAttackPathChokePoints()
+      setChokePoints(data)
+      setShowChoke(true)
+    } catch (err) { console.error(err) }
+  }
+
   const handleSelectPath = async (path: any) => {
     setSelectedPath(path)
     try {
@@ -434,19 +465,35 @@ export default function AttackPathsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <Header title="Attack Paths" subtitle="Graph-based analysis of exploitable attack chains across your cloud environment" breadcrumbs={[{ label: 'Posture', href: '/darca/overview' }, { label: 'Attack Paths' }]} />
-        <button
-          onClick={handleAnalyze}
-          disabled={analyzing}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-            analyzing
-              ? 'bg-brand-gray-200 text-brand-gray-400 cursor-not-allowed'
-              : 'bg-brand-green text-white hover:bg-brand-green/90'
+        <div className="flex items-center gap-2">
+          {paths.length > 0 && (
+            <button
+              onClick={handleShowChoke}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border',
+                showChoke
+                  ? 'bg-amber-50 border-amber-300 text-amber-700'
+                  : 'border-brand-gray-200 text-brand-gray-600 hover:bg-brand-gray-50'
+              )}
+            >
+              <ExclamationTriangleIcon className="w-4 h-4" />
+              Choke Points
+            </button>
           )}
-        >
-          <ArrowPathIcon className={cn('w-4 h-4', analyzing && 'animate-spin')} />
-          {analyzing ? 'Analyzing...' : 'Run Analysis'}
-        </button>
+          <button
+            onClick={handleAnalyze}
+            disabled={analyzing}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+              analyzing
+                ? 'bg-brand-gray-200 text-brand-gray-400 cursor-not-allowed'
+                : 'bg-brand-green text-white hover:bg-brand-green/90'
+            )}
+          >
+            <ArrowPathIcon className={cn('w-4 h-4', analyzing && 'animate-spin')} />
+            {analyzing ? 'Analyzing...' : 'Run Analysis'}
+          </button>
+        </div>
       </div>
 
       {/* Analysis Result Toast */}
@@ -536,8 +583,44 @@ export default function AttackPathsPage() {
           <option value="lateral_movement">Lateral Movement</option>
           <option value="exposure">Exposure</option>
           <option value="detection_evasion">Detection Evasion</option>
+          <option value="credential_access">Credential Access</option>
+          <option value="supply_chain">Supply Chain</option>
+          <option value="ransomware">Ransomware</option>
         </select>
       </div>
+
+      {/* Choke Points Panel */}
+      {showChoke && chokePoints?.choke_points?.length > 0 && (
+        <div className="card mb-6">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-bold text-brand-navy">Choke Points — High-Value Remediation Targets</h3>
+              <p className="text-xs text-brand-gray-400 mt-0.5">
+                Nodes appearing most frequently across attack paths. Fixing these reduces the most risk.
+              </p>
+            </div>
+            <button onClick={() => setShowChoke(false)} className="p-1 hover:bg-brand-gray-100 rounded">
+              <XMarkIcon className="w-4 h-4 text-brand-gray-400" />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {chokePoints.choke_points.map((cp: any, i: number) => (
+              <div key={i} className="flex items-center gap-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                  {i + 1}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-amber-900 truncate">{cp.label}</p>
+                  <p className="text-[10px] text-amber-700">
+                    {cp.service} &middot; {cp.node_type} &middot; {cp.path_appearances} paths &middot; {cp.connection_count} connections
+                  </p>
+                </div>
+                <span className="text-xs font-mono font-bold text-amber-700">{cp.choke_score}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-4">

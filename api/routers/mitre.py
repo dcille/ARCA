@@ -11,9 +11,19 @@ from api.models.user import User
 from api.models.finding import Finding
 from api.models.scan import Scan
 from api.models.provider import Provider
+from api.models.attack_path import AttackPath
 from api.services.auth_service import get_current_user
 
 router = APIRouter()
+
+
+def _build_reverse_mapping(check_to_mitre: dict) -> dict[str, list[str]]:
+    """Build technique_id -> [check_ids] reverse mapping."""
+    reverse: dict[str, list[str]] = {}
+    for check_id, tech_ids in check_to_mitre.items():
+        for tid in tech_ids:
+            reverse.setdefault(tid, []).append(check_id)
+    return reverse
 
 
 @router.get("/matrix")
@@ -222,4 +232,272 @@ async def get_technique_detail(
             "status": "not_assessed" if (pass_count + fail_count) == 0 else ("protected" if fail_count == 0 else "at_risk"),
         },
         "checks": checks_detail,
+    }
+
+
+@router.get("/technique/{technique_id}/checks")
+async def get_technique_checks(
+    technique_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all check_ids that detect/mitigate a specific technique, with their current status."""
+    from scanner.mitre.attack_mapping import MITRE_TECHNIQUES, CHECK_TO_MITRE
+
+    if technique_id not in MITRE_TECHNIQUES:
+        raise HTTPException(status_code=404, detail="Technique not found")
+
+    reverse = _build_reverse_mapping(CHECK_TO_MITRE)
+    check_ids = reverse.get(technique_id, [])
+
+    # Get latest finding status for each check
+    query = (
+        select(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id)
+        .where(Finding.check_id.in_(check_ids))
+    )
+    result = await db.execute(query)
+    findings = result.scalars().all()
+
+    check_status: dict[str, dict] = {}
+    for f in findings:
+        cid = f.check_id
+        if cid not in check_status:
+            check_status[cid] = {"check_id": cid, "check_title": f.check_title, "pass": 0, "fail": 0, "service": f.service}
+        if f.status == "PASS":
+            check_status[cid]["pass"] += 1
+        else:
+            check_status[cid]["fail"] += 1
+
+    return {
+        "technique_id": technique_id,
+        "technique_name": MITRE_TECHNIQUES[technique_id]["name"],
+        "checks": [
+            {**v, "status": "fail" if v["fail"] > 0 else ("pass" if v["pass"] > 0 else "not_assessed")}
+            for v in check_status.values()
+        ],
+        "unmapped_checks": [cid for cid in check_ids if cid not in check_status],
+    }
+
+
+@router.get("/coverage-gaps")
+async def get_coverage_gaps(
+    provider_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Analyze MITRE technique coverage gaps: which techniques are covered, at risk, or not assessed."""
+    from scanner.mitre.attack_mapping import MITRE_TECHNIQUES, CHECK_TO_MITRE
+
+    query = (
+        select(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id)
+    )
+    if provider_id:
+        query = query.where(Finding.provider_id == provider_id)
+
+    result = await db.execute(query)
+    findings = result.scalars().all()
+
+    # Build technique status from findings
+    tech_pass: dict[str, int] = {}
+    tech_fail: dict[str, int] = {}
+
+    for f in findings:
+        techs = CHECK_TO_MITRE.get(f.check_id, [])
+        for tid in techs:
+            if f.status == "PASS":
+                tech_pass[tid] = tech_pass.get(tid, 0) + 1
+            else:
+                tech_fail[tid] = tech_fail.get(tid, 0) + 1
+
+    covered_passing = []
+    covered_failing = []
+    not_covered = []
+
+    for tid, info in MITRE_TECHNIQUES.items():
+        p = tech_pass.get(tid, 0)
+        f = tech_fail.get(tid, 0)
+        entry = {
+            "id": tid,
+            "name": info["name"],
+            "tactic": info.get("tactic", ""),
+            "pass_count": p,
+            "fail_count": f,
+        }
+        if p + f == 0:
+            not_covered.append(entry)
+        elif f > 0:
+            covered_failing.append(entry)
+        else:
+            covered_passing.append(entry)
+
+    total = len(MITRE_TECHNIQUES)
+    assessed = len(covered_passing) + len(covered_failing)
+
+    return {
+        "coverage_score": round((len(covered_passing) / total * 100) if total else 0, 1),
+        "total_techniques": total,
+        "assessed": assessed,
+        "protected": len(covered_passing),
+        "at_risk": len(covered_failing),
+        "not_covered": len(not_covered),
+        "techniques_passing": covered_passing,
+        "techniques_failing": sorted(covered_failing, key=lambda t: t["fail_count"], reverse=True),
+        "techniques_not_covered": not_covered,
+    }
+
+
+@router.get("/navigator-layer")
+async def export_navigator_layer(
+    provider_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Export MITRE ATT&CK Navigator layer (JSON format compatible with ATT&CK Navigator v4.4)."""
+    from scanner.mitre.attack_mapping import MITRE_TECHNIQUES, CHECK_TO_MITRE
+
+    query = (
+        select(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id)
+    )
+    if provider_id:
+        query = query.where(Finding.provider_id == provider_id)
+
+    result = await db.execute(query)
+    findings = result.scalars().all()
+
+    tech_pass: dict[str, int] = {}
+    tech_fail: dict[str, int] = {}
+    tech_checks: dict[str, list[str]] = {}
+
+    for f in findings:
+        techs = CHECK_TO_MITRE.get(f.check_id, [])
+        for tid in techs:
+            if f.status == "PASS":
+                tech_pass[tid] = tech_pass.get(tid, 0) + 1
+            else:
+                tech_fail[tid] = tech_fail.get(tid, 0) + 1
+            tech_checks.setdefault(tid, [])
+            if f.check_id not in tech_checks[tid]:
+                tech_checks[tid].append(f.check_id)
+
+    techniques_layer = []
+    for tid, info in MITRE_TECHNIQUES.items():
+        p = tech_pass.get(tid, 0)
+        f = tech_fail.get(tid, 0)
+        total = p + f
+
+        if total == 0:
+            score = 0
+            color = ""  # Not assessed — no color
+        elif f > 0:
+            score = 2
+            color = "#ff6666"  # Red — at risk
+        else:
+            score = 1
+            color = "#83d353"  # Green — protected
+
+        fail_checks = [c for c in tech_checks.get(tid, []) if c in [ff.check_id for ff in findings if ff.status == "FAIL"]]
+        comment = f"{p} pass, {f} fail" if total > 0 else "Not assessed"
+        if fail_checks:
+            comment += f". Failing: {', '.join(fail_checks[:5])}"
+
+        entry = {
+            "techniqueID": tid,
+            "score": score,
+            "comment": comment,
+            "enabled": True,
+            "showSubtechniques": False,
+        }
+        if color:
+            entry["color"] = color
+        techniques_layer.append(entry)
+
+    return {
+        "name": "D-ARCA Security Coverage",
+        "versions": {
+            "attack": "15",
+            "navigator": "4.4",
+            "layer": "4.4",
+        },
+        "domain": "enterprise-attack",
+        "description": "Auto-generated MITRE ATT&CK coverage layer from D-ARCA CSPM findings.",
+        "filters": {
+            "platforms": ["Linux", "macOS", "Windows", "IaaS", "SaaS", "Containers", "Azure AD", "Google Workspace", "Office 365"]
+        },
+        "sorting": 3,
+        "layout": {
+            "layout": "side",
+            "showID": True,
+            "showName": True,
+            "showAggregateScores": True,
+            "countUnscored": False,
+            "aggregateFunction": "max",
+        },
+        "techniques": techniques_layer,
+        "gradient": {
+            "colors": ["#ffffff", "#83d353", "#ff6666"],
+            "minValue": 0,
+            "maxValue": 2,
+        },
+        "legendItems": [
+            {"label": "Not Assessed", "color": "#ffffff"},
+            {"label": "Protected (all pass)", "color": "#83d353"},
+            {"label": "At Risk (failures)", "color": "#ff6666"},
+        ],
+    }
+
+
+@router.get("/attack-paths")
+async def get_mitre_attack_paths_coverage(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Show which MITRE techniques are covered by discovered attack paths."""
+    from scanner.mitre.attack_mapping import MITRE_TECHNIQUES
+
+    # Get all attack paths for this user
+    result = await db.execute(
+        select(AttackPath).where(AttackPath.user_id == current_user.id)
+    )
+    paths = result.scalars().all()
+
+    technique_paths: dict[str, list[dict]] = {}
+    for p in paths:
+        techniques = []
+        if p.techniques:
+            try:
+                techniques = json.loads(p.techniques)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        for tid in techniques:
+            technique_paths.setdefault(tid, []).append({
+                "path_id": p.id,
+                "title": p.title,
+                "severity": p.severity,
+                "risk_score": p.risk_score,
+                "category": p.category,
+            })
+
+    coverage = []
+    for tid, info in MITRE_TECHNIQUES.items():
+        related = technique_paths.get(tid, [])
+        if related:
+            coverage.append({
+                "technique_id": tid,
+                "technique_name": info["name"],
+                "tactic": info.get("tactic", ""),
+                "attack_paths": related,
+                "path_count": len(related),
+                "max_risk_score": max(p["risk_score"] for p in related),
+            })
+
+    return {
+        "techniques_with_paths": len(coverage),
+        "total_techniques": len(MITRE_TECHNIQUES),
+        "coverage": sorted(coverage, key=lambda c: c["max_risk_score"], reverse=True),
     }

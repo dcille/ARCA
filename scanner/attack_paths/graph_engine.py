@@ -281,6 +281,141 @@ SCENARIO_TEMPLATES = [
         "category": "detection_evasion",
         "builder": "_build_data_logging_gap_path",
     },
+    # ── Alibaba Cloud scenarios ──────────────────────────────────
+    {
+        "id": "alibaba_ram_escalation",
+        "title": "Alibaba RAM Privilege Escalation",
+        "description": "Compromised RAM user with weak MFA and wildcard policies escalates to administrator access across all Alibaba Cloud services.",
+        "category": "privilege_escalation",
+        "severity": "critical",
+        "match_services": {"ram"},
+        "match_checks": ["ali_ram_no_wildcard_policy", "ali_ram_mfa_enabled", "ali_ram_access_key_rotation", "ali_ram_unused_users", "ali_ram_policies_groups_only"],
+        "min_matches": 2,
+        "techniques": ["T1078.004", "T1098", "T1548"],
+        "builder": "_build_alibaba_ram_escalation_path",
+    },
+    {
+        "id": "alibaba_ecs_oss_exposure",
+        "title": "Alibaba ECS/OSS Public Data Exposure",
+        "description": "Internet-facing ECS instance with open security groups provides pivot to publicly accessible unencrypted OSS buckets, enabling mass data exfiltration.",
+        "category": "data_exfiltration",
+        "severity": "critical",
+        "match_services": {"ecs", "oss"},
+        "match_checks": ["ali_ecs_no_public_ip", "ali_ecs_sg_no_public_ingress", "ali_oss_no_public_access", "ali_oss_encryption_enabled"],
+        "min_matches": 2,
+        "techniques": ["T1190", "T1530", "T1537"],
+        "builder": "_build_alibaba_ecs_oss_exposure_path",
+    },
+    {
+        "id": "alibaba_network_chain",
+        "title": "Alibaba Network/SLB to Database Chain",
+        "description": "HTTP listener on SLB combined with open SSH on ECS, missing VPC flow logs, and publicly accessible RDS creates a network-based attack chain to sensitive databases.",
+        "category": "exposure",
+        "severity": "high",
+        "match_services": {"vpc", "ecs", "slb", "rds"},
+        "match_checks": ["ali_vpc_flow_logs", "ali_ecs_sg_no_ssh_open", "ali_slb_https_listener", "ali_rds_no_public_access"],
+        "min_matches": 2,
+        "techniques": ["T1190", "T1021.004", "T1046"],
+        "builder": "_build_alibaba_network_chain_path",
+    },
+    {
+        "id": "alibaba_monitoring_blindspot",
+        "title": "Alibaba Monitoring Blindspot",
+        "description": "Disabled ActionTrail, missing SLS alerts, and absent Security Center agents create a monitoring dead zone where attacker activity goes undetected.",
+        "category": "detection_evasion",
+        "severity": "high",
+        "match_services": {"actiontrail", "sls", "security_center"},
+        "match_checks": ["ali_actiontrail_enabled", "ali_actiontrail_multi_region", "ali_sls_retention_365", "ali_security_center_enabled", "ali_sas_agents_installed"],
+        "min_matches": 2,
+        "techniques": ["T1562.008", "T1070", "T1562.001"],
+        "builder": "_build_alibaba_monitoring_blindspot_path",
+    },
+    # ── Cross-SaaS-to-Cloud scenarios ────────────────────────────
+    {
+        "id": "github_secrets_to_cloud",
+        "title": "GitHub Secrets Exposure to Cloud Access",
+        "description": "Repositories without secret scanning leak cloud credentials. Combined with unrotated access keys, attackers gain persistent cloud infrastructure access via committed secrets.",
+        "category": "credential_access",
+        "severity": "critical",
+        "match_services": {"github", "iam", "ram", "azure_iam"},
+        "match_checks": ["github_repo_secret_scanning", "iam_access_key_rotation", "ali_ram_access_key_rotation", "azure_iam_custom_role_admin"],
+        "min_matches": 2,
+        "techniques": ["T1552", "T1552.001", "T1078.004"],
+        "builder": "_build_github_secrets_cloud_path",
+    },
+    {
+        "id": "m365_identity_to_azure",
+        "title": "M365 Identity Compromise to Azure Resources",
+        "description": "Legacy authentication and weak MFA in Microsoft 365 allow credential phishing that pivots to Azure subscription resources via shared Azure AD identity.",
+        "category": "privilege_escalation",
+        "severity": "critical",
+        "match_services": {"m365", "azure_iam", "azure_security"},
+        "match_checks": ["m365_ca_block_legacy_auth", "m365_admin_mfa_enforced", "azure_iam_owner_count"],
+        "min_matches": 2,
+        "techniques": ["T1566", "T1078.004", "T1484"],
+        "builder": "_build_m365_identity_azure_path",
+    },
+    {
+        "id": "saas_credential_theft_to_cloud",
+        "title": "SaaS Platform Credential Theft to Cloud",
+        "description": "Compromised SaaS platform (ServiceNow/Salesforce) without encryption at rest exposes stored cloud credentials in custom fields, providing unauthorized cloud infrastructure access.",
+        "category": "credential_access",
+        "severity": "high",
+        "match_services": {"servicenow", "salesforce", "iam", "azure_iam"},
+        "match_checks": ["servicenow_encryption_at_rest", "servicenow_ac_acl_active", "salesforce_encryption_at_rest", "iam_access_key_rotation"],
+        "min_matches": 2,
+        "techniques": ["T1552", "T1078.004", "T1213"],
+        "builder": "_build_saas_credential_cloud_path",
+    },
+    # ── Advanced scenarios ────────────────────────────────────────
+    {
+        "id": "supply_chain_container_registry",
+        "title": "Supply Chain via Container Registry",
+        "description": "Container registries without image scanning allow malicious or vulnerable images to deploy into production clusters, achieving code execution with task role permissions.",
+        "category": "supply_chain",
+        "severity": "critical",
+        "match_services": {"ecr", "ecs", "eks", "gke", "oke", "ack", "containerregistry"},
+        "match_checks": ["ecr_image_scanning_enabled", "ecr_lifecycle_policy_configured", "gcp_gke_binary_authorization", "k8s_image_pull_policy_always"],
+        "min_matches": 1,
+        "techniques": ["T1525", "T1195", "T1610"],
+        "builder": "_build_supply_chain_container_path",
+    },
+    {
+        "id": "ransomware_kill_chain",
+        "title": "Ransomware Kill Chain",
+        "description": "Complete ransomware attack chain: internet-facing RDP/SSH without MFA enables initial access, followed by logging disablement, backup destruction, and data encryption for impact.",
+        "category": "ransomware",
+        "severity": "critical",
+        "match_services": {"iam", "ec2", "vpc", "s3", "cloudtrail", "backup", "rds", "ebs"},
+        "match_checks": ["ec2_sg_open_port_22", "ec2_sg_open_port_3389", "iam_user_mfa_enabled", "cloudtrail_multiregion", "s3_bucket_versioning_enabled", "s3_bucket_object_lock", "rds_automated_backups_enabled"],
+        "min_matches": 3,
+        "techniques": ["T1190", "T1110", "T1078", "T1562.008", "T1490", "T1486", "T1485"],
+        "builder": "_build_ransomware_kill_chain_path",
+    },
+    {
+        "id": "insider_data_exfiltration_saas",
+        "title": "Insider Data Exfiltration via SaaS Channels",
+        "description": "Malicious insider leverages unmasked data in Snowflake, unrestricted Salesforce exports, and M365 external sharing without DLP to exfiltrate sensitive data through SaaS channels.",
+        "category": "data_exfiltration",
+        "severity": "high",
+        "match_services": {"m365", "salesforce", "snowflake"},
+        "match_checks": ["m365_external_sharing_restricted", "m365_dlp_policies_configured", "salesforce_field_level_security", "snowflake_column_masking_policies"],
+        "min_matches": 2,
+        "techniques": ["T1530", "T1567", "T1537"],
+        "builder": "_build_insider_exfiltration_saas_path",
+    },
+    {
+        "id": "multi_cloud_lateral_movement",
+        "title": "Multi-Cloud Lateral Movement",
+        "description": "IAM misconfigurations across multiple cloud providers allow attackers to pivot from the weakest environment to all connected cloud accounts via cross-cloud service accounts and federation.",
+        "category": "lateral_movement",
+        "severity": "critical",
+        "match_services": {"iam", "azure_iam", "gcp_iam", "ram"},
+        "match_checks": ["iam_user_mfa_enabled", "azure_iam_owner_count", "gcp_iam_no_public_access", "ali_ram_mfa_enabled"],
+        "min_matches": 3,
+        "techniques": ["T1078.004", "T1021", "T1563", "T1550"],
+        "builder": "_build_multi_cloud_lateral_path",
+    },
 ]
 
 
@@ -1622,14 +1757,745 @@ class AttackPathAnalyzer:
             ],
         )
 
+    def _build_alibaba_ram_escalation_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Alibaba RAM: Compromised user → weak MFA → wildcard policy → admin access."""
+        ram_findings = [f for f in findings
+                        if any(k in f["check_id"] for k in ["ali_ram_no_wildcard", "ali_ram_mfa",
+                                                             "ali_ram_access_key", "ali_ram_unused",
+                                                             "ali_ram_policies_groups"])
+                        and f.get("status") == "FAIL"]
+        if not ram_findings:
+            return None
+
+        nodes, edges, affected = [], [], []
+        attacker = GraphNode(id="ali-ram-attacker", node_type=NodeType.IDENTITY,
+                             label="Compromised RAM User", service="ram")
+        nodes.append(attacker)
+
+        mfa_findings = [f for f in ram_findings if "mfa" in f["check_id"].lower()]
+        policy_findings = [f for f in ram_findings if "wildcard" in f["check_id"].lower()
+                           or "policies" in f["check_id"].lower()]
+        key_findings = [f for f in ram_findings if "access_key" in f["check_id"].lower()
+                        or "unused" in f["check_id"].lower()]
+
+        for f in (mfa_findings + key_findings)[:2]:
+            n = GraphNode(id=f"ali-mfa-{_make_id()}", node_type=NodeType.IDENTITY,
+                          label=f.get("resource_name") or f["check_title"],
+                          service="ram", severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(attacker.id if len(nodes) == 2 else nodes[-2].id,
+                                   n.id, EdgeType.CAN_ESCALATE, "bypasses weak MFA"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        for f in policy_findings[:2]:
+            n = GraphNode(id=f"ali-policy-{_make_id()}", node_type=NodeType.IDENTITY,
+                          label=f.get("resource_name") or f["check_title"],
+                          service="ram", severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(nodes[-2].id, n.id, EdgeType.CAN_ESCALATE,
+                                   "exploits wildcard policy"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        admin_node = GraphNode(id=f"ali-admin-{_make_id()}", node_type=NodeType.IDENTITY,
+                               label="Administrator Access", service="ram", severity="critical")
+        nodes.append(admin_node)
+        edges.append(GraphEdge(nodes[-2].id, admin_node.id, EdgeType.CAN_ESCALATE,
+                               "gains administrator access"))
+
+        return AttackPath(
+            id=_make_id(),
+            title="Alibaba RAM Privilege Escalation",
+            description="Compromised RAM user with weak MFA and wildcard policies escalates to "
+                        "administrator access across all Alibaba Cloud services.",
+            severity=self._max_severity([f["severity"] for f in ram_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Compromised RAM User",
+            target="Administrator Access",
+            category="privilege_escalation",
+            techniques=["T1078.004", "T1098", "T1548"],
+            affected_resources=affected,
+            remediation=[
+                "Enable MFA for all RAM users",
+                "Remove wildcard (*) actions from RAM policies",
+                "Rotate RAM access keys every 90 days",
+                "Remove unused RAM users and access keys",
+                "Attach policies to groups instead of individual users",
+            ],
+        )
+
+    def _build_alibaba_ecs_oss_exposure_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Alibaba ECS/OSS: Internet → public ECS → open SG → public OSS → data."""
+        ecs_findings = [f for f in findings
+                        if any(k in f["check_id"] for k in ["ali_ecs_no_public", "ali_ecs_sg"])
+                        and f.get("status") == "FAIL"]
+        oss_findings = [f for f in findings
+                        if any(k in f["check_id"] for k in ["ali_oss_no_public", "ali_oss_encryption"])
+                        and f.get("status") == "FAIL"]
+        if not ecs_findings and not oss_findings:
+            return None
+
+        nodes, edges, affected = [], [], []
+        internet = GraphNode(id="ali-internet", node_type=NodeType.INTERNET,
+                             label="Internet", service="external")
+        nodes.append(internet)
+
+        for f in ecs_findings[:2]:
+            n = GraphNode(id=f"ali-ecs-{_make_id()}", node_type=NodeType.RESOURCE,
+                          label=f.get("resource_name") or f["check_title"],
+                          service="ecs", severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(internet.id, n.id, EdgeType.EXPOSES,
+                                   "publicly accessible ECS instance"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        for f in oss_findings[:2]:
+            n = GraphNode(id=f"ali-oss-{_make_id()}", node_type=NodeType.DATA_STORE,
+                          label=f.get("resource_name") or f["check_title"],
+                          service="oss", severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            src = nodes[-2].id if len(nodes) > 2 else internet.id
+            edges.append(GraphEdge(src, n.id, EdgeType.HAS_ACCESS,
+                                   "pivots to public OSS bucket"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        data_node = GraphNode(id=f"ali-data-{_make_id()}", node_type=NodeType.DATA_STORE,
+                              label="Exfiltrated Data", service="oss", severity="critical")
+        nodes.append(data_node)
+        edges.append(GraphEdge(nodes[-2].id, data_node.id, EdgeType.HAS_ACCESS,
+                               "mass data exfiltration"))
+
+        return AttackPath(
+            id=_make_id(),
+            title="Alibaba ECS/OSS Public Data Exposure",
+            description="Internet-facing ECS instance with open security groups provides pivot to "
+                        "publicly accessible unencrypted OSS buckets, enabling mass data exfiltration.",
+            severity=self._max_severity([f["severity"] for f in ecs_findings + oss_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Internet",
+            target="OSS Data",
+            category="data_exfiltration",
+            techniques=["T1190", "T1530", "T1537"],
+            affected_resources=affected,
+            remediation=[
+                "Remove public IP addresses from ECS instances",
+                "Restrict security group inbound rules to known IPs",
+                "Disable public access on OSS buckets",
+                "Enable server-side encryption on all OSS buckets",
+                "Use VPC endpoints for OSS access",
+            ],
+        )
+
+    def _build_alibaba_network_chain_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Alibaba Network: Internet via SLB → HTTP → ECS SSH → VPC → public RDS."""
+        net_findings = [f for f in findings
+                        if any(k in f["check_id"] for k in ["ali_vpc_flow", "ali_ecs_sg_no_ssh",
+                                                             "ali_slb_https", "ali_rds_no_public"])
+                        and f.get("status") == "FAIL"]
+        if not net_findings:
+            return None
+
+        nodes, edges, affected = [], [], []
+        internet = GraphNode(id="ali-net-internet", node_type=NodeType.INTERNET,
+                             label="Internet", service="external")
+        nodes.append(internet)
+
+        slb_findings = [f for f in net_findings if "slb" in f["check_id"].lower()]
+        ecs_findings = [f for f in net_findings if "ecs" in f["check_id"].lower()]
+        vpc_findings = [f for f in net_findings if "vpc" in f["check_id"].lower()]
+        rds_findings = [f for f in net_findings if "rds" in f["check_id"].lower()]
+
+        prev_id = internet.id
+        for layer, prefix, svc, etype, lbl in [
+            (slb_findings, "ali-slb", "slb", EdgeType.ROUTES_TO, "HTTP listener on SLB"),
+            (ecs_findings, "ali-ssh", "ecs", EdgeType.EXPOSES, "open SSH on ECS"),
+            (vpc_findings, "ali-vpc", "vpc", EdgeType.LATERAL_MOVE, "no VPC flow logs"),
+            (rds_findings, "ali-rds", "rds", EdgeType.HAS_ACCESS, "publicly accessible RDS"),
+        ]:
+            for f in layer[:1]:
+                n = GraphNode(id=f"{prefix}-{_make_id()}", node_type=self._classify_node_type(svc),
+                              label=f.get("resource_name") or f["check_title"],
+                              service=svc, severity=f["severity"],
+                              metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+                nodes.append(n)
+                edges.append(GraphEdge(prev_id, n.id, etype, lbl))
+                prev_id = n.id
+                affected.append(f.get("resource_id") or f["check_title"])
+
+        if len(nodes) < 3:
+            return None
+
+        return AttackPath(
+            id=_make_id(),
+            title="Alibaba Network/SLB to Database Chain",
+            description="HTTP listener on SLB combined with open SSH on ECS, missing VPC flow logs, "
+                        "and publicly accessible RDS creates a network-based attack chain.",
+            severity=self._max_severity([f["severity"] for f in net_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Internet via SLB",
+            target="Public RDS Database",
+            category="exposure",
+            techniques=["T1190", "T1021.004", "T1046"],
+            affected_resources=affected,
+            remediation=[
+                "Configure HTTPS listeners on SLB instead of HTTP",
+                "Restrict SSH access in ECS security groups to bastion hosts",
+                "Enable VPC flow logs for network monitoring",
+                "Disable public access on RDS instances",
+                "Use internal SLB for backend service communication",
+            ],
+        )
+
+    def _build_alibaba_monitoring_blindspot_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Alibaba Monitoring: Threat Actor → disabled ActionTrail → no SLS → no Security Center."""
+        monitor_findings = [f for f in findings
+                            if any(k in f["check_id"] for k in ["ali_actiontrail", "ali_sls",
+                                                                  "ali_security_center", "ali_sas"])
+                            and f.get("status") == "FAIL"]
+        if not monitor_findings:
+            return None
+
+        nodes, edges, affected = [], [], []
+        attacker = GraphNode(id="ali-threat-actor", node_type=NodeType.IDENTITY,
+                             label="Threat Actor", service="external")
+        nodes.append(attacker)
+
+        for f in monitor_findings[:4]:
+            n = GraphNode(id=f"ali-blind-{_make_id()}", node_type=NodeType.SERVICE,
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(attacker.id, n.id, EdgeType.LATERAL_MOVE,
+                                   "undetected due to disabled monitoring"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        target = GraphNode(id=f"ali-unmonitored-{_make_id()}", node_type=NodeType.RESOURCE,
+                           label="Unmonitored Environment", service="multi-service")
+        nodes.append(target)
+        for n in nodes[1:-1]:
+            edges.append(GraphEdge(n.id, target.id, EdgeType.LATERAL_MOVE,
+                                   "monitoring dead zone"))
+
+        return AttackPath(
+            id=_make_id(),
+            title="Alibaba Monitoring Blindspot",
+            description="Disabled ActionTrail, missing SLS alerts, and absent Security Center agents "
+                        "create a monitoring dead zone where attacker activity goes undetected.",
+            severity=self._max_severity([f["severity"] for f in monitor_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Threat Actor",
+            target="Unmonitored Environment",
+            category="detection_evasion",
+            techniques=["T1562.008", "T1070", "T1562.001"],
+            affected_resources=affected,
+            remediation=[
+                "Enable ActionTrail in all regions with multi-account delivery",
+                "Configure SLS alerts for security-critical events",
+                "Deploy Security Center agents on all ECS instances",
+                "Set SLS log retention to at least 365 days",
+                "Enable ActionTrail log file validation",
+            ],
+        )
+
+    def _build_github_secrets_cloud_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """GitHub → missing secret scanning → committed credential → unrotated key → cloud."""
+        gh_findings = [f for f in findings
+                       if any(k in f["check_id"] for k in ["github_repo_secret_scanning"])
+                       and f.get("status") == "FAIL"]
+        key_findings = [f for f in findings
+                        if any(k in f["check_id"] for k in ["iam_access_key_rotation",
+                                                              "ali_ram_access_key",
+                                                              "azure_iam_custom_role"])
+                        and f.get("status") == "FAIL"]
+        all_findings = gh_findings + key_findings
+        if not gh_findings or not key_findings:
+            return None
+
+        nodes, edges, affected = [], [], []
+        repo = GraphNode(id="gh-repo", node_type=NodeType.SERVICE,
+                         label="GitHub Repository", service="github")
+        nodes.append(repo)
+
+        for f in gh_findings[:2]:
+            n = GraphNode(id=f"gh-scan-{_make_id()}", node_type=NodeType.SERVICE,
+                          label=f.get("resource_name") or f["check_title"],
+                          service="github", severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(repo.id, n.id, EdgeType.EXPOSES,
+                                   "missing secret scanning"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        cred_node = GraphNode(id=f"gh-cred-{_make_id()}", node_type=NodeType.IDENTITY,
+                              label="Committed Cloud Credential", service="github",
+                              severity="critical")
+        nodes.append(cred_node)
+        edges.append(GraphEdge(nodes[-2].id, cred_node.id, EdgeType.CREDENTIAL_ACCESS,
+                               "leaked cloud credential"))
+
+        for f in key_findings[:2]:
+            n = GraphNode(id=f"gh-key-{_make_id()}", node_type=NodeType.IDENTITY,
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(cred_node.id, n.id, EdgeType.HAS_ACCESS,
+                                   "unrotated access key"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        cloud = GraphNode(id=f"gh-cloud-{_make_id()}", node_type=NodeType.RESOURCE,
+                          label="Cloud Infrastructure", service="multi-service",
+                          severity="critical")
+        nodes.append(cloud)
+        edges.append(GraphEdge(nodes[-2].id, cloud.id, EdgeType.HAS_ACCESS,
+                               "persistent cloud access"))
+
+        return AttackPath(
+            id=_make_id(),
+            title="GitHub Secrets Exposure to Cloud Access",
+            description="Repositories without secret scanning leak cloud credentials. Combined with "
+                        "unrotated access keys, attackers gain persistent cloud infrastructure access.",
+            severity=self._max_severity([f["severity"] for f in all_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="GitHub Repository",
+            target="Cloud Infrastructure",
+            category="credential_access",
+            techniques=["T1552", "T1552.001", "T1078.004"],
+            affected_resources=affected,
+            remediation=[
+                "Enable secret scanning on all GitHub repositories",
+                "Enable push protection to block secrets before commit",
+                "Rotate all cloud access keys every 90 days",
+                "Use OIDC federation instead of long-lived credentials in CI/CD",
+                "Implement pre-commit hooks to detect secrets locally",
+            ],
+        )
+
+    def _build_m365_identity_azure_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """M365: Phishing → legacy auth → no MFA → Azure AD → Azure resources."""
+        m365_findings = [f for f in findings
+                         if any(k in f["check_id"] for k in ["m365_ca_block_legacy",
+                                                               "m365_admin_mfa"])
+                         and f.get("status") == "FAIL"]
+        azure_findings = [f for f in findings
+                          if any(k in f["check_id"] for k in ["azure_iam_owner_count"])
+                          and f.get("status") == "FAIL"]
+        all_findings = m365_findings + azure_findings
+        if not m365_findings or not azure_findings:
+            return None
+
+        nodes, edges, affected = [], [], []
+        phishing = GraphNode(id="m365-phish", node_type=NodeType.INTERNET,
+                             label="Phishing Email", service="external")
+        nodes.append(phishing)
+
+        for f in m365_findings[:2]:
+            n = GraphNode(id=f"m365-auth-{_make_id()}", node_type=NodeType.SERVICE,
+                          label=f.get("resource_name") or f["check_title"],
+                          service="m365", severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(phishing.id if len(nodes) == 2 else nodes[-2].id,
+                                   n.id, EdgeType.EXPOSES,
+                                   "exploits legacy auth / missing MFA"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        azure_ad = GraphNode(id=f"m365-aad-{_make_id()}", node_type=NodeType.IDENTITY,
+                             label="Azure AD Identity", service="azure_iam",
+                             severity="high")
+        nodes.append(azure_ad)
+        edges.append(GraphEdge(nodes[-2].id, azure_ad.id, EdgeType.CAN_ESCALATE,
+                               "shared Azure AD identity"))
+
+        for f in azure_findings[:2]:
+            n = GraphNode(id=f"m365-az-{_make_id()}", node_type=NodeType.RESOURCE,
+                          label=f.get("resource_name") or f["check_title"],
+                          service="azure_iam", severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(azure_ad.id, n.id, EdgeType.HAS_ACCESS,
+                                   "accesses Azure subscription resources"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        return AttackPath(
+            id=_make_id(),
+            title="M365 Identity Compromise to Azure Resources",
+            description="Legacy authentication and weak MFA in Microsoft 365 allow credential "
+                        "phishing that pivots to Azure subscription resources via shared Azure AD identity.",
+            severity=self._max_severity([f["severity"] for f in all_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Phishing Email",
+            target="Azure Subscription Resources",
+            category="privilege_escalation",
+            techniques=["T1566", "T1078.004", "T1484"],
+            affected_resources=affected,
+            remediation=[
+                "Block legacy authentication via Conditional Access policies",
+                "Enforce MFA for all administrators and privileged roles",
+                "Limit the number of subscription owners to 3 or fewer",
+                "Enable Azure AD Identity Protection for risky sign-in detection",
+                "Implement Conditional Access policies for Azure management",
+            ],
+        )
+
+    def _build_saas_credential_cloud_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """SaaS: Compromised platform → unencrypted data → stored credentials → cloud."""
+        saas_findings = [f for f in findings
+                         if any(k in f["check_id"] for k in ["servicenow_encryption",
+                                                               "servicenow_ac_acl",
+                                                               "salesforce_encryption"])
+                         and f.get("status") == "FAIL"]
+        cloud_findings = [f for f in findings
+                          if any(k in f["check_id"] for k in ["iam_access_key_rotation",
+                                                                "azure_iam_custom_role"])
+                          and f.get("status") == "FAIL"]
+        all_findings = saas_findings + cloud_findings
+        if not saas_findings or not cloud_findings:
+            return None
+
+        nodes, edges, affected = [], [], []
+        entry = GraphNode(id="saas-compromised", node_type=NodeType.SERVICE,
+                          label="Compromised SaaS Platform", service="saas")
+        nodes.append(entry)
+
+        for f in saas_findings[:2]:
+            n = GraphNode(id=f"saas-data-{_make_id()}", node_type=NodeType.DATA_STORE,
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(entry.id if len(nodes) == 2 else nodes[-2].id,
+                                   n.id, EdgeType.HAS_ACCESS,
+                                   "accesses unencrypted data"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        cred_node = GraphNode(id=f"saas-cred-{_make_id()}", node_type=NodeType.IDENTITY,
+                              label="Stored Cloud Credentials", service="saas",
+                              severity="critical")
+        nodes.append(cred_node)
+        edges.append(GraphEdge(nodes[-2].id, cred_node.id, EdgeType.CREDENTIAL_ACCESS,
+                               "extracts stored cloud credentials"))
+
+        for f in cloud_findings[:2]:
+            n = GraphNode(id=f"saas-cloud-{_make_id()}", node_type=NodeType.RESOURCE,
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(cred_node.id, n.id, EdgeType.HAS_ACCESS,
+                                   "unauthorized cloud access"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        return AttackPath(
+            id=_make_id(),
+            title="SaaS Platform Credential Theft to Cloud",
+            description="Compromised SaaS platform without encryption at rest exposes stored cloud "
+                        "credentials in custom fields, providing unauthorized cloud infrastructure access.",
+            severity=self._max_severity([f["severity"] for f in all_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Compromised SaaS Platform",
+            target="Cloud Infrastructure",
+            category="credential_access",
+            techniques=["T1552", "T1078.004", "T1213"],
+            affected_resources=affected,
+            remediation=[
+                "Enable encryption at rest on ServiceNow and Salesforce",
+                "Enforce ACL rules to restrict access to sensitive records",
+                "Never store cloud credentials in SaaS custom fields",
+                "Rotate all cloud access keys regularly",
+                "Implement a secrets management solution for integrations",
+            ],
+        )
+
+    def _build_supply_chain_container_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Supply chain: Malicious image → registry without scanning → cluster → production."""
+        registry_findings = [f for f in findings
+                             if any(k in f["check_id"] for k in ["ecr_image_scanning",
+                                                                   "ecr_lifecycle_policy",
+                                                                   "gcp_gke_binary_authorization",
+                                                                   "k8s_image_pull_policy"])
+                             and f.get("status") == "FAIL"]
+        if not registry_findings:
+            return None
+
+        nodes, edges, affected = [], [], []
+        malicious = GraphNode(id="sc-malicious", node_type=NodeType.INTERNET,
+                              label="Malicious Image", service="external")
+        nodes.append(malicious)
+
+        for f in registry_findings[:3]:
+            n = GraphNode(id=f"sc-reg-{_make_id()}", node_type=NodeType.SERVICE,
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(malicious.id if len(nodes) == 2 else nodes[-2].id,
+                                   n.id, EdgeType.EXPOSES,
+                                   "registry without image scanning"))
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        cluster = GraphNode(id=f"sc-cluster-{_make_id()}", node_type=NodeType.RESOURCE,
+                            label="Production Cluster", service="kubernetes",
+                            severity="high")
+        nodes.append(cluster)
+        edges.append(GraphEdge(nodes[-2].id, cluster.id, EdgeType.LATERAL_MOVE,
+                               "deploys to production cluster"))
+
+        target = GraphNode(id=f"sc-data-{_make_id()}", node_type=NodeType.DATA_STORE,
+                           label="Production Data (via Task Role)", service="multi-service",
+                           severity="critical")
+        nodes.append(target)
+        edges.append(GraphEdge(cluster.id, target.id, EdgeType.ASSUMES_ROLE,
+                               "task role permissions"))
+
+        return AttackPath(
+            id=_make_id(),
+            title="Supply Chain via Container Registry",
+            description="Container registries without image scanning allow malicious or vulnerable "
+                        "images to deploy into production clusters, achieving code execution with "
+                        "task role permissions.",
+            severity=self._max_severity([f["severity"] for f in registry_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Malicious Image",
+            target="Production Data",
+            category="supply_chain",
+            techniques=["T1525", "T1195", "T1610"],
+            affected_resources=affected,
+            remediation=[
+                "Enable image scanning on all container registries",
+                "Configure lifecycle policies to remove untagged images",
+                "Enable Binary Authorization or admission controllers",
+                "Set imagePullPolicy to Always on all workloads",
+                "Implement image signing and verification pipelines",
+            ],
+        )
+
+    def _build_ransomware_kill_chain_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Ransomware: Internet → RDP/SSH → no MFA → disable logging → delete backups → encrypt."""
+        rw_findings = [f for f in findings
+                       if any(k in f["check_id"] for k in ["ec2_sg_open_port_22",
+                                                             "ec2_sg_open_port_3389",
+                                                             "iam_user_mfa",
+                                                             "cloudtrail_multiregion",
+                                                             "s3_bucket_versioning",
+                                                             "s3_bucket_object_lock",
+                                                             "rds_automated_backups"])
+                       and f.get("status") == "FAIL"]
+        if len(rw_findings) < 3:
+            return None
+
+        nodes, edges, affected = [], [], []
+        internet = GraphNode(id="rw-internet", node_type=NodeType.INTERNET,
+                             label="Internet", service="external")
+        nodes.append(internet)
+
+        access_findings = [f for f in rw_findings if "sg_open_port" in f["check_id"]]
+        mfa_findings = [f for f in rw_findings if "mfa" in f["check_id"]]
+        log_findings = [f for f in rw_findings if "cloudtrail" in f["check_id"]]
+        backup_findings = [f for f in rw_findings if "versioning" in f["check_id"]
+                           or "object_lock" in f["check_id"]
+                           or "automated_backups" in f["check_id"]]
+
+        prev_id = internet.id
+        for layer, prefix, lbl, etype in [
+            (access_findings, "rw-rdp", "open RDP/SSH access", EdgeType.EXPOSES),
+            (mfa_findings, "rw-mfa", "no MFA on user", EdgeType.CAN_ESCALATE),
+            (log_findings, "rw-log", "disables logging", EdgeType.LATERAL_MOVE),
+            (backup_findings, "rw-backup", "deletes backups", EdgeType.LATERAL_MOVE),
+        ]:
+            for f in layer[:1]:
+                n = GraphNode(id=f"{prefix}-{_make_id()}", node_type=self._classify_node_type(f["service"]),
+                              label=f.get("resource_name") or f["check_title"],
+                              service=f["service"], severity=f["severity"],
+                              metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+                nodes.append(n)
+                edges.append(GraphEdge(prev_id, n.id, etype, lbl))
+                prev_id = n.id
+                affected.append(f.get("resource_id") or f["check_title"])
+
+        encrypt_target = GraphNode(id=f"rw-encrypt-{_make_id()}", node_type=NodeType.DATA_STORE,
+                                   label="Encrypted / Ransomed Data", service="multi-service",
+                                   severity="critical")
+        nodes.append(encrypt_target)
+        edges.append(GraphEdge(prev_id, encrypt_target.id, EdgeType.HAS_ACCESS,
+                               "encrypts data for ransom"))
+
+        return AttackPath(
+            id=_make_id(),
+            title="Ransomware Kill Chain",
+            description="Complete ransomware attack chain: internet-facing RDP/SSH without MFA enables "
+                        "initial access, followed by logging disablement, backup destruction, and "
+                        "data encryption for impact.",
+            severity="critical",
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Internet",
+            target="Encrypted / Ransomed Data",
+            category="ransomware",
+            techniques=["T1190", "T1110", "T1078", "T1562.008", "T1490", "T1486", "T1485"],
+            affected_resources=affected,
+            remediation=[
+                "Close RDP (3389) and SSH (22) to the internet",
+                "Enforce MFA for all IAM users and console access",
+                "Enable CloudTrail in all regions with tamper protection",
+                "Enable S3 bucket versioning and Object Lock",
+                "Enable automated backups with deletion protection on RDS",
+                "Implement immutable backup strategies",
+            ],
+        )
+
+    def _build_insider_exfiltration_saas_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Insider: Unmasked Snowflake → Salesforce export → M365 sharing → exfiltration."""
+        saas_findings = [f for f in findings
+                         if any(k in f["check_id"] for k in ["m365_external_sharing",
+                                                               "m365_dlp_policies",
+                                                               "salesforce_field_level",
+                                                               "snowflake_column_masking"])
+                         and f.get("status") == "FAIL"]
+        if len(saas_findings) < 2:
+            return None
+
+        nodes, edges, affected = [], [], []
+        insider = GraphNode(id="insider-actor", node_type=NodeType.IDENTITY,
+                            label="Malicious Insider", service="internal")
+        nodes.append(insider)
+
+        snow_findings = [f for f in saas_findings if "snowflake" in f["check_id"]]
+        sf_findings = [f for f in saas_findings if "salesforce" in f["check_id"]]
+        m365_findings = [f for f in saas_findings if "m365" in f["check_id"]]
+
+        prev_id = insider.id
+        for layer, prefix, svc, lbl in [
+            (snow_findings, "ins-snow", "snowflake", "accesses unmasked data"),
+            (sf_findings, "ins-sf", "salesforce", "unrestricted data export"),
+            (m365_findings, "ins-m365", "m365", "external sharing without DLP"),
+        ]:
+            for f in layer[:1]:
+                n = GraphNode(id=f"{prefix}-{_make_id()}", node_type=NodeType.DATA_STORE,
+                              label=f.get("resource_name") or f["check_title"],
+                              service=svc, severity=f["severity"],
+                              metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+                nodes.append(n)
+                edges.append(GraphEdge(prev_id, n.id, EdgeType.HAS_ACCESS, lbl))
+                prev_id = n.id
+                affected.append(f.get("resource_id") or f["check_title"])
+
+        exfil = GraphNode(id=f"ins-exfil-{_make_id()}", node_type=NodeType.SERVICE,
+                          label="Data Exfiltration", service="external",
+                          severity="high")
+        nodes.append(exfil)
+        edges.append(GraphEdge(prev_id, exfil.id, EdgeType.HAS_ACCESS,
+                               "data exfiltrated via SaaS channels"))
+
+        return AttackPath(
+            id=_make_id(),
+            title="Insider Data Exfiltration via SaaS Channels",
+            description="Malicious insider leverages unmasked data in Snowflake, unrestricted "
+                        "Salesforce exports, and M365 external sharing without DLP to exfiltrate "
+                        "sensitive data through SaaS channels.",
+            severity=self._max_severity([f["severity"] for f in saas_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Malicious Insider",
+            target="Data Exfiltration",
+            category="data_exfiltration",
+            techniques=["T1530", "T1567", "T1537"],
+            affected_resources=affected,
+            remediation=[
+                "Enable column-level masking policies in Snowflake",
+                "Enforce field-level security in Salesforce",
+                "Restrict external sharing in Microsoft 365",
+                "Configure DLP policies across all SaaS platforms",
+                "Implement data loss prevention monitoring and alerts",
+            ],
+        )
+
+    def _build_multi_cloud_lateral_path(self, findings, services, checks) -> Optional[AttackPath]:
+        """Multi-cloud: Weakest IAM → compromised → cross-cloud service account → all envs."""
+        iam_findings = [f for f in findings
+                        if any(k in f["check_id"] for k in ["iam_user_mfa", "azure_iam_owner",
+                                                              "gcp_iam_no_public", "ali_ram_mfa"])
+                        and f.get("status") == "FAIL"]
+        if len(iam_findings) < 3:
+            return None
+
+        nodes, edges, affected = [], [], []
+        entry = GraphNode(id="mcl-weakest", node_type=NodeType.IDENTITY,
+                          label="Weakest Cloud IAM", service="multi-service")
+        nodes.append(entry)
+
+        prev_id = entry.id
+        for f in iam_findings[:4]:
+            n = GraphNode(id=f"mcl-iam-{_make_id()}", node_type=NodeType.IDENTITY,
+                          label=f.get("resource_name") or f["check_title"],
+                          service=f["service"], severity=f["severity"],
+                          metadata={"finding_id": f["id"], "check_id": f["check_id"]})
+            nodes.append(n)
+            edges.append(GraphEdge(prev_id, n.id, EdgeType.LATERAL_MOVE,
+                                   "cross-cloud lateral movement"))
+            prev_id = n.id
+            affected.append(f.get("resource_id") or f["check_title"])
+
+        cross_cloud = GraphNode(id=f"mcl-cross-{_make_id()}", node_type=NodeType.IDENTITY,
+                                label="Cross-Cloud Service Account", service="multi-service",
+                                severity="high")
+        nodes.append(cross_cloud)
+        edges.append(GraphEdge(prev_id, cross_cloud.id, EdgeType.ASSUMES_ROLE,
+                               "pivots via federation / service account"))
+
+        all_envs = GraphNode(id=f"mcl-all-{_make_id()}", node_type=NodeType.RESOURCE,
+                             label="All Cloud Environments", service="multi-service",
+                             severity="critical")
+        nodes.append(all_envs)
+        edges.append(GraphEdge(cross_cloud.id, all_envs.id, EdgeType.HAS_ACCESS,
+                               "full access to all environments"))
+
+        return AttackPath(
+            id=_make_id(),
+            title="Multi-Cloud Lateral Movement",
+            description="IAM misconfigurations across multiple cloud providers allow attackers to "
+                        "pivot from the weakest environment to all connected cloud accounts via "
+                        "cross-cloud service accounts and federation.",
+            severity=self._max_severity([f["severity"] for f in iam_findings]),
+            risk_score=0,
+            nodes=nodes, edges=edges,
+            entry_point="Weakest Cloud IAM",
+            target="All Cloud Environments",
+            category="lateral_movement",
+            techniques=["T1078.004", "T1021", "T1563", "T1550"],
+            affected_resources=affected,
+            remediation=[
+                "Enforce MFA across all cloud provider IAM users",
+                "Limit subscription/account owners to a minimum",
+                "Remove public IAM bindings in GCP",
+                "Audit cross-cloud service accounts and federation trusts",
+                "Implement consistent identity governance across all clouds",
+            ],
+        )
+
     def _score_paths(self) -> None:
         """Assign risk scores to discovered attack paths."""
         severity_weights = {
             "critical": 40, "high": 30, "medium": 20, "low": 10, "informational": 5
         }
         category_weights = {
+            "ransomware": 1.5,
             "privilege_escalation": 1.3,
+            "credential_access": 1.25,
             "data_exfiltration": 1.2,
+            "supply_chain": 1.15,
             "lateral_movement": 1.1,
             "exposure": 1.0,
             "detection_evasion": 0.9,
