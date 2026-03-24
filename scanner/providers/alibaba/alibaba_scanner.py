@@ -1,7 +1,7 @@
 """Alibaba Cloud Security Scanner — CIS/CCM-aligned checks.
 
-Implements 30+ security checks for Alibaba Cloud services following
-CIS Alibaba Cloud Benchmark, NIST 800-53, and CSA CCM v4.1.
+Implements 60+ security checks for Alibaba Cloud services following
+CIS Alibaba Cloud Foundation Benchmark v1.0 and v2.0, NIST 800-53, and CSA CCM v4.1.
 """
 import json
 import logging
@@ -12,7 +12,19 @@ from scanner.providers.base_check import CheckResult
 
 logger = logging.getLogger(__name__)
 
-COMPLIANCE = ["CIS-Alibaba-1.0", "NIST-800-53", "CCM-4.1"]
+COMPLIANCE = ["CIS-Alibaba-1.0", "CIS-Alibaba-2.0", "NIST-800-53", "CCM-4.1"]
+
+
+def _port_range_includes(port_range: str, port: int) -> bool:
+    """Check if an Alibaba security group port range string includes a given port."""
+    if not port_range or port_range == "-1/-1":
+        return True  # -1/-1 means all ports
+    try:
+        parts = port_range.split("/")
+        lo, hi = int(parts[0]), int(parts[1])
+        return lo <= port <= hi
+    except (ValueError, IndexError):
+        return False
 
 
 class AlibabaScanner:
@@ -49,6 +61,8 @@ class AlibabaScanner:
             "slb": self._check_slb,
             "waf": self._check_waf,
             "security_center": self._check_security_center,
+            "ack": self._check_ack,
+            "sls": self._check_sls,
         }
 
         for service_name, check_fn in check_methods.items():
@@ -168,6 +182,36 @@ class AlibabaScanner:
                                 compliance_frameworks=COMPLIANCE,
                             ).to_dict())
 
+                            # CIS 2.0 4.3 — SSH port 22 specific check
+                            if _port_range_includes(port_range, 22):
+                                results.append(CheckResult(
+                                    check_id="ali_ecs_sg_no_ssh_open",
+                                    check_title="Security group does not allow unrestricted SSH (port 22) from 0.0.0.0/0",
+                                    service="ecs", severity="high", region=region,
+                                    status="FAIL",
+                                    resource_id=sg_id,
+                                    resource_name=sg.security_group_name or sg_id,
+                                    status_extended=f"SG {sg_id} allows SSH (port 22) from 0.0.0.0/0",
+                                    remediation="Restrict port 22 access to specific trusted IP ranges or use bastion hosts",
+                                    remediation_url="https://www.alibabacloud.com/help/doc-detail/51170.htm",
+                                    compliance_frameworks=COMPLIANCE,
+                                ).to_dict())
+
+                            # CIS 2.0 4.4 — RDP port 3389 specific check
+                            if _port_range_includes(port_range, 3389):
+                                results.append(CheckResult(
+                                    check_id="ali_ecs_sg_no_rdp_open",
+                                    check_title="Security group does not allow unrestricted RDP (port 3389) from 0.0.0.0/0",
+                                    service="ecs", severity="high", region=region,
+                                    status="FAIL",
+                                    resource_id=sg_id,
+                                    resource_name=sg.security_group_name or sg_id,
+                                    status_extended=f"SG {sg_id} allows RDP (port 3389) from 0.0.0.0/0",
+                                    remediation="Restrict port 3389 access to specific trusted IP ranges",
+                                    remediation_url="https://www.alibabacloud.com/help/doc-detail/51170.htm",
+                                    compliance_frameworks=COMPLIANCE,
+                                ).to_dict())
+
         except Exception as e:
             logger.warning(f"Alibaba ECS checks failed: {e}")
         return results
@@ -268,6 +312,82 @@ class AlibabaScanner:
                         remediation="Enable SSL encryption for database connections",
                         compliance_frameworks=COMPLIANCE,
                     ).to_dict())
+
+                    # CIS 2.0 6.2 — RDS not open to the world (whitelist check)
+                    try:
+                        ip_req = rds_models.DescribeDBInstanceIPArrayListRequest(dbinstance_id=db_id)
+                        ip_resp = client.describe_dbinstance_iparray_list(ip_req)
+                        open_world = False
+                        for ip_arr in ip_resp.body.items.dbinstance_iparray or []:
+                            ips = ip_arr.security_iplist or ""
+                            if "0.0.0.0/0" in ips or "0.0.0.0" in ips.split(","):
+                                open_world = True
+                                break
+                        results.append(CheckResult(
+                            check_id="ali_rds_not_open_world",
+                            check_title="RDS instance whitelist does not allow 0.0.0.0/0",
+                            service="rds", severity="critical", region=region,
+                            status="FAIL" if open_world else "PASS",
+                            resource_id=db_id, resource_name=db_name,
+                            status_extended=f"RDS {db_name} open to world: {open_world}",
+                            remediation="Remove 0.0.0.0/0 from the RDS IP whitelist and restrict to specific IPs",
+                            remediation_url="https://www.alibabacloud.com/help/doc-detail/26198.htm",
+                            compliance_frameworks=COMPLIANCE,
+                        ).to_dict())
+                    except Exception:
+                        pass
+
+                    # CIS 2.0 6.3 — SQL Auditing enabled
+                    try:
+                        audit_req = rds_models.DescribeSQLCollectorPolicyRequest(dbinstance_id=db_id)
+                        audit_resp = client.describe_sqlcollector_policy(audit_req)
+                        audit_enabled = audit_resp.body.sqlcollector_status == "Enable"
+                    except Exception:
+                        audit_enabled = False
+                    results.append(CheckResult(
+                        check_id="ali_rds_audit_enabled",
+                        check_title="RDS instance has SQL auditing (SQL Explorer) enabled",
+                        service="rds", severity="medium", region=region,
+                        status="PASS" if audit_enabled else "FAIL",
+                        resource_id=db_id, resource_name=db_name,
+                        status_extended=f"RDS {db_name} SQL audit: {audit_enabled}",
+                        remediation="Enable SQL Explorer/Auditing for the RDS instance via the console",
+                        remediation_url="https://www.alibabacloud.com/help/doc-detail/96123.htm",
+                        compliance_frameworks=COMPLIANCE,
+                    ).to_dict())
+
+                    # CIS 2.0 6.7/6.8/6.9 — PostgreSQL specific parameters
+                    engine = getattr(db, 'engine', '') or ''
+                    if engine.lower() == 'postgresql':
+                        try:
+                            param_req = rds_models.DescribeParametersRequest(dbinstance_id=db_id)
+                            param_resp = client.describe_parameters(param_req)
+                            running_params = {}
+                            for p in param_resp.body.running_parameters.dbinstance_parameter or []:
+                                running_params[p.parameter_name] = p.parameter_value
+
+                            for param_name, check_id, title in [
+                                ("log_connections", "ali_rds_pg_log_connections",
+                                 "PostgreSQL log_connections is set to ON"),
+                                ("log_disconnections", "ali_rds_pg_log_disconnections",
+                                 "PostgreSQL log_disconnections is set to ON"),
+                                ("log_duration", "ali_rds_pg_log_duration",
+                                 "PostgreSQL log_duration is set to ON"),
+                            ]:
+                                val = running_params.get(param_name, "off")
+                                results.append(CheckResult(
+                                    check_id=check_id,
+                                    check_title=title,
+                                    service="rds", severity="medium", region=region,
+                                    status="PASS" if val.lower() == "on" else "FAIL",
+                                    resource_id=db_id, resource_name=db_name,
+                                    status_extended=f"RDS {db_name} {param_name}: {val}",
+                                    remediation=f"Set parameter '{param_name}' to 'ON' in RDS instance parameters",
+                                    remediation_url="https://www.alibabacloud.com/help/doc-detail/96751.htm",
+                                    compliance_frameworks=COMPLIANCE,
+                                ).to_dict())
+                        except Exception:
+                            pass
 
         except Exception as e:
             logger.warning(f"Alibaba RDS checks failed: {e}")
@@ -491,7 +611,7 @@ class AlibabaScanner:
                     compliance_frameworks=COMPLIANCE,
                 ).to_dict())
 
-            # ali_ram_password_policy
+            # ali_ram_password_policy (aggregate check)
             try:
                 policy_resp = client.get_password_policy(ram_models.GetPasswordPolicyRequest())
                 policy = policy_resp.body.password_policy
@@ -520,6 +640,162 @@ class AlibabaScanner:
                     remediation="Set minimum password length to 14+ and require all character types",
                     compliance_frameworks=COMPLIANCE,
                 ).to_dict())
+
+                # CIS 2.0 1.7 — Granular: requires uppercase
+                results.append(CheckResult(
+                    check_id="ali_ram_password_uppercase",
+                    check_title="RAM password policy requires at least one uppercase letter",
+                    service="ram", severity="medium",
+                    status="PASS" if require_upper else "FAIL",
+                    resource_id="password-policy",
+                    remediation="Run: aliyun ram SetPasswordPolicy --RequireUppercaseCharacters true",
+                    remediation_url="https://www.alibabacloud.com/help/doc-detail/116413.htm",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+
+                # CIS 2.0 1.8 — Granular: requires lowercase
+                results.append(CheckResult(
+                    check_id="ali_ram_password_lowercase",
+                    check_title="RAM password policy requires at least one lowercase letter",
+                    service="ram", severity="medium",
+                    status="PASS" if require_lower else "FAIL",
+                    resource_id="password-policy",
+                    remediation="Run: aliyun ram SetPasswordPolicy --RequireLowercaseCharacters true",
+                    remediation_url="https://www.alibabacloud.com/help/doc-detail/116413.htm",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+
+                # CIS 2.0 1.9 — Granular: requires symbol
+                results.append(CheckResult(
+                    check_id="ali_ram_password_symbol",
+                    check_title="RAM password policy requires at least one symbol",
+                    service="ram", severity="medium",
+                    status="PASS" if require_symbols else "FAIL",
+                    resource_id="password-policy",
+                    remediation="Run: aliyun ram SetPasswordPolicy --RequireSymbols true",
+                    remediation_url="https://www.alibabacloud.com/help/doc-detail/116413.htm",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+
+                # CIS 2.0 1.10 — Granular: requires number
+                results.append(CheckResult(
+                    check_id="ali_ram_password_number",
+                    check_title="RAM password policy requires at least one number",
+                    service="ram", severity="medium",
+                    status="PASS" if require_numbers else "FAIL",
+                    resource_id="password-policy",
+                    remediation="Run: aliyun ram SetPasswordPolicy --RequireNumbers true",
+                    remediation_url="https://www.alibabacloud.com/help/doc-detail/116413.htm",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+
+                # CIS 2.0 1.11 — Granular: minimum length >= 14
+                results.append(CheckResult(
+                    check_id="ali_ram_password_length",
+                    check_title="RAM password policy requires minimum length of 14 or greater",
+                    service="ram", severity="medium",
+                    status="PASS" if min_length >= 14 else "FAIL",
+                    resource_id="password-policy",
+                    status_extended=f"Minimum password length: {min_length}",
+                    remediation="Run: aliyun ram SetPasswordPolicy --MinimumPasswordLength 14",
+                    remediation_url="https://www.alibabacloud.com/help/doc-detail/116413.htm",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+
+                # CIS 2.0 1.12 — Password reuse prevention
+                reuse_prevention = getattr(policy, 'password_reuse_prevention', 0) or 0
+                results.append(CheckResult(
+                    check_id="ali_ram_password_reuse",
+                    check_title="RAM password policy prevents password reuse",
+                    service="ram", severity="medium",
+                    status="PASS" if reuse_prevention >= 5 else "FAIL",
+                    resource_id="password-policy",
+                    status_extended=f"Password reuse prevention: {reuse_prevention} previous passwords",
+                    remediation="Run: aliyun ram SetPasswordPolicy --PasswordReusePrevention 5",
+                    remediation_url="https://www.alibabacloud.com/help/doc-detail/116413.htm",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+
+                # CIS 2.0 1.13 — Password expiry <= 365 days
+                max_age = getattr(policy, 'max_password_age', 0) or 0
+                expiry_ok = 0 < max_age <= 365 if max_age else False
+                results.append(CheckResult(
+                    check_id="ali_ram_password_expiry",
+                    check_title="RAM password policy expires passwords within 365 days",
+                    service="ram", severity="medium",
+                    status="PASS" if expiry_ok else "FAIL",
+                    resource_id="password-policy",
+                    status_extended=f"Max password age: {max_age} days" if max_age else "Password expiry not configured",
+                    remediation="Run: aliyun ram SetPasswordPolicy --MaxPasswordAge 365",
+                    remediation_url="https://www.alibabacloud.com/help/doc-detail/116413.htm",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+
+                # CIS 2.0 1.14 — Lockout after 5 failed attempts
+                max_attempts = getattr(policy, 'max_login_attemps', 0) or 0
+                results.append(CheckResult(
+                    check_id="ali_ram_password_lockout",
+                    check_title="RAM password policy blocks logon after 5 incorrect attempts",
+                    service="ram", severity="medium",
+                    status="PASS" if 0 < max_attempts <= 5 else "FAIL",
+                    resource_id="password-policy",
+                    status_extended=f"Max login attempts: {max_attempts}" if max_attempts else "Lockout not configured",
+                    remediation="Run: aliyun ram SetPasswordPolicy --MaxLoginAttemps 5",
+                    remediation_url="https://www.alibabacloud.com/help/doc-detail/116413.htm",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+            except Exception:
+                pass
+
+            # CIS 2.0 1.15 — No wildcard administrative policies
+            try:
+                policies_resp = client.list_policies(ram_models.ListPoliciesRequest(policy_type="Custom", max_items=200))
+                for pol in policies_resp.body.policies.policy or []:
+                    pol_name = pol.policy_name
+                    try:
+                        detail_resp = client.get_policy(ram_models.GetPolicyRequest(
+                            policy_name=pol_name, policy_type="Custom",
+                        ))
+                        doc = detail_resp.body.default_policy_version.policy_document or ""
+                        has_admin = '"Action": "*"' in doc and '"Resource": "*"' in doc and '"Effect": "Allow"' in doc
+                        if has_admin:
+                            results.append(CheckResult(
+                                check_id="ali_ram_no_wildcard_policy",
+                                check_title="RAM policy does not allow full *:* administrative privileges",
+                                service="ram", severity="critical",
+                                status="FAIL",
+                                resource_id=pol_name, resource_name=pol_name,
+                                status_extended=f"Policy '{pol_name}' grants full *:* administrative privileges",
+                                remediation="Edit the policy to grant least-privilege permissions or detach from all identities",
+                                remediation_url="https://www.alibabacloud.com/help/doc-detail/93733.htm",
+                                compliance_frameworks=COMPLIANCE,
+                            ).to_dict())
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            # CIS 2.0 1.16 — Policies attached only to groups/roles
+            try:
+                for user in users:
+                    username = user.user_name
+                    try:
+                        pol_resp = client.list_policies_for_user(ram_models.ListPoliciesForUserRequest(user_name=username))
+                        user_policies = pol_resp.body.policies.policy or []
+                        if user_policies:
+                            results.append(CheckResult(
+                                check_id="ali_ram_policies_groups_only",
+                                check_title="RAM policies should be attached to groups/roles, not directly to users",
+                                service="ram", severity="medium",
+                                status="FAIL",
+                                resource_id=username, resource_name=username,
+                                status_extended=f"User '{username}' has {len(user_policies)} direct policy attachment(s)",
+                                remediation="Detach policies from users and attach to groups or roles instead",
+                                remediation_url="https://www.alibabacloud.com/help/doc-detail/116809.htm",
+                                compliance_frameworks=COMPLIANCE,
+                            ).to_dict())
+                    except Exception:
+                        pass
             except Exception:
                 pass
 
@@ -685,6 +961,32 @@ class AlibabaScanner:
                 remediation="Create an ActionTrail trail to log all API activity",
                 compliance_frameworks=COMPLIANCE,
             ).to_dict())
+
+            # ali_actiontrail_oss_not_public — CIS 2.2 OSS bucket for trail not public
+            for trail in trails:
+                trail_name = trail.name
+                oss_bucket = getattr(trail, 'oss_bucket_name', None)
+                if oss_bucket:
+                    try:
+                        import oss2
+                        auth = oss2.Auth(self._access_key_id, self._access_key_secret)
+                        oss_loc = getattr(trail, 'oss_bucket_location', None) or f"oss-{self.regions[0]}"
+                        bucket = oss2.Bucket(auth, f"https://{oss_loc}.aliyuncs.com", oss_bucket)
+                        acl = bucket.get_bucket_acl()
+                        is_public = acl.acl in ("public-read", "public-read-write")
+                    except Exception:
+                        is_public = False
+                    results.append(CheckResult(
+                        check_id="ali_actiontrail_oss_not_public",
+                        check_title="ActionTrail log OSS bucket is not publicly accessible",
+                        service="actiontrail", severity="critical",
+                        status="FAIL" if is_public else "PASS",
+                        resource_id=oss_bucket, resource_name=oss_bucket,
+                        status_extended=f"ActionTrail OSS bucket {oss_bucket} public: {is_public}",
+                        remediation="Set the ActionTrail log delivery OSS bucket ACL to private",
+                        remediation_url="https://www.alibabacloud.com/help/doc-detail/China/China",
+                        compliance_frameworks=COMPLIANCE,
+                    ).to_dict())
 
             for trail in trails:
                 trail_name = trail.name
@@ -874,16 +1176,17 @@ class AlibabaScanner:
             )
             client = SasClient(config)
 
-            # ali_security_center_enabled — check if threat detection is active
+            # ali_security_center_enabled — CIS 8.1 check if threat detection is active
+            sc_active = False
+            sc_version = None
             try:
                 overview_req = sas_models.DescribeAlarmEventListRequest(
                     current_page=1, page_size=1,
                 )
                 overview_resp = client.describe_alarm_event_list(overview_req)
-                # If we can query, Security Center is enabled
                 sc_active = True
             except Exception:
-                sc_active = False
+                pass
             results.append(CheckResult(
                 check_id="ali_security_center_enabled",
                 check_title="Security Center (Threat Detection) is enabled",
@@ -895,6 +1198,414 @@ class AlibabaScanner:
                 compliance_frameworks=COMPLIANCE,
             ).to_dict())
 
+            # ali_sas_advanced_edition — CIS 8.1 Security Center should be Advanced/Enterprise
+            try:
+                version_req = sas_models.DescribeVersionConfigRequest()
+                version_resp = client.describe_version_config(version_req)
+                sc_version = version_resp.body.version
+                is_advanced = sc_version and int(sc_version) >= 3  # 3=Advanced, 5=Enterprise
+            except Exception:
+                is_advanced = False
+            results.append(CheckResult(
+                check_id="ali_sas_advanced_edition",
+                check_title="Security Center is at least Advanced edition",
+                service="security_center", severity="high",
+                status="PASS" if is_advanced else "FAIL",
+                resource_id="security-center-edition",
+                status_extended=f"Security Center version: {sc_version or 'unknown'} (3=Advanced, 5=Enterprise)",
+                remediation="Upgrade Security Center to Advanced or Enterprise edition for full threat detection",
+                remediation_url="https://www.alibabacloud.com/help/doc-detail/42306.htm",
+                compliance_frameworks=COMPLIANCE,
+            ).to_dict())
+
+            # ali_sas_agents_installed — CIS 8.2 all ECS instances have agent
+            if sc_active:
+                try:
+                    agent_req = sas_models.DescribeCloudCenterInstancesRequest(
+                        current_page=1, page_size=100,
+                    )
+                    agent_resp = client.describe_cloud_center_instances(agent_req)
+                    total_instances = agent_resp.body.page_info.total_count or 0
+                    online_count = 0
+                    for inst in agent_resp.body.instances or []:
+                        if inst.client_status == "online":
+                            online_count += 1
+                    all_online = online_count == total_instances and total_instances > 0
+                    results.append(CheckResult(
+                        check_id="ali_sas_agents_installed",
+                        check_title="Security Center agents installed and online on all instances",
+                        service="security_center", severity="high",
+                        status="PASS" if all_online else "FAIL",
+                        resource_id="security-center-agents",
+                        status_extended=f"Agents online: {online_count}/{total_instances}",
+                        remediation="Install and activate the Security Center agent on all ECS instances",
+                        remediation_url="https://www.alibabacloud.com/help/doc-detail/68600.htm",
+                        compliance_frameworks=COMPLIANCE,
+                    ).to_dict())
+                except Exception:
+                    pass
+
+            # ali_sas_notification_enabled — CIS 8.5 notifications configured
+            if sc_active:
+                try:
+                    notif_req = sas_models.DescribeNoticeConfigRequest()
+                    notif_resp = client.describe_notice_config(notif_req)
+                    configs = notif_resp.body.notice_config_list or []
+                    has_notification = len(configs) > 0
+                    results.append(CheckResult(
+                        check_id="ali_sas_notification_enabled",
+                        check_title="Security Center notification contacts are configured",
+                        service="security_center", severity="medium",
+                        status="PASS" if has_notification else "FAIL",
+                        resource_id="security-center-notifications",
+                        status_extended=f"Notification configs: {len(configs)}",
+                        remediation="Configure notification contacts in Security Center for alerts on vulnerabilities and threats",
+                        remediation_url="https://www.alibabacloud.com/help/doc-detail/China/China/China/China",
+                        compliance_frameworks=COMPLIANCE,
+                    ).to_dict())
+                except Exception:
+                    pass
+
+            # ali_sas_vuln_scan_enabled — CIS 8.7 vulnerability scanning
+            if sc_active:
+                try:
+                    vuln_req = sas_models.DescribeGroupedVulRequest(
+                        current_page=1, page_size=1, type="cve",
+                    )
+                    vuln_resp = client.describe_grouped_vul(vuln_req)
+                    vuln_scan_active = vuln_resp.body.total_count is not None
+                    results.append(CheckResult(
+                        check_id="ali_sas_vuln_scan_enabled",
+                        check_title="Security Center vulnerability scanning is active",
+                        service="security_center", severity="medium",
+                        status="PASS" if vuln_scan_active else "FAIL",
+                        resource_id="security-center-vuln-scan",
+                        status_extended=f"Vulnerability scanning active: {vuln_scan_active}",
+                        remediation="Enable automatic vulnerability scanning in Security Center settings",
+                        compliance_frameworks=COMPLIANCE,
+                    ).to_dict())
+                except Exception:
+                    pass
+
         except Exception as e:
             logger.warning(f"Alibaba Security Center checks failed: {e}")
+        return results
+
+    # ── ACK (Container Service for Kubernetes) checks ─────────────────
+
+    def _check_ack(self) -> list[dict]:
+        """CIS Alibaba 2.0 Domain 7 — Kubernetes Engine (ACK) checks."""
+        results = []
+        try:
+            from alibabacloud_cs20151215.client import Client as CsClient
+            from alibabacloud_cs20151215 import models as cs_models
+            from alibabacloud_tea_openapi.models import Config
+
+            config = Config(
+                access_key_id=self._access_key_id,
+                access_key_secret=self._access_key_secret,
+                endpoint="cs.aliyuncs.com",
+            )
+            client = CsClient(config)
+
+            clusters_resp = client.describe_clusters_v1(cs_models.DescribeClustersV1Request(page_size=50))
+            clusters = clusters_resp.body.clusters or []
+
+            for cluster in clusters:
+                cluster_id = cluster.cluster_id
+                cluster_name = cluster.name or cluster_id
+                cluster_type = cluster.cluster_type or ""
+                region = cluster.region_id or self.regions[0]
+
+                # ali_ack_log_service — CIS 7.1 logging to SLS enabled
+                log_enabled = False
+                try:
+                    log_config = cluster.meta_data
+                    if log_config:
+                        import json as _json
+                        meta = _json.loads(log_config) if isinstance(log_config, str) else log_config
+                        log_enabled = bool(meta.get("Addons", {}).get("China", {}).get("China", False))
+                except Exception:
+                    pass
+                # Check cluster tags/addons for log service
+                try:
+                    detail_resp = client.describe_cluster_detail(cluster_id)
+                    detail = detail_resp.body
+                    if hasattr(detail, 'meta_data') and detail.meta_data:
+                        import json as _json
+                        meta = _json.loads(detail.meta_data) if isinstance(detail.meta_data, str) else detail.meta_data
+                        addons = meta.get("Addons") or []
+                        for addon in addons:
+                            if isinstance(addon, dict) and addon.get("name") in ("logtail-ds", "alibaba-log-controller"):
+                                log_enabled = True
+                                break
+                except Exception:
+                    pass
+                results.append(CheckResult(
+                    check_id="ali_ack_log_service",
+                    check_title="ACK cluster has Log Service (SLS) integration enabled",
+                    service="ack", severity="high", region=region,
+                    status="PASS" if log_enabled else "FAIL",
+                    resource_id=cluster_id, resource_name=cluster_name,
+                    status_extended=f"ACK cluster {cluster_name} log service: {log_enabled}",
+                    remediation="Enable Log Service (SLS) for ACK cluster to collect audit and container logs",
+                    remediation_url="https://www.alibabacloud.com/help/doc-detail/China/China",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+
+                # ali_ack_cloud_monitor — CIS 7.2 cloud monitoring enabled
+                monitoring_enabled = False
+                try:
+                    if hasattr(detail, 'meta_data') and detail.meta_data:
+                        import json as _json
+                        meta = _json.loads(detail.meta_data) if isinstance(detail.meta_data, str) else detail.meta_data
+                        addons = meta.get("Addons") or []
+                        for addon in addons:
+                            if isinstance(addon, dict) and addon.get("name") in ("arms-prometheus", "metrics-server"):
+                                monitoring_enabled = True
+                                break
+                except Exception:
+                    pass
+                results.append(CheckResult(
+                    check_id="ali_ack_cloud_monitor",
+                    check_title="ACK cluster has Cloud Monitor integration enabled",
+                    service="ack", severity="medium", region=region,
+                    status="PASS" if monitoring_enabled else "FAIL",
+                    resource_id=cluster_id, resource_name=cluster_name,
+                    status_extended=f"ACK cluster {cluster_name} cloud monitoring: {monitoring_enabled}",
+                    remediation="Enable ARMS Prometheus or CloudMonitor agent for ACK cluster monitoring",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+
+                # ali_ack_rbac_enabled — CIS 7.3 RBAC authorization
+                rbac_enabled = False
+                try:
+                    if hasattr(detail, 'parameters') and detail.parameters:
+                        import json as _json
+                        params = _json.loads(detail.parameters) if isinstance(detail.parameters, str) else detail.parameters
+                        rbac_enabled = params.get("KubernetesVersion", "") >= "1.12"
+                    # Managed clusters always have RBAC
+                    if cluster_type in ("ManagedKubernetes", "Ask"):
+                        rbac_enabled = True
+                except Exception:
+                    if cluster_type in ("ManagedKubernetes", "Ask"):
+                        rbac_enabled = True
+                results.append(CheckResult(
+                    check_id="ali_ack_rbac_enabled",
+                    check_title="ACK cluster has RBAC authorization enabled",
+                    service="ack", severity="high", region=region,
+                    status="PASS" if rbac_enabled else "FAIL",
+                    resource_id=cluster_id, resource_name=cluster_name,
+                    status_extended=f"ACK cluster {cluster_name} RBAC: {rbac_enabled}",
+                    remediation="Enable RBAC for the ACK cluster (managed clusters have it by default)",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+
+                # ali_ack_no_basic_auth — CIS 7.6 no basic authentication
+                basic_auth_disabled = True
+                try:
+                    if hasattr(detail, 'parameters') and detail.parameters:
+                        import json as _json
+                        params = _json.loads(detail.parameters) if isinstance(detail.parameters, str) else detail.parameters
+                        if params.get("BasicAuth") or params.get("basic_auth"):
+                            basic_auth_disabled = False
+                    # Managed clusters >= 1.20 always disable basic auth
+                    if cluster_type in ("ManagedKubernetes", "Ask"):
+                        basic_auth_disabled = True
+                except Exception:
+                    pass
+                results.append(CheckResult(
+                    check_id="ali_ack_no_basic_auth",
+                    check_title="ACK cluster does not use basic authentication",
+                    service="ack", severity="high", region=region,
+                    status="PASS" if basic_auth_disabled else "FAIL",
+                    resource_id=cluster_id, resource_name=cluster_name,
+                    status_extended=f"ACK cluster {cluster_name} basic auth disabled: {basic_auth_disabled}",
+                    remediation="Disable basic authentication and use certificate-based authentication or OIDC",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+
+                # ali_ack_network_policy — CIS 7.7 network policy enabled (Terway/Calico)
+                network_policy = False
+                try:
+                    network_type = getattr(detail, 'network_mode', '') or ''
+                    if 'terway' in network_type.lower():
+                        network_policy = True
+                    if hasattr(detail, 'meta_data') and detail.meta_data:
+                        import json as _json
+                        meta = _json.loads(detail.meta_data) if isinstance(detail.meta_data, str) else detail.meta_data
+                        addons = meta.get("Addons") or []
+                        for addon in addons:
+                            if isinstance(addon, dict) and addon.get("name") in ("terway-eniip", "calico"):
+                                network_policy = True
+                                break
+                except Exception:
+                    pass
+                results.append(CheckResult(
+                    check_id="ali_ack_network_policy",
+                    check_title="ACK cluster has network policy plugin enabled (Terway/Calico)",
+                    service="ack", severity="medium", region=region,
+                    status="PASS" if network_policy else "FAIL",
+                    resource_id=cluster_id, resource_name=cluster_name,
+                    status_extended=f"ACK cluster {cluster_name} network policy: {network_policy}",
+                    remediation="Enable Terway or Calico network policy plugin for pod-level network isolation",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+
+                # ali_ack_private_cluster — CIS 7.9 API server not public
+                is_private = True
+                try:
+                    endpoint = getattr(detail, 'master_url', '') or ''
+                    external_endpoint = getattr(detail, 'external_loadbalancer_id', '') or ''
+                    if external_endpoint:
+                        is_private = False
+                    # Check if public access is explicitly enabled
+                    maintenance_info = getattr(detail, 'maintenance_window', None)
+                    api_public = getattr(detail, 'public_access_enabled', None)
+                    if api_public is True:
+                        is_private = False
+                except Exception:
+                    pass
+                results.append(CheckResult(
+                    check_id="ali_ack_private_cluster",
+                    check_title="ACK cluster API server is not publicly accessible",
+                    service="ack", severity="high", region=region,
+                    status="PASS" if is_private else "FAIL",
+                    resource_id=cluster_id, resource_name=cluster_name,
+                    status_extended=f"ACK cluster {cluster_name} private: {is_private}",
+                    remediation="Disable public access to the cluster API server and use internal endpoints or VPN",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+
+        except Exception as e:
+            logger.warning(f"Alibaba ACK checks failed: {e}")
+        return results
+
+    # ── SLS / Log Monitoring checks ──────────────────────────────────
+
+    def _check_sls(self) -> list[dict]:
+        """CIS Alibaba 2.0 Domain 2 — Log Service monitoring and alerts."""
+        results = []
+        try:
+            from alibabacloud_sls20201230.client import Client as SlsClient
+            from alibabacloud_sls20201230 import models as sls_models
+            from alibabacloud_tea_openapi.models import Config
+
+            config = Config(
+                access_key_id=self._access_key_id,
+                access_key_secret=self._access_key_secret,
+                endpoint=f"{self.regions[0]}.log.aliyuncs.com",
+            )
+            client = SlsClient(config)
+
+            # Collect all projects and their alert configs
+            projects = []
+            try:
+                proj_resp = client.list_project(sls_models.ListProjectRequest(size=100))
+                projects = proj_resp.body.projects or []
+            except Exception:
+                pass
+
+            has_any_alert = False
+            alert_categories_found = set()
+
+            # Map CIS 2.0 monitoring controls to expected log alert categories
+            ALERT_CATEGORIES = {
+                "unauthorized_api": "ali_sls_alert_unauthorized_api",       # CIS 2.10
+                "console_no_mfa": "ali_sls_alert_console_no_mfa",           # CIS 2.11
+                "root_usage": "ali_sls_alert_root_usage",                   # CIS 2.12
+                "ram_policy_change": "ali_sls_alert_ram_policy_change",     # CIS 2.13
+                "iam_change": "ali_sls_alert_iam_change",                   # CIS 2.14
+                "vpc_change": "ali_sls_alert_vpc_change",                   # CIS 2.15
+                "route_table_change": "ali_sls_alert_route_change",         # CIS 2.16
+                "security_group_change": "ali_sls_alert_sg_change",         # CIS 2.17
+                "nacl_change": "ali_sls_alert_nacl_change",                 # CIS 2.18
+                "slb_change": "ali_sls_alert_slb_change",                   # CIS 2.19
+                "rds_change": "ali_sls_alert_rds_change",                   # CIS 2.20
+                "oss_policy_change": "ali_sls_alert_oss_change",            # CIS 2.21
+                "actiontrail_change": "ali_sls_alert_actiontrail_change",   # CIS 2.22
+            }
+
+            for project in projects:
+                project_name = project.project_name if hasattr(project, 'project_name') else str(project)
+                try:
+                    alert_resp = client.list_alerts(project_name, sls_models.ListAlertsRequest(size=100))
+                    alerts = alert_resp.body.results or []
+                    if alerts:
+                        has_any_alert = True
+                    for alert in alerts:
+                        alert_name = (getattr(alert, 'name', '') or '').lower()
+                        alert_query = (getattr(alert, 'display_name', '') or '').lower()
+                        combined = f"{alert_name} {alert_query}"
+                        # Heuristic matching of alerts to CIS categories
+                        if "unauthorized" in combined or "accessdenied" in combined:
+                            alert_categories_found.add("unauthorized_api")
+                        if "mfa" in combined or "nomfa" in combined:
+                            alert_categories_found.add("console_no_mfa")
+                        if "root" in combined:
+                            alert_categories_found.add("root_usage")
+                        if "policy" in combined and ("ram" in combined or "iam" in combined):
+                            alert_categories_found.add("ram_policy_change")
+                        if "iam" in combined or ("ram" in combined and "change" in combined):
+                            alert_categories_found.add("iam_change")
+                        if "vpc" in combined:
+                            alert_categories_found.add("vpc_change")
+                        if "route" in combined:
+                            alert_categories_found.add("route_table_change")
+                        if "security" in combined and "group" in combined:
+                            alert_categories_found.add("security_group_change")
+                        if "nacl" in combined or "acl" in combined:
+                            alert_categories_found.add("nacl_change")
+                        if "slb" in combined or "loadbalancer" in combined:
+                            alert_categories_found.add("slb_change")
+                        if "rds" in combined or "database" in combined:
+                            alert_categories_found.add("rds_change")
+                        if "oss" in combined or "bucket" in combined:
+                            alert_categories_found.add("oss_policy_change")
+                        if "actiontrail" in combined or "trail" in combined:
+                            alert_categories_found.add("actiontrail_change")
+                except Exception:
+                    pass
+
+                # CIS 2.23 — Log retention >= 365 days
+                try:
+                    logstores_resp = client.list_logstore(project_name, sls_models.ListLogstoreRequest(size=100))
+                    for ls in logstores_resp.body.logstores or []:
+                        ls_name = ls if isinstance(ls, str) else getattr(ls, 'logstore_name', str(ls))
+                        try:
+                            ls_detail = client.get_logstore(project_name, ls_name)
+                            ttl = getattr(ls_detail.body, 'ttl', 0) or 0
+                            results.append(CheckResult(
+                                check_id="ali_sls_retention_365",
+                                check_title="SLS log store retention is at least 365 days",
+                                service="sls", severity="medium",
+                                status="PASS" if ttl >= 365 else "FAIL",
+                                resource_id=f"{project_name}/{ls_name}",
+                                resource_name=ls_name,
+                                status_extended=f"Log store {ls_name} TTL: {ttl} days",
+                                remediation="Set log store retention (TTL) to at least 365 days",
+                                compliance_frameworks=COMPLIANCE,
+                            ).to_dict())
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+            # Emit a result for each CIS 2.10-2.22 monitoring alert category
+            for cat_key, check_id in ALERT_CATEGORIES.items():
+                found = cat_key in alert_categories_found
+                friendly_name = cat_key.replace("_", " ")
+                results.append(CheckResult(
+                    check_id=check_id,
+                    check_title=f"Log monitoring alert exists for {friendly_name}",
+                    service="sls", severity="medium",
+                    status="PASS" if found else "FAIL",
+                    resource_id=f"sls-alert-{cat_key}",
+                    status_extended=f"Log alert for {friendly_name}: {'configured' if found else 'not found'}",
+                    remediation=f"Create a log alert in SLS to detect {friendly_name} events from ActionTrail logs",
+                    compliance_frameworks=COMPLIANCE,
+                ).to_dict())
+
+        except Exception as e:
+            logger.warning(f"Alibaba SLS checks failed: {e}")
         return results
