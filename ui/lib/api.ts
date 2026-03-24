@@ -456,6 +456,28 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/security-graph/stats')
   }
 
+  async getSecurityGraphNodeDetail(nodeId: string) {
+    return this.request<any>('GET', `/api/v1/security-graph/nodes/${encodeURIComponent(nodeId)}`)
+  }
+
+  async getSecurityGraphBlastRadius(nodeId: string, maxDepth?: number) {
+    const params: Record<string, string> = {}
+    if (maxDepth) params.max_depth = String(maxDepth)
+    return this.request<any>('GET', `/api/v1/security-graph/blast-radius/${encodeURIComponent(nodeId)}`, undefined, { params })
+  }
+
+  async getSecurityGraphPaths(source: string, target: string) {
+    return this.request<any>('GET', '/api/v1/security-graph/paths', undefined, {
+      params: { source, target },
+    })
+  }
+
+  async searchSecurityGraphNodes(query: string) {
+    return this.request<any>('GET', '/api/v1/security-graph/search', undefined, {
+      params: { q: query },
+    })
+  }
+
   // MITRE ATT&CK
   async getMitreMatrix(params?: Record<string, string>) {
     return this.request<any>('GET', '/api/v1/mitre/matrix', undefined, { params })

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Header from '@/components/layout/Header'
 import { api } from '@/lib/api'
-import { formatPercent } from '@/lib/utils'
+import { formatPercent, getPassRateColor, getPassRateStroke } from '@/lib/utils'
 import { XMarkIcon, ChevronDownIcon, ChevronRightIcon, BookOpenIcon, FunnelIcon, CheckIcon, CloudIcon, ServerIcon } from '@heroicons/react/24/outline'
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -17,13 +17,13 @@ const SEVERITY_COLORS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   PASS: 'bg-green-100 text-green-800',
   FAIL: 'bg-red-100 text-red-800',
-  NOT_EVALUATED: 'bg-gray-100 text-gray-500',
+  NOT_EVALUATED: 'bg-amber-100 text-amber-700',
 }
 
 const STATUS_DOT: Record<string, string> = {
   PASS: 'bg-green-500',
   FAIL: 'bg-red-500',
-  NOT_EVALUATED: 'bg-gray-300',
+  NOT_EVALUATED: 'bg-amber-400',
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -433,50 +433,69 @@ export default function CompliancePage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="relative w-16 h-16">
-                    <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
-                      <path
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        fill="none"
-                        stroke="#E6E6E6"
-                        strokeWidth="3"
-                      />
-                      <path
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        fill="none"
-                        stroke={passRate >= 80 ? '#86BC25' : passRate >= 50 ? '#D97706' : '#DC2626'}
-                        strokeWidth="3"
-                        strokeDasharray={`${passRate}, 100`}
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-xs font-bold text-brand-navy">
-                        {formatPercent(passRate)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-brand-gray-500">Total Checks</span>
-                      <span className="font-medium text-brand-navy">{summary.total_checks || 0}</span>
-                    </div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-status-pass">Passed</span>
-                      <span className="font-medium text-status-pass">{summary.passed || 0}</span>
-                    </div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-status-fail">Failed</span>
-                      <span className="font-medium text-status-fail">{summary.failed || 0}</span>
-                    </div>
-                    {(summary.not_evaluated || 0) > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-brand-gray-400">Not Evaluated</span>
-                        <span className="font-medium text-brand-gray-400">{summary.not_evaluated}</span>
+                {/* Dual metrics: Evaluation Coverage + Pass Rate */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  {/* Evaluation Coverage */}
+                  <div className="text-center">
+                    <div className="relative w-14 h-14 mx-auto mb-1">
+                      <svg className="w-14 h-14 transform -rotate-90" viewBox="0 0 36 36">
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#E6E6E6" strokeWidth="3" />
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none"
+                          stroke="#0076A8"
+                          strokeWidth="3"
+                          strokeDasharray={`${summary.total_checks ? (((summary.passed || 0) + (summary.failed || 0)) / summary.total_checks * 100) : 0}, 100`}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-[10px] font-bold text-brand-navy">
+                          {summary.total_checks ? Math.round(((summary.passed || 0) + (summary.failed || 0)) / summary.total_checks * 100) : 0}%
+                        </span>
                       </div>
-                    )}
+                    </div>
+                    <p className="text-[10px] font-medium text-brand-gray-500">Coverage</p>
                   </div>
+                  {/* Pass Rate */}
+                  <div className="text-center">
+                    <div className="relative w-14 h-14 mx-auto mb-1">
+                      <svg className="w-14 h-14 transform -rotate-90" viewBox="0 0 36 36">
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#E6E6E6" strokeWidth="3" />
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none"
+                          stroke={getPassRateStroke(passRate)}
+                          strokeWidth="3"
+                          strokeDasharray={`${passRate}, 100`}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-[10px] font-bold text-brand-navy">
+                          {formatPercent(passRate)}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] font-medium text-brand-gray-500">Pass Rate</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-brand-gray-500">Total Checks</span>
+                    <span className="font-medium text-brand-navy">{summary.total_checks || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-status-pass">Passed</span>
+                    <span className="font-medium text-status-pass">{summary.passed || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-status-fail">Failed</span>
+                    <span className="font-medium text-status-fail">{summary.failed || 0}</span>
+                  </div>
+                  {(summary.not_evaluated || 0) > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-amber-600">Not Evaluated</span>
+                      <span className="font-medium text-amber-600">{summary.not_evaluated}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -520,13 +539,13 @@ export default function CompliancePage() {
                 <p className="text-2xl font-bold text-red-700">{controlsData.summary.failed}</p>
                 <p className="text-xs text-red-600">Failed</p>
               </div>
-              <div className="bg-gray-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-gray-400">{controlsData.summary.not_evaluated || 0}</p>
-                <p className="text-xs text-gray-400">Not Evaluated</p>
+              <div className="bg-amber-50 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-amber-600">{controlsData.summary.not_evaluated || 0}</p>
+                <p className="text-xs text-amber-600">Not Evaluated</p>
               </div>
-              <div className="bg-blue-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-blue-700">{controlsData.summary.pass_rate}%</p>
-                <p className="text-xs text-blue-600">Pass Rate</p>
+              <div className="rounded-lg p-3 text-center" style={{ backgroundColor: `${getPassRateStroke(controlsData.summary.pass_rate)}10` }}>
+                <p className={`text-2xl font-bold ${getPassRateColor(controlsData.summary.pass_rate)}`}>{controlsData.summary.pass_rate}%</p>
+                <p className="text-xs text-brand-gray-500">Pass Rate</p>
               </div>
             </div>
           )}
@@ -543,7 +562,7 @@ export default function CompliancePage() {
                     controlStatusFilter === s
                       ? s === 'PASS' ? 'bg-green-100 text-green-800'
                       : s === 'FAIL' ? 'bg-red-100 text-red-800'
-                      : s === 'NOT_EVALUATED' ? 'bg-gray-200 text-gray-600'
+                      : s === 'NOT_EVALUATED' ? 'bg-amber-100 text-amber-700'
                       : 'bg-brand-green text-white'
                       : 'border border-brand-gray-300 text-brand-gray-500 hover:bg-brand-gray-50'
                   }`}
@@ -804,7 +823,7 @@ export default function CompliancePage() {
                                           ? 'border-green-200 bg-green-50/50'
                                           : check.status === 'FAIL'
                                           ? 'border-red-200 bg-red-50/50'
-                                          : 'border-brand-gray-200 bg-white'
+                                          : 'border-amber-200 bg-amber-50/30'
                                       }`}
                                     >
                                       <div className="flex items-start gap-2">
@@ -826,7 +845,7 @@ export default function CompliancePage() {
                                             </p>
                                           )}
                                           {check.status === 'NOT_EVALUATED' && (
-                                            <p className="text-[10px] text-brand-gray-400 mt-1 italic">Not evaluated — no scan data</p>
+                                            <p className="text-[10px] text-amber-600 mt-1 italic">Not evaluated — no scan data</p>
                                           )}
                                           {check.evidence_method && (
                                             <p className="text-[10px] text-brand-gray-400 mt-1">
