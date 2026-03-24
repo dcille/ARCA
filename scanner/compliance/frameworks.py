@@ -713,6 +713,326 @@ FRAMEWORKS = {
         ],
     },
 
+    # ═══════════════════════════════════════════════════════════════════
+    # CIS OCI Foundation Benchmark v3.1.0
+    # ═══════════════════════════════════════════════════════════════════
+    "CIS-OCI-3.1": {
+        "name": "CIS Oracle Cloud Infrastructure Foundations Benchmark v3.1.0",
+        "description": "Center for Internet Security best-practice security configuration for Oracle Cloud Infrastructure (v3.1.0)",
+        "category": "cis",
+        "controls": [
+            # ── Identity and Access Management ──
+            {
+                "id": "1.1",
+                "title": "Ensure service level admins are created to manage resources of particular service",
+                "description": "To apply least-privilege security principle, create service-level administrators in corresponding groups and assign specific users to each service-level administrative group in a tenancy.",
+                "checks": {"oci": ["oci_iam_policy_no_wildcard"]},
+            },
+            {
+                "id": "1.2",
+                "title": "Ensure permissions on all resources are given only to the tenancy administrator group",
+                "description": "No group other than Administrators should have access to manage all resources in a tenancy, as this violates the enforcement of the least privilege principle.",
+                "checks": {"oci": ["oci_iam_policy_no_wildcard"]},
+            },
+            {
+                "id": "1.3",
+                "title": "Ensure IAM administrators cannot update tenancy Administrators group",
+                "description": "The policy that gives IAM-Administrators or any other group full access to groups resources should not allow access to the tenancy Administrators group.",
+                "checks": {"oci": ["oci_iam_policy_no_wildcard"]},
+            },
+            {
+                "id": "1.4",
+                "title": "Ensure IAM password policy requires minimum length of 14 or greater",
+                "description": "Password policies should require a minimum password length of 14 characters and contain 1 non-alphabetic character.",
+                "checks": {"oci": [
+                    "oci_iam_password_length", "oci_iam_password_numeric",
+                    "oci_iam_password_special",
+                ]},
+            },
+            {
+                "id": "1.5",
+                "title": "Ensure IAM password policy expires passwords within 365 days",
+                "description": "IAM password policies should expire passwords after 365 days and require immediate changes based on security events.",
+                "checks": {"oci": ["oci_iam_password_length"]},
+            },
+            {
+                "id": "1.6",
+                "title": "Ensure IAM password policy prevents password reuse",
+                "description": "IAM password policies should prevent the reuse of the last 24 passwords to maintain password security effectiveness.",
+                "checks": {"oci": ["oci_iam_password_length"]},
+            },
+            {
+                "id": "1.7",
+                "title": "Ensure MFA is enabled for all users with a console password",
+                "description": "Multi-factor authentication requires use of more than one factor to verify a user identity, adding an extra layer of security.",
+                "checks": {"oci": ["oci_iam_user_mfa_enabled", "oci_iam_admin_mfa_enabled"]},
+            },
+            {
+                "id": "1.8",
+                "title": "Ensure user API keys rotate within 90 days",
+                "description": "API keys should be rotated every 90 days or less as they provide the same level of access as the associated user.",
+                "checks": {"oci": ["oci_iam_api_key_rotation"]},
+            },
+            {
+                "id": "1.9",
+                "title": "Ensure user customer secret keys rotate every 90 days",
+                "description": "Customer secret keys for S3 Compatibility API should be rotated at least every 90 days.",
+                "checks": {"oci": ["oci_iam_secret_key_rotation"]},
+            },
+            {
+                "id": "1.10",
+                "title": "Ensure user auth tokens rotate within 90 days or less",
+                "description": "Auth tokens should be rotated every 90 days or less as they provide access to APIs that do not support OCI signature-based authentication.",
+                "checks": {"oci": ["oci_iam_api_key_rotation"]},
+            },
+            {
+                "id": "1.11",
+                "title": "Ensure user IAM Database Passwords rotate within 90 days",
+                "description": "IAM database passwords should be rotated within 90 days as they provide access to Autonomous Databases in the tenancy.",
+                "checks": {"oci": ["oci_iam_api_key_rotation"]},
+            },
+            {
+                "id": "1.12",
+                "title": "Ensure API keys are not created for tenancy administrator users",
+                "description": "Tenancy administrator users should not have API keys. Service-level administrative users with API keys should be used instead.",
+                "checks": {"oci": ["oci_iam_api_key_rotation"]},
+            },
+            {
+                "id": "1.13",
+                "title": "Ensure all OCI IAM local user accounts have a valid and current email address",
+                "description": "All OCI IAM local user accounts should have a valid and current email address to tie the account to identity and enable password reset.",
+                "checks": {"oci": ["oci_iam_user_mfa_enabled"]},
+            },
+            {
+                "id": "1.14",
+                "title": "Ensure Instance Principal authentication is used for OCI instances, OCI Cloud Databases and OCI Functions",
+                "description": "OCI instances, databases and functions should use Instance Principal authentication instead of hard-coded API keys.",
+                "checks": {"oci": ["oci_iam_policy_no_wildcard"]},
+            },
+            {
+                "id": "1.15",
+                "title": "Ensure storage service-level admins cannot delete resources they manage",
+                "description": "Service-level administrators should not be able to delete resources they manage, applying separation of duties principle.",
+                "checks": {"oci": ["oci_iam_policy_no_wildcard"]},
+            },
+            {
+                "id": "1.16",
+                "title": "Ensure OCI IAM credentials unused for 45 days or more are disabled",
+                "description": "Credentials that have been unused for 45 days or more should be deactivated or removed.",
+                "checks": {"oci": ["oci_iam_api_key_rotation"]},
+            },
+            {
+                "id": "1.17",
+                "title": "Ensure there is only one active API Key for any single OCI IAM user",
+                "description": "Having a single API Key per OCI IAM user reduces attack surface area and makes key management easier.",
+                "checks": {"oci": ["oci_iam_api_key_rotation"]},
+            },
+            # ── Networking ──
+            {
+                "id": "2.1",
+                "title": "Ensure no security lists allow ingress from 0.0.0.0/0 to port 22",
+                "description": "No security list should allow unrestricted ingress access to port 22 (SSH).",
+                "checks": {"oci": ["oci_network_sl_no_ssh_open"]},
+            },
+            {
+                "id": "2.2",
+                "title": "Ensure no security lists allow ingress from 0.0.0.0/0 to port 3389",
+                "description": "No security list should allow unrestricted ingress access to port 3389 (RDP).",
+                "checks": {"oci": ["oci_network_sl_no_rdp_open"]},
+            },
+            {
+                "id": "2.3",
+                "title": "Ensure no network security groups allow ingress from 0.0.0.0/0 to port 22",
+                "description": "No network security group should allow unrestricted ingress to port 22 (SSH).",
+                "checks": {"oci": ["oci_network_nsg_no_unrestricted_ingress"]},
+            },
+            {
+                "id": "2.4",
+                "title": "Ensure no network security groups allow ingress from 0.0.0.0/0 to port 3389",
+                "description": "No network security group should allow unrestricted ingress access to port 3389 (RDP).",
+                "checks": {"oci": ["oci_network_nsg_no_unrestricted_ingress"]},
+            },
+            {
+                "id": "2.5",
+                "title": "Ensure the default security list of every VCN restricts all traffic except ICMP within VCN",
+                "description": "The default security list should not allow unrestricted ingress and egress access to resources in the VCN.",
+                "checks": {"oci": ["oci_network_sl_no_ssh_open", "oci_network_sl_no_rdp_open"]},
+            },
+            {
+                "id": "2.6",
+                "title": "Ensure Oracle Integration Cloud (OIC) access is restricted to allowed sources",
+                "description": "Network access to OIC instances should be restricted to approved corporate IP Addresses or VCNs.",
+                "checks": {"oci": ["oci_network_nsg_no_unrestricted_ingress"]},
+            },
+            {
+                "id": "2.7",
+                "title": "Ensure Oracle Analytics Cloud (OAC) access is restricted to allowed sources or deployed within a VCN",
+                "description": "All new OAC instances should be deployed within a VCN and Access Control Rules restricted to corporate IP Addresses.",
+                "checks": {"oci": ["oci_network_nsg_no_unrestricted_ingress"]},
+            },
+            {
+                "id": "2.8",
+                "title": "Ensure Oracle Autonomous Shared Databases (ADB) access is restricted to allowed sources or deployed within a VCN",
+                "description": "ADB-S databases should be deployed within a VCN with Access Control Rules restricted to corporate IP Addresses.",
+                "checks": {"oci": ["oci_db_autonomous_private_endpoint"]},
+            },
+            # ── Compute ──
+            {
+                "id": "3.1",
+                "title": "Ensure Compute Instance Legacy Metadata service endpoint is disabled",
+                "description": "Compute Instances should use Instance Metadata Service v2 (IMDSv2) to reduce the risk of SSRF attacks.",
+                "checks": {"oci": ["oci_compute_imds_v2"]},
+            },
+            {
+                "id": "3.2",
+                "title": "Ensure Secure Boot is enabled on Compute Instance",
+                "description": "Shielded Instances with Secure Boot enabled prevent unauthorized boot loaders and operating systems from booting.",
+                "checks": {"oci": ["oci_compute_secure_boot"]},
+            },
+            {
+                "id": "3.3",
+                "title": "Ensure In-transit Encryption is enabled on Compute Instance",
+                "description": "The Block Volume service should enable in-transit encryption for paravirtualized volume attachments on VM instances.",
+                "checks": {"oci": ["oci_compute_boot_volume_transit_encryption"]},
+            },
+            # ── Logging and Monitoring ──
+            {
+                "id": "4.1",
+                "title": "Ensure default tags are used on resources",
+                "description": "Default tags like CreatedBy should be set at the Root Compartment level to ensure all created resources are tagged.",
+                "checks": {"oci": ["oci_logging_log_groups_exist"]},
+            },
+            {
+                "id": "4.2",
+                "title": "Create at least one notification topic and subscription to receive monitoring alerts",
+                "description": "Notifications provide a multi-channel messaging service for events of interest within OCI.",
+                "checks": {"oci": ["oci_notifications_topic_configured", "oci_notifications_security_topic_exists"]},
+            },
+            {
+                "id": "4.3",
+                "title": "Ensure a notification is configured for Identity Provider changes",
+                "description": "An Event Rule and Notification should be triggered when Identity Providers are created, updated or deleted.",
+                "checks": {"oci": ["oci_notifications_topic_configured"]},
+            },
+            {
+                "id": "4.4",
+                "title": "Ensure a notification is configured for IdP group mapping changes",
+                "description": "An Event Rule and Notification should be triggered when Identity Provider Group Mappings are created, updated or deleted.",
+                "checks": {"oci": ["oci_notifications_topic_configured"]},
+            },
+            {
+                "id": "4.5",
+                "title": "Ensure a notification is configured for IAM group changes",
+                "description": "An Event Rule and Notification should be triggered when IAM Groups are created, updated or deleted.",
+                "checks": {"oci": ["oci_notifications_topic_configured"]},
+            },
+            {
+                "id": "4.6",
+                "title": "Ensure a notification is configured for IAM policy changes",
+                "description": "An Event Rule and Notification should be triggered when IAM Policies are created, updated or deleted.",
+                "checks": {"oci": ["oci_notifications_topic_configured"]},
+            },
+            {
+                "id": "4.7",
+                "title": "Ensure a notification is configured for user changes",
+                "description": "An Event Rule and Notification should be triggered when IAM Users are created, updated, deleted, or their capabilities/state updated.",
+                "checks": {"oci": ["oci_notifications_topic_configured"]},
+            },
+            {
+                "id": "4.8",
+                "title": "Ensure a notification is configured for VCN changes",
+                "description": "An Event Rule and Notification should be triggered when Virtual Cloud Networks are created, updated or deleted.",
+                "checks": {"oci": ["oci_notifications_topic_configured"]},
+            },
+            {
+                "id": "4.9",
+                "title": "Ensure a notification is configured for changes to route tables",
+                "description": "An Event Rule and Notification should be triggered when route tables are created, updated or deleted.",
+                "checks": {"oci": ["oci_notifications_topic_configured"]},
+            },
+            {
+                "id": "4.10",
+                "title": "Ensure a notification is configured for security list changes",
+                "description": "An Event Rule and Notification should be triggered when security lists are created, updated or deleted.",
+                "checks": {"oci": ["oci_notifications_topic_configured"]},
+            },
+            {
+                "id": "4.11",
+                "title": "Ensure a notification is configured for network security group changes",
+                "description": "An Event Rule and Notification should be triggered when network security groups are created, updated or deleted.",
+                "checks": {"oci": ["oci_notifications_topic_configured"]},
+            },
+            {
+                "id": "4.12",
+                "title": "Ensure a notification is configured for changes to network gateways",
+                "description": "An Event Rule and Notification should be triggered when Network Gateways are created, updated, deleted, attached, detached, or moved.",
+                "checks": {"oci": ["oci_notifications_topic_configured"]},
+            },
+            {
+                "id": "4.13",
+                "title": "Ensure VCN flow logging is enabled for all subnets",
+                "description": "VCN flow logs record details about traffic that has been accepted or rejected based on security list rules.",
+                "checks": {"oci": ["oci_network_vcn_flow_logs"]},
+            },
+            {
+                "id": "4.14",
+                "title": "Ensure Cloud Guard is enabled in the root compartment of the tenancy",
+                "description": "Cloud Guard should be enabled in the root compartment with default configuration, activity detectors and responders.",
+                "checks": {"oci": ["oci_cloud_guard_enabled"]},
+            },
+            {
+                "id": "4.15",
+                "title": "Ensure a notification is configured for Oracle Cloud Guard problems detected",
+                "description": "An Event Rule and Notification should be triggered when Oracle Cloud Guard Problems are created, dismissed or remediated.",
+                "checks": {"oci": ["oci_cloud_guard_enabled", "oci_notifications_topic_configured"]},
+            },
+            {
+                "id": "4.16",
+                "title": "Ensure customer created Customer Managed Key (CMK) is rotated at least annually",
+                "description": "Vault keys should be rotated periodically to limit the amount of data encrypted by one key version.",
+                "checks": {"oci": ["oci_vault_key_rotation"]},
+            },
+            {
+                "id": "4.17",
+                "title": "Ensure write level Object Storage logging is enabled for all buckets",
+                "description": "Object Storage write logs should log all write requests (PUT, POST, DELETE) made to objects in a bucket.",
+                "checks": {"oci": ["oci_objectstorage_bucket_emit_events"]},
+            },
+            {
+                "id": "4.18",
+                "title": "Ensure a notification is configured for Local OCI User Authentication",
+                "description": "An Event Rule and Notification should be triggered when a user authenticates via OCI local authentication.",
+                "checks": {"oci": ["oci_notifications_topic_configured"]},
+            },
+            # ── Storage ──
+            {
+                "id": "5.1",
+                "title": "Ensure no Object Storage buckets are publicly visible",
+                "description": "Object Storage buckets should not be publicly visible to prevent unauthorized data access.",
+                "checks": {"oci": ["oci_objectstorage_bucket_public_access"]},
+            },
+            {
+                "id": "5.3",
+                "title": "Ensure File Storage Systems are encrypted with Customer Managed Keys (CMK)",
+                "description": "File Storage Systems should use customer managed encryption keys for enhanced control over data encryption.",
+                "checks": {"oci": ["oci_filestorage_cmk_encryption"]},
+            },
+            # ── Asset Management ──
+            {
+                "id": "6.1",
+                "title": "Create at least one compartment in your tenancy to store cloud resources",
+                "description": "Create additional compartments within the tenancy and corresponding policies to control access to resources.",
+                "checks": {"oci": ["oci_logging_log_groups_exist"]},
+            },
+            {
+                "id": "6.2",
+                "title": "Ensure no resources are created in the root compartment",
+                "description": "Resources should not be placed in the root compartment to enable proper organization and access controls.",
+                "checks": {"oci": ["oci_logging_log_groups_exist"]},
+            },
+        ],
+    },
+
     "CIS-Alibaba-1.0": {
         "name": "CIS Alibaba Cloud Foundation Benchmark v1.0",
         "description": "Center for Internet Security best-practice security configuration for Alibaba Cloud",
