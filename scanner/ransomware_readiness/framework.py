@@ -64,6 +64,7 @@ class RRRule:
     nist_subcategory: str
     check_ids: dict[str, list[str]]  # provider -> [check_ids]
     remediation: dict[str, str] = field(default_factory=dict)  # provider -> guidance
+    ransomware_context: str = ""  # Why this control matters specifically for ransomware readiness
     is_composite: bool = False  # requires composite evaluation logic
     is_manual: bool = False  # requires manual operator input (D7)
 

@@ -50,21 +50,31 @@ def _eval_cis_benchmark_compliance(
         return CheckEvaluation(
             rule_id=rule.rule_id, domain=rule.domain, severity=rule.severity,
             status="warning", account_id=account_id, provider=provider,
-            evidence={"reason": "No CIS benchmark checks found in scan results"},
+            evidence={
+                "summary": f"No se encontraron checks de CIS Benchmark ({prefix}) en los resultados del scan.",
+                "check_type": "composite",
+                "expected": "Checks de CIS Benchmark Level 1 presentes en los resultados del scan",
+                "actual": "Sin resultados de CIS Benchmark disponibles",
+            },
         )
 
     compliance_pct = (passed_cis / total_cis) * 100
+    status = "pass" if compliance_pct >= 80 else "fail"
     return CheckEvaluation(
         rule_id=rule.rule_id, domain=rule.domain, severity=rule.severity,
-        status="pass" if compliance_pct >= 80 else "fail",
+        status=status,
         resource_count=total_cis, passed_resources=passed_cis,
         failed_resources=total_cis - passed_cis,
         account_id=account_id, provider=provider,
         evidence={
+            "summary": f"Compliance CIS Benchmark: {round(compliance_pct, 1)}% ({passed_cis}/{total_cis} checks). "
+                       f"Umbral mínimo: 80%. Resultado: {'CUMPLE' if status == 'pass' else 'NO CUMPLE'}.",
+            "check_type": "composite",
+            "expected": "Porcentaje de compliance CIS Benchmark Level 1 ≥ 80%",
+            "actual": f"{round(compliance_pct, 1)}% ({passed_cis} de {total_cis} checks pasan)",
             "compliance_percentage": round(compliance_pct, 1),
             "total_cis_checks": total_cis,
             "passed": passed_cis,
-            "threshold": "≥80%",
         },
     )
 
@@ -93,21 +103,33 @@ def _eval_security_alerts_configured(
         return CheckEvaluation(
             rule_id=rule.rule_id, domain=rule.domain, severity=rule.severity,
             status="warning", account_id=account_id, provider=provider,
-            evidence={"reason": "No alert checks found"},
+            evidence={
+                "summary": f"No se encontraron checks de alertas de seguridad para {provider.upper()}.",
+                "check_type": "composite",
+                "checks_evaluated": check_ids,
+                "expected": "Alertas configuradas para eventos críticos de seguridad",
+                "actual": "Sin checks de alertas disponibles en el scan",
+            },
         )
 
     # Pass if majority of alert checks pass
     threshold = max(1, total // 2)
+    status = "pass" if passing >= threshold else "fail"
     return CheckEvaluation(
         rule_id=rule.rule_id, domain=rule.domain, severity=rule.severity,
-        status="pass" if passing >= threshold else "fail",
+        status=status,
         resource_count=total, passed_resources=passing,
         failed_resources=total - passing,
         account_id=account_id, provider=provider,
         evidence={
-            "alerts_configured": passing,
-            "alerts_required": total,
-            "threshold": f"≥{threshold}",
+            "summary": f"Alertas de seguridad configuradas: {passing} de {total} checks verificados. "
+                       f"Se requiere ≥{threshold} alertas activas. "
+                       f"Checks: {', '.join(check_ids)}. "
+                       f"Resultado: {'CUMPLE' if status == 'pass' else 'NO CUMPLE'}.",
+            "check_type": "composite",
+            "checks_evaluated": check_ids,
+            "expected": f"Al menos {threshold} de {total} alertas de seguridad configuradas",
+            "actual": f"{passing} alertas configuradas de {total} verificadas",
         },
     )
 
@@ -140,16 +162,31 @@ def _eval_cross_region_backup(
         return CheckEvaluation(
             rule_id=rule.rule_id, domain=rule.domain, severity=rule.severity,
             status="warning", account_id=account_id, provider=provider,
-            evidence={"reason": "No cross-region/cross-account backup checks found"},
+            evidence={
+                "summary": f"No se encontraron checks de backup cross-region/cross-account para {provider.upper()}.",
+                "check_type": "composite",
+                "checks_evaluated": check_ids,
+                "expected": "Configuración de backup cross-region o cross-account detectada",
+                "actual": "Sin checks de backup cross-region disponibles en el scan",
+            },
         )
 
+    status = "pass" if passing > 0 else "fail"
     return CheckEvaluation(
         rule_id=rule.rule_id, domain=rule.domain, severity=rule.severity,
-        status="pass" if passing > 0 else "fail",
+        status=status,
         resource_count=total, passed_resources=passing,
         failed_resources=total - passing,
         account_id=account_id, provider=provider,
-        evidence={"total": total, "passing": passing},
+        evidence={
+            "summary": f"Backup cross-region/cross-account: {passing} de {total} recursos con replicación. "
+                       f"Se requiere al menos 1 recurso con replicación. "
+                       f"Resultado: {'CUMPLE' if status == 'pass' else 'NO CUMPLE'}.",
+            "check_type": "composite",
+            "checks_evaluated": check_ids,
+            "expected": "Al menos 1 configuración de backup cross-region/cross-account",
+            "actual": f"{passing} de {total} recursos con replicación configurada",
+        },
     )
 
 
@@ -179,16 +216,31 @@ def _eval_environment_segmentation(
         return CheckEvaluation(
             rule_id=rule.rule_id, domain=rule.domain, severity=rule.severity,
             status="warning", account_id=account_id, provider=provider,
-            evidence={"reason": "No environment segmentation checks found"},
+            evidence={
+                "summary": f"No se encontraron checks de segmentación de ambientes para {provider.upper()}.",
+                "check_type": "composite",
+                "checks_evaluated": check_ids,
+                "expected": "Evidencia de segmentación entre ambientes (dev/staging/prod)",
+                "actual": "Sin checks de segmentación disponibles en el scan",
+            },
         )
 
+    status = "pass" if passing > 0 else "fail"
     return CheckEvaluation(
         rule_id=rule.rule_id, domain=rule.domain, severity=rule.severity,
-        status="pass" if passing > 0 else "fail",
+        status=status,
         resource_count=total, passed_resources=passing,
         failed_resources=total - passing,
         account_id=account_id, provider=provider,
-        evidence={"total": total, "passing": passing},
+        evidence={
+            "summary": f"Segmentación de ambientes: {passing} de {total} redes con segmentación. "
+                       f"Se requiere al menos 1 configuración de segmentación. "
+                       f"Resultado: {'CUMPLE' if status == 'pass' else 'NO CUMPLE'}.",
+            "check_type": "composite",
+            "checks_evaluated": check_ids,
+            "expected": "Al menos 1 evidencia de segmentación entre ambientes",
+            "actual": f"{passing} de {total} redes con indicadores de segmentación",
+        },
     )
 
 
@@ -217,17 +269,31 @@ def _eval_tagging_compliance(
         return CheckEvaluation(
             rule_id=rule.rule_id, domain=rule.domain, severity=rule.severity,
             status="warning", account_id=account_id, provider=provider,
-            evidence={"reason": "No tagging compliance checks found"},
+            evidence={
+                "summary": f"No se encontraron checks de tagging/labeling compliance para {provider.upper()}.",
+                "check_type": "composite",
+                "checks_evaluated": check_ids,
+                "expected": "Checks de compliance de tagging disponibles",
+                "actual": "Sin checks de tagging disponibles en el scan",
+            },
         )
 
     pct = (passing / total) * 100
+    status = "pass" if pct >= 80 else "fail"
     return CheckEvaluation(
         rule_id=rule.rule_id, domain=rule.domain, severity=rule.severity,
-        status="pass" if pct >= 80 else "fail",
+        status=status,
         resource_count=total, passed_resources=passing,
         failed_resources=total - passing,
         account_id=account_id, provider=provider,
-        evidence={"compliance_pct": round(pct, 1), "threshold": "≥80%"},
+        evidence={
+            "summary": f"Tagging compliance: {round(pct, 1)}% ({passing}/{total} recursos). "
+                       f"Umbral mínimo: 80%. Resultado: {'CUMPLE' if status == 'pass' else 'NO CUMPLE'}.",
+            "check_type": "composite",
+            "checks_evaluated": check_ids,
+            "expected": "Porcentaje de recursos correctamente etiquetados ≥ 80%",
+            "actual": f"{round(pct, 1)}% ({passing} de {total} recursos correctamente etiquetados)",
+        },
     )
 
 

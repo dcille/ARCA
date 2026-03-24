@@ -83,6 +83,14 @@ export default function FindingDetailPage() {
             <p className="text-sm text-brand-gray-600">{finding.rule_description}</p>
           </div>
 
+          {/* Ransomware context */}
+          {finding.ransomware_context && (
+            <div className="bg-red-50 border border-red-100 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-red-800 mb-1">Riesgo de Ransomware</h3>
+              <p className="text-sm text-red-700">{finding.ransomware_context}</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-brand-gray-50 rounded-lg p-3 text-center">
               <p className="text-lg font-bold text-brand-navy">{finding.resource_count}</p>
@@ -101,10 +109,79 @@ export default function FindingDetailPage() {
           {/* Evidence */}
           {finding.evidence && Object.keys(finding.evidence).length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-brand-navy mb-1">Evidence</h3>
-              <pre className="bg-brand-gray-50 rounded-lg p-3 text-xs text-brand-gray-600 overflow-x-auto max-h-60">
-                {JSON.stringify(finding.evidence, null, 2)}
-              </pre>
+              <h3 className="text-sm font-semibold text-brand-navy mb-2">Evidence</h3>
+              <div className="bg-brand-gray-50 rounded-lg p-4 space-y-3">
+                {/* Summary */}
+                {finding.evidence.summary && (
+                  <p className="text-sm text-brand-gray-700">{finding.evidence.summary}</p>
+                )}
+
+                {/* Expected vs Actual */}
+                {(finding.evidence.expected || finding.evidence.actual) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {finding.evidence.expected && (
+                      <div className="bg-white rounded-lg p-3 border border-brand-gray-200">
+                        <p className="text-xs font-semibold text-brand-gray-400 uppercase mb-1">Expected</p>
+                        <p className="text-sm text-brand-gray-600">{finding.evidence.expected}</p>
+                      </div>
+                    )}
+                    {finding.evidence.actual && (
+                      <div className="bg-white rounded-lg p-3 border border-brand-gray-200">
+                        <p className="text-xs font-semibold text-brand-gray-400 uppercase mb-1">Actual</p>
+                        <p className="text-sm text-brand-gray-600">{finding.evidence.actual}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Checks evaluated */}
+                {finding.evidence.checks_evaluated && finding.evidence.checks_evaluated.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-brand-gray-400 uppercase mb-1">Checks Evaluated</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {finding.evidence.checks_evaluated.map((check: string) => (
+                        <span key={check} className="px-2 py-0.5 bg-white border border-brand-gray-200 rounded text-xs text-brand-gray-600 font-mono">
+                          {check}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Failed resource details */}
+                {finding.evidence.failed_details && finding.evidence.failed_details.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-brand-gray-400 uppercase mb-1">Failed Resources</p>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                      {finding.evidence.failed_details.map((detail: any, i: number) => (
+                        <div key={i} className="bg-white rounded p-2 border border-red-100 text-xs">
+                          <span className="font-medium text-brand-navy">{detail.resource_name || detail.resource_id || 'Unknown'}</span>
+                          {detail.check_id && <span className="text-brand-gray-400 ml-2 font-mono">{detail.check_id}</span>}
+                          {detail.status_extended && (
+                            <p className="text-brand-gray-500 mt-0.5">{detail.status_extended}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Check type badge */}
+                {finding.evidence.check_type && (
+                  <div className="flex items-center gap-2 pt-1 border-t border-brand-gray-200">
+                    <span className="text-xs text-brand-gray-400">Tipo de check:</span>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      finding.evidence.check_type === 'automated' ? 'bg-blue-100 text-blue-700' :
+                      finding.evidence.check_type === 'composite' ? 'bg-purple-100 text-purple-700' :
+                      'bg-amber-100 text-amber-700'
+                    }`}>
+                      {finding.evidence.check_type === 'automated' ? 'Automático (CSPM)' :
+                       finding.evidence.check_type === 'composite' ? 'Compuesto (multi-check)' :
+                       'Manual (gobernanza)'}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

@@ -184,6 +184,9 @@ def evaluate_ransomware_readiness(self, user_id: str, scan_id: str = None):
             acct_score.level = level_info["level"].value
             session.add(acct_score)
 
+        # Delete previous RR findings for this user before persisting new ones
+        session.query(RRFinding).filter(RRFinding.user_id == user_id).delete()
+
         # Persist RR findings
         for ev in all_evaluations:
             rr_finding = RRFinding(

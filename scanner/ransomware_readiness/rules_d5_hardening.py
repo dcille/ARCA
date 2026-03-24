@@ -28,6 +28,7 @@ D5_RULES: list[RRRule] = [
             "azure": "Revisar findings de CIS Azure Benchmark. Remediar controles Level 1. Usar Azure Policy para enforcement.",
             "gcp": "Revisar findings de CIS GCP Benchmark. Remediar controles Level 1. Usar Organization Policies.",
         },
+        ransomware_context="El CIS Benchmark cubre configuraciones base que previenen vectores de entrada de ransomware. Un compliance ≥80% indica una postura de seguridad sólida.",
     ),
 
     RRRule(
@@ -51,6 +52,7 @@ D5_RULES: list[RRRule] = [
             "azure": "Habilitar Microsoft Defender for Servers. Configurar vulnerability assessment para VMs y container registries.",
             "gcp": "Habilitar Security Command Center. Configurar Container Analysis para Artifact Registry.",
         },
+        ransomware_context="Las vulnerabilidades no parcheadas son explotadas por ransomware para obtener acceso inicial o escalar privilegios. El scanning activo permite priorizar parches críticos.",
     ),
 
     RRRule(
@@ -74,6 +76,7 @@ D5_RULES: list[RRRule] = [
             "azure": "Habilitar vulnerability scanning en ACR con Microsoft Defender. Configurar admission policies en AKS.",
             "gcp": "Habilitar Container Analysis en Artifact Registry. Usar Binary Authorization para enforcement.",
         },
+        ransomware_context="Imágenes de container con vulnerabilidades pueden ser explotadas para obtener acceso al cluster y desde ahí ejecutar ransomware contra los datos.",
     ),
 
     RRRule(
@@ -97,6 +100,7 @@ D5_RULES: list[RRRule] = [
             "azure": "Habilitar Microsoft Defender for Cloud en todas las suscripciones. Activar plans para cada tipo de recurso.",
             "gcp": "Habilitar Security Command Center Premium a nivel de organización. Activar todas las fuentes de findings.",
         },
+        ransomware_context="Servicios como GuardDuty/Defender/SCC detectan actividad sospechosa asociada a ransomware: crypto mining, acceso inusual a KMS, eliminación masiva de recursos.",
     ),
 
     RRRule(
@@ -120,6 +124,7 @@ D5_RULES: list[RRRule] = [
             "azure": "Usar Azure Marketplace hardened images o crear custom images con hardening. Usar Azure Image Builder.",
             "gcp": "Usar Shielded VMs. Crear custom images con CIS hardening aplicado. Usar Packer pipeline.",
         },
+        ransomware_context="Imágenes sin hardening tienen servicios y puertos innecesarios expuestos que amplían la superficie de ataque para la entrada y propagación de ransomware.",
     ),
 
     RRRule(
@@ -143,6 +148,7 @@ D5_RULES: list[RRRule] = [
             "azure": "Actualizar runtime stack de Azure Functions. Usar Managed Identity. Almacenar secrets en Key Vault.",
             "gcp": "Actualizar runtimes de Cloud Functions. Usar Secret Manager. Asignar service accounts con least privilege.",
         },
+        ransomware_context="Funciones serverless comprometidas pueden ser usadas como vector de persistencia y propagación de ransomware dentro de la infraestructura cloud.",
     ),
 
     RRRule(
@@ -166,6 +172,7 @@ D5_RULES: list[RRRule] = [
             "azure": "Configurar rate-limit policies en API Management. Usar quotas por subscription y por operation.",
             "gcp": "Configurar quota policies en API Gateway o Cloud Endpoints.",
         },
+        ransomware_context="APIs sin rate limiting pueden ser abusadas para exfiltrar datos masivamente o ejecutar operaciones destructivas en masa como parte de un ataque de ransomware.",
     ),
 
     RRRule(
@@ -190,6 +197,7 @@ D5_RULES: list[RRRule] = [
             "azure": "Crear Azure Policy para requerir tags obligatorios. Usar tag inheritance policies.",
             "gcp": "Usar labels obligatorios. Implementar Organization Policy constraints para labeling compliance.",
         },
+        ransomware_context="El tagging permite identificar rápidamente qué recursos son críticos durante un ataque de ransomware, priorizando su protección y recuperación.",
     ),
 
     RRRule(
@@ -213,6 +221,7 @@ D5_RULES: list[RRRule] = [
             "azure": "Configurar Azure Policy compliance monitoring. Habilitar Change Analysis. Usar Activity Log alerts.",
             "gcp": "Habilitar Cloud Asset Inventory. Configurar alertas para cambios en configuraciones críticas.",
         },
+        ransomware_context="El drift detection identifica cambios no autorizados en la infraestructura, que pueden ser indicadores tempranos de que un atacante está preparando un ataque de ransomware.",
     ),
 
     RRRule(
@@ -236,6 +245,7 @@ D5_RULES: list[RRRule] = [
             "azure": "Configurar Azure Policy default initiative. Habilitar Defender for Cloud defaults.",
             "gcp": "Configurar Organization Policies para defaults seguros. Restringir default service account.",
         },
+        ransomware_context="Configuraciones inseguras por defecto crean vulnerabilidades que los atacantes explotan para obtener acceso inicial y desplegar ransomware.",
     ),
 
     RRRule(
@@ -259,6 +269,7 @@ D5_RULES: list[RRRule] = [
             "azure": "Actualizar VMs con OS EOL. Migrar App Services a runtimes soportados.",
             "gcp": "Actualizar instancias con OS EOL. Migrar Cloud SQL a versiones soportadas.",
         },
+        ransomware_context="Software EOL sin parches de seguridad es un blanco fácil para exploits que permiten la entrada de ransomware en la infraestructura.",
     ),
 
     RRRule(
@@ -278,6 +289,7 @@ D5_RULES: list[RRRule] = [
         remediation={
             "aws": "Configurar IMDSv2 required: aws ec2 modify-instance-metadata-options --http-tokens required. Aplicar como default a nivel de cuenta.",
         },
+        ransomware_context="SSRF attacks contra IMDSv1 permiten obtener credenciales IAM temporales que pueden usarse para cifrar S3, eliminar backups y ejecutar ransomware.",
     ),
 
     RRRule(
@@ -297,6 +309,7 @@ D5_RULES: list[RRRule] = [
         remediation={
             "gcp": "Deshabilitar serial port access: metadata serial-port-enable=false. Deshabilitar project-wide SSH keys por instancia.",
         },
+        ransomware_context="Serial port access y project-wide SSH keys son vectores de acceso lateral que ransomware puede explotar para propagarse entre instancias.",
     ),
 
     RRRule(
@@ -320,6 +333,7 @@ D5_RULES: list[RRRule] = [
             "azure": "Habilitar Trusted Launch para VMs con Secure Boot y vTPM.",
             "gcp": "Habilitar Shielded VM: Secure Boot, vTPM, Integrity Monitoring al crear instancias.",
         },
+        ransomware_context="Shielded VMs protegen contra rootkits y boot-level malware que pueden persistir entre reinicios, algo usado por ransomware avanzado para mantener presencia.",
     ),
 
     RRRule(
@@ -344,5 +358,6 @@ D5_RULES: list[RRRule] = [
             "azure": "Integrar IaC scanning (Checkov, tfsec) en Azure DevOps/GitHub Actions pipeline.",
             "gcp": "Integrar IaC scanning en Cloud Build pipeline. Usar Checkov o similar.",
         },
+        ransomware_context="IaC scanning en pipeline previene que configuraciones inseguras lleguen a producción, cerrando vectores de entrada para ransomware antes del deployment.",
     ),
 ]

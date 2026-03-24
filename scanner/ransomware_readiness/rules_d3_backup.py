@@ -29,6 +29,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Configurar Immutable Blob Storage con time-based retention policy en modo locked.",
             "gcp": "Configurar Bucket Lock con retention policy: gsutil retention set <duration> gs://<bucket>.",
         },
+        ransomware_context="CRÍTICO: Los backups inmutables son la defensa principal contra ransomware. Object Lock impide que el atacante elimine o sobrescriba los backups incluso con credenciales administrativas.",
     ),
 
     RRRule(
@@ -52,6 +53,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Configurar Azure Backup policies con retention ≥30 días en Recovery Services vault.",
             "gcp": "Configurar backup retention en servicios individuales (Cloud SQL ≥30d, GKE backup plans).",
         },
+        ransomware_context="El ransomware puede permanecer latente semanas antes de activarse. Retención ≥30 días asegura que existan copias de datos de antes de la infección.",
     ),
 
     RRRule(
@@ -76,6 +78,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Habilitar GRS (Geo-Redundant Storage) en Recovery Services vaults. Configurar Cross Region Restore.",
             "gcp": "Configurar multi-region storage para backups. Usar proyecto dedicado para backups aislados.",
         },
+        ransomware_context="Si el atacante compromete una cuenta/región, los backups locales pueden ser eliminados. Los backups cross-region/cross-account sobreviven a este escenario.",
     ),
 
     RRRule(
@@ -99,6 +102,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Habilitar Soft Delete para backups en Recovery Services vault (14 días mínimo de retención).",
             "gcp": "Configurar retention policies con lock. Usar Organization Policy para prevenir eliminación de backups.",
         },
+        ransomware_context="CRÍTICO: El primer objetivo del ransomware moderno es eliminar los backups. Deletion protection y MFA Delete son la barrera que lo impide.",
     ),
 
     RRRule(
@@ -122,6 +126,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Azure SQL tiene automated backups por defecto. Verificar retention period (7-35 días) en long-term retention.",
             "gcp": "Habilitar automated backups en Cloud SQL: gcloud sql instances patch --backup-start-time --enable-bin-log.",
         },
+        ransomware_context="Los snapshots automatizados de bases de datos garantizan puntos de recuperación recientes, minimizando la pérdida de datos tras un ataque de ransomware.",
     ),
 
     RRRule(
@@ -145,6 +150,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Azure Backup usa encryption por defecto. Verificar uso de CMK en Recovery Services vault.",
             "gcp": "Verificar que backups heredan encryption. Configurar CMEK para backup buckets.",
         },
+        ransomware_context="Backups sin cifrar pueden ser leídos por el atacante para exfiltrar datos antes de cifrarlos con ransomware (doble extorsión).",
     ),
 
     RRRule(
@@ -168,6 +174,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Verificar point-in-time restore configurado en Azure SQL (disponible dentro del retention period).",
             "gcp": "Habilitar point-in-time recovery en Cloud SQL: habilitar binary logging y automated backups.",
         },
+        ransomware_context="PITR permite recuperar la base de datos al momento exacto antes del ataque, minimizando la pérdida de transacciones y reduciendo el RTO.",
     ),
 
     RRRule(
@@ -191,6 +198,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Habilitar Soft Delete para blobs (14 días mínimo) y containers en Storage Account > Data protection.",
             "gcp": "Habilitar soft delete policy en Cloud Storage buckets con retention period adecuado.",
         },
+        ransomware_context="Soft delete permite recuperar objetos eliminados por ransomware durante el periodo de retención, actuando como una red de seguridad adicional.",
     ),
 
     RRRule(
@@ -214,6 +222,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Habilitar blob versioning en Storage Accounts de backup.",
             "gcp": "Habilitar object versioning en Cloud Storage buckets de backup.",
         },
+        ransomware_context="El versioning mantiene todas las versiones anteriores de los objetos, permitiendo recuperar la versión pre-infección de cada archivo afectado por ransomware.",
     ),
 
     RRRule(
@@ -237,6 +246,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Crear Azure Backup policies o snapshot policies para Managed Disks.",
             "gcp": "Crear snapshot schedules en Compute Engine para discos persistentes.",
         },
+        ransomware_context="Snapshot lifecycle policies automáticas garantizan que siempre existan copias recientes de los discos, incluso si el equipo olvida crear snapshots manuales.",
     ),
 
     RRRule(
@@ -259,6 +269,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Habilitar Azure Backup para VMs en Recovery Services vault. Configurar backup policy.",
             "gcp": "Crear snapshot schedules para discos de VMs críticas. Considerar VM Manager para gestión centralizada.",
         },
+        ransomware_context="Las VMs son a menudo el primer objetivo del ransomware. Snapshots automáticas permiten restaurar la VM completa a un estado pre-infección.",
     ),
 
     RRRule(
@@ -282,6 +293,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Configurar Azure Backup para AKS o implementar Velero con Azure Blob Storage backend.",
             "gcp": "Usar Backup for GKE (nativo). Configurar backup plans para clusters y namespaces críticos.",
         },
+        ransomware_context="Los clusters Kubernetes pueden ser reconstruidos, pero los persistent volumes contienen datos de negocio. Sin backup de K8s, la recuperación es mucho más lenta.",
     ),
 
     RRRule(
@@ -305,6 +317,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Configurar alertas en Azure Monitor para backup job failures en Recovery Services vault.",
             "gcp": "Configurar Cloud Monitoring alerts para fallos en backup jobs y snapshot creation.",
         },
+        ransomware_context="Si los backups fallan silenciosamente, puede que no haya copias recuperables cuando ocurra el ataque de ransomware. El monitoreo detecta fallos de backup a tiempo.",
     ),
 
     RRRule(
@@ -329,6 +342,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Crear suscripción dedicada para Recovery Services. Configurar Cross-subscription backup.",
             "gcp": "Crear proyecto GCP dedicado para backups. Configurar permisos mínimos y replicación cross-project.",
         },
+        ransomware_context="CRÍTICO: El aislamiento de backups en cuenta/proyecto separado impide que un atacante con acceso a la cuenta de producción pueda eliminar los backups.",
     ),
 
     RRRule(
@@ -353,6 +367,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Documentar RTO/RPO por servicio. Validar configuración de backup contra los objetivos definidos.",
             "gcp": "Documentar RTO/RPO por servicio. Verificar que backup schedules cumplen con los objetivos.",
         },
+        ransomware_context="Sin RTO/RPO documentados, la recuperación de ransomware será caótica y más lenta. Saber cuánto se puede perder (RPO) y cuánto tarda recuperar (RTO) es esencial.",
     ),
 
     RRRule(
@@ -377,6 +392,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Realizar pruebas de restauración trimestrales en Recovery Services. Documentar RTO logrado.",
             "gcp": "Ejecutar restore tests trimestrales. Documentar tiempos de recuperación y validar integridad de datos.",
         },
+        ransomware_context="Un backup nunca probado puede fallar cuando más se necesita. Las pruebas de restauración validan que la recuperación de ransomware realmente funciona.",
     ),
 
     RRRule(
@@ -401,6 +417,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Documentar DR plan con Azure Site Recovery. Incluir procedimientos de ransomware recovery.",
             "gcp": "Crear DR plan con procedimientos GCP. Incluir escenario de ransomware con pasos de aislamiento y recovery.",
         },
+        ransomware_context="Un DR plan específico para ransomware acelera la respuesta: el equipo sabe exactamente qué hacer, en qué orden, y qué restaurar primero.",
     ),
 
     RRRule(
@@ -423,6 +440,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Verificar backup mode en Cosmos DB (Continuous o Periodic). Configurar continuous backup preferido.",
             "gcp": "Configurar Firestore export schedules via Cloud Functions o Cloud Scheduler.",
         },
+        ransomware_context="Las bases de datos NoSQL contienen datos de aplicación críticos. Sin backup, un ataque de ransomware puede causar pérdida permanente de datos de negocio.",
     ),
 
     RRRule(
@@ -446,6 +464,7 @@ D3_RULES: list[RRRule] = [
             "azure": "Configurar backup para Azure Functions App Service. Mantener código en repositorio.",
             "gcp": "Mantener Cloud Functions código en repositorio. Usar versioning y traffic splitting.",
         },
+        ransomware_context="El ransomware puede modificar código de funciones serverless para persistir o propagarse. Versioning y backup del código permiten restaurar funciones limpias.",
     ),
 
     RRRule(
@@ -469,5 +488,6 @@ D3_RULES: list[RRRule] = [
             "azure": "Configurar RBAC en Recovery Services vault. Asignar roles específicos (Backup Operator, Backup Reader).",
             "gcp": "Restringir acceso a backup resources via IAM. Crear custom roles para backup management.",
         },
+        ransomware_context="Si las access policies del backup vault son permisivas, el atacante puede eliminar o modificar los backups desde la cuenta comprometida.",
     ),
 ]

@@ -9,12 +9,14 @@ import AccountHeatmap from '@/components/ransomware-readiness/AccountHeatmap'
 import DomainCard from '@/components/ransomware-readiness/DomainCard'
 import Badge from '@/components/ui/Badge'
 import { api } from '@/lib/api'
+import KnowledgeBasePanel from '@/components/ransomware-readiness/KnowledgeBasePanel'
 import {
   ShieldExclamationIcon,
   ArrowPathIcon,
   ChartBarIcon,
   DocumentArrowDownIcon,
   ClipboardDocumentListIcon,
+  BookOpenIcon,
 } from '@heroicons/react/24/outline'
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
@@ -36,6 +38,7 @@ export default function RansomwareReadinessPage() {
   const [history, setHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [evaluating, setEvaluating] = useState(false)
+  const [kbOpen, setKbOpen] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -120,6 +123,13 @@ export default function RansomwareReadinessPage() {
           <ClipboardDocumentListIcon className="w-4 h-4" />
           Governance Inputs
         </Link>
+        <button
+          onClick={() => setKbOpen(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 border border-brand-blue/30 bg-brand-blue/5 rounded-lg hover:bg-brand-blue/10 text-sm font-medium text-brand-blue transition-colors"
+        >
+          <BookOpenIcon className="w-4 h-4" />
+          Knowledge Base
+        </button>
       </div>
 
       {/* Main score + radar */}
@@ -189,6 +199,7 @@ export default function RansomwareReadinessPage() {
               weight={d.weight}
               checks_passed={d.checks_passed}
               checks_failed={d.checks_failed}
+              checks_warning={d.checks_warning}
               critical_fails={d.critical_fails}
               nist_csf={d.nist_csf}
             />
@@ -297,6 +308,9 @@ export default function RansomwareReadinessPage() {
           </p>
         )}
       </div>
+
+      {/* Knowledge Base side panel */}
+      <KnowledgeBasePanel open={kbOpen} onClose={() => setKbOpen(false)} />
     </div>
   )
 }

@@ -9,6 +9,7 @@ interface Props {
   weight: number
   checks_passed: number
   checks_failed: number
+  checks_warning?: number
   critical_fails: number
   nist_csf: string
 }
@@ -21,7 +22,7 @@ function barColor(score: number): string {
   return 'bg-red-500'
 }
 
-export default function DomainCard({ id, name, score, weight, checks_passed, checks_failed, critical_fails, nist_csf }: Props) {
+export default function DomainCard({ id, name, score, weight, checks_passed, checks_failed, checks_warning = 0, critical_fails, nist_csf }: Props) {
   const total = checks_passed + checks_failed
   const pct = total > 0 ? Math.round((score / 100) * 100) : 0
 
@@ -43,6 +44,9 @@ export default function DomainCard({ id, name, score, weight, checks_passed, che
       <div className="flex items-center gap-3 text-xs text-brand-gray-400">
         <span className="text-emerald-600 font-medium">{checks_passed} passed</span>
         <span className="text-red-500 font-medium">{checks_failed} failed</span>
+        {checks_warning > 0 && (
+          <span className="text-amber-600 font-medium">{checks_warning} warning</span>
+        )}
         {critical_fails > 0 && (
           <span className="text-red-600 font-bold">{critical_fails} critical</span>
         )}

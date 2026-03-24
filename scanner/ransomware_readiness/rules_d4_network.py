@@ -27,6 +27,7 @@ D4_RULES: list[RRRule] = [
             "azure": "Eliminar reglas NSG allow inbound desde Any en puertos de gestión. Usar Azure Bastion para acceso.",
             "gcp": "Eliminar firewall rules con 0.0.0.0/0 en puertos sensibles. Usar IAP (Identity-Aware Proxy) para acceso.",
         },
+        ransomware_context="CRÍTICO: Puertos de gestión abiertos a internet (RDP, SSH, SMB) son el vector de entrada más común para ransomware. SMB (445) es usado por WannaCry y NotPetya para propagación.",
     ),
 
     RRRule(
@@ -49,6 +50,7 @@ D4_RULES: list[RRRule] = [
             "azure": "Configurar NSG default rules deny. Agregar solo allow rules específicas necesarias.",
             "gcp": "Configurar firewall rules con prioridad deny-all al final. Solo permitir tráfico específico necesario.",
         },
+        ransomware_context="Reglas allow-all permiten movimiento lateral libre del ransomware dentro de la red. Deny-by-default limita la propagación a segmentos autorizados.",
     ),
 
     RRRule(
@@ -72,6 +74,7 @@ D4_RULES: list[RRRule] = [
             "azure": "Deshabilitar Blob anonymous access en Storage Account. Configurar firewall rules para restringir red access.",
             "gcp": "Habilitar Uniform bucket-level access. Eliminar allUsers y allAuthenticatedUsers de IAM bindings.",
         },
+        ransomware_context="CRÍTICO: Storage público permite al atacante acceder y cifrar/eliminar datos directamente desde internet sin necesidad de comprometer credenciales.",
     ),
 
     RRRule(
@@ -95,6 +98,7 @@ D4_RULES: list[RRRule] = [
             "azure": "Crear Private Endpoints para Storage, SQL, Key Vault. Deshabilitar public access en estos servicios.",
             "gcp": "Configurar Private Google Access. Usar Private Service Connect. Deshabilitar public IPs en Cloud SQL.",
         },
+        ransomware_context="Private endpoints eliminan la exposición a internet de bases de datos y storage, reduciendo la superficie de ataque para ransomware basado en explotación de servicios.",
     ),
 
     RRRule(
@@ -118,6 +122,7 @@ D4_RULES: list[RRRule] = [
             "azure": "Habilitar NSG Flow Logs en Network Watcher. Configurar retención y envío a Log Analytics.",
             "gcp": "Habilitar VPC Flow Logs en cada subnet: gcloud compute networks subnets update --enable-flow-logs.",
         },
+        ransomware_context="Flow Logs son esenciales para la investigación forense post-ransomware: permiten identificar el movimiento lateral del atacante y los datos exfiltrados.",
     ),
 
     RRRule(
@@ -141,6 +146,7 @@ D4_RULES: list[RRRule] = [
             "azure": "Configurar Azure WAF en Application Gateway. Usar OWASP rule set. Habilitar bot protection.",
             "gcp": "Configurar Cloud Armor security policies. Asociar a backend services de load balancers.",
         },
+        ransomware_context="WAF previene la explotación de vulnerabilidades web (SQLi, RCE) que pueden ser el vector de entrada inicial para desplegar ransomware en la infraestructura.",
     ),
 
     RRRule(
@@ -165,6 +171,7 @@ D4_RULES: list[RRRule] = [
             "azure": "Crear VNets separadas por ambiente. Usar VNet Peering con NSG rules restrictivas entre ambientes.",
             "gcp": "Crear VPC networks o proyectos separados por ambiente. Usar VPC peering o Shared VPC con firewall rules.",
         },
+        ransomware_context="La segmentación entre ambientes impide que ransomware desplegado en desarrollo se propague a producción. Limita el blast radius del ataque.",
     ),
 
     RRRule(
@@ -188,6 +195,7 @@ D4_RULES: list[RRRule] = [
             "azure": "Configurar Azure Firewall con egress filtering. Usar FQDN filtering para limitar destinos permitidos.",
             "gcp": "Configurar egress firewall rules. Usar Cloud NAT con logging. Implementar proxy para internet access.",
         },
+        ransomware_context="El egress filtering previene la comunicación del ransomware con servidores C2 (Command & Control) y bloquea la exfiltración de datos previa al cifrado.",
     ),
 
     RRRule(
@@ -211,6 +219,7 @@ D4_RULES: list[RRRule] = [
             "azure": "Configurar Azure DNS Private Resolver. Habilitar DNSSEC para zones públicas.",
             "gcp": "Habilitar DNSSEC en Cloud DNS. Configurar DNS policies para logging y forwarding seguro.",
         },
+        ransomware_context="DNS tunneling es una técnica usada por ransomware para exfiltrar datos y comunicarse con C2. La seguridad DNS detecta y bloquea estas comunicaciones.",
     ),
 
     RRRule(
@@ -234,6 +243,7 @@ D4_RULES: list[RRRule] = [
             "azure": "Configurar TLS 1.2 minimum policy en Application Gateway. Habilitar diagnostic logs.",
             "gcp": "Configurar SSL policy con TLS 1.2 minimum. Habilitar logging en backend services.",
         },
+        ransomware_context="Load balancers con TLS débil pueden ser explotados para interceptar tráfico o como vector de entrada para ataques que derivan en ransomware.",
     ),
 
     RRRule(
@@ -257,6 +267,7 @@ D4_RULES: list[RRRule] = [
             "azure": "Configurar authentication policies en API Management. Habilitar rate limiting y OAuth2 validation.",
             "gcp": "Configurar API Gateway con authentication (API Key, Firebase Auth, Service Account). Habilitar quota policies.",
         },
+        ransomware_context="APIs sin autenticación pueden ser abusadas para acceder a datos o ejecutar acciones que faciliten un ataque de ransomware automatizado.",
     ),
 
     RRRule(
@@ -280,6 +291,7 @@ D4_RULES: list[RRRule] = [
             "azure": "Auditar Public IP addresses. Disociar y eliminar IPs públicas no necesarias. Usar Private Endpoints.",
             "gcp": "Auditar external IP addresses. Eliminar IPs estáticas no utilizadas. Usar Cloud NAT en lugar de IPs públicas directas.",
         },
+        ransomware_context="Cada IP pública es un punto de entrada potencial para ransomware. Reducir IPs públicas reduce la superficie de ataque externa.",
     ),
 
     RRRule(
@@ -303,6 +315,7 @@ D4_RULES: list[RRRule] = [
             "azure": "Identificar NSGs sin NICs o subnets asociadas. Eliminar NSGs no utilizados.",
             "gcp": "Identificar firewall rules sin instancias target. Eliminar reglas obsoletas.",
         },
+        ransomware_context="Security groups obsoletos pueden ser asignados accidentalmente, exponiendo recursos a internet y creando vectores de entrada para ransomware.",
     ),
 
     RRRule(
@@ -326,6 +339,7 @@ D4_RULES: list[RRRule] = [
             "azure": "Revisar VNet peering. Deshabilitar 'Allow forwarded traffic' donde no sea necesario.",
             "gcp": "Revisar VPC peering. Configurar export/import custom routes selectivamente.",
         },
+        ransomware_context="Peering/VPN sin controles permite que ransomware se propague entre VPCs/redes conectadas. El routing restrictivo limita la propagación lateral.",
     ),
 
     RRRule(
@@ -349,5 +363,6 @@ D4_RULES: list[RRRule] = [
             "azure": "Crear VNets custom con address space planificado. No usar la VNet creada por defecto.",
             "gcp": "Eliminar default network. Crear VPC networks custom con subnets planificadas.",
         },
+        ransomware_context="La VPC default tiene configuraciones inseguras por defecto que facilitan el acceso desde internet y el movimiento lateral de ransomware.",
     ),
 ]

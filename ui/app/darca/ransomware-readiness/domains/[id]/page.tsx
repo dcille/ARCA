@@ -122,10 +122,14 @@ export default function DomainDetailPage() {
                 <Badge type="severity" value={rule.severity} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-brand-navy">{rule.rule_id}: {rule.name}</p>
+                  <p className="text-xs text-brand-gray-500 mt-0.5">{rule.description}</p>
+                  {rule.ransomware_context && (
+                    <p className="text-xs text-red-600 mt-0.5 italic">{rule.ransomware_context}</p>
+                  )}
                   <p className="text-xs text-brand-gray-400 mt-0.5">
                     {rule.cloud_providers?.join(', ')?.toUpperCase()} &middot; NIST {rule.nist_subcategory}
-                    {rule.is_manual && ' &middot; Manual input required'}
-                    {rule.failed_resources > 0 && ` &middot; ${rule.failed_resources} resources affected`}
+                    {rule.is_manual && ' \u00b7 Manual input required'}
+                    {rule.failed_resources > 0 && ` \u00b7 ${rule.failed_resources} resources affected`}
                   </p>
                 </div>
                 {rule.last_evaluated && (
