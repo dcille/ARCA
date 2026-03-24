@@ -130,6 +130,17 @@ def run_cloud_scan(self, scan_id: str, provider_id: str, services=None, regions=
         except Exception as notify_err:
             logger.warning(f"Notification dispatch failed: {notify_err}")
 
+        # Trigger Ransomware Readiness evaluation
+        try:
+            celery_app.send_task(
+                "api.tasks.rr_tasks.evaluate_ransomware_readiness",
+                args=[scan.user_id],
+                kwargs={"scan_id": scan_id},
+            )
+            logger.info(f"RR evaluation triggered for scan {scan_id}")
+        except Exception as rr_err:
+            logger.warning(f"RR evaluation trigger failed: {rr_err}")
+
         logger.info(f"Cloud scan {scan_id} completed: {total} checks, {passed} passed, {failed} failed")
 
     except Exception as e:

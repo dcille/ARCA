@@ -12,7 +12,7 @@ from api.database import engine, Base
 from api.routers import (
     auth, providers, scans, findings, compliance, saas, dashboard,
     attack_paths, reports, inventory, schedules, notifications, integrations,
-    organizations, mitre, dspm, security_graph,
+    organizations, mitre, dspm, security_graph, ransomware_readiness,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,6 +72,7 @@ app.include_router(organizations.router, prefix="/api/v1/organizations", tags=["
 app.include_router(mitre.router, prefix="/api/v1/mitre", tags=["MITRE ATT&CK"])
 app.include_router(dspm.router, prefix="/api/v1/dspm", tags=["DSPM"])
 app.include_router(security_graph.router, prefix="/api/v1/security-graph", tags=["Security Graph"])
+app.include_router(ransomware_readiness.router, prefix="/api/v1/ransomware-readiness", tags=["Ransomware Readiness"])
 
 
 @app.get("/api/v1/health")

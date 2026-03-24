@@ -24,6 +24,7 @@ import {
   XMarkIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
+  ShieldExclamationIcon,
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/auth'
 import { api } from '@/lib/api'
@@ -42,6 +43,7 @@ const sections: NavSection[] = [
       { name: 'Findings', href: '/darca/findings', icon: MagnifyingGlassIcon },
       { name: 'Compliance', href: '/darca/compliance', icon: DocumentChartBarIcon },
       { name: 'MITRE ATT&CK', href: '/darca/mitre-attack', icon: TableCellsIcon },
+      { name: 'Ransomware Readiness', href: '/darca/ransomware-readiness', icon: ShieldExclamationIcon },
     ],
   },
   {

@@ -386,3 +386,39 @@ async def export_findings(
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="ARCA_Findings.csv"'},
     )
+
+
+@router.get("/ransomware-readiness")
+async def ransomware_readiness_report(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate Ransomware Readiness executive PDF report."""
+    from api.services.rr_report_service import gather_rr_report_data, generate_rr_executive_html
+
+    data = await gather_rr_report_data(db, current_user.id)
+    if "error" in data:
+        raise HTTPException(status_code=404, detail=data["error"])
+
+    html = generate_rr_executive_html(data, org_name="Organization")
+
+    # Convert HTML to PDF using the same approach as executive reports
+    try:
+        from api.services.report_service import html_to_pdf
+        pdf_bytes = html_to_pdf(html)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": 'attachment; filename="ARCA_Ransomware_Readiness_Report.pdf"'
+            },
+        )
+    except Exception:
+        # Fallback: return HTML if PDF conversion not available
+        return Response(
+            content=html.encode(),
+            media_type="text/html",
+            headers={
+                "Content-Disposition": 'attachment; filename="ARCA_Ransomware_Readiness_Report.html"'
+            },
+        )
