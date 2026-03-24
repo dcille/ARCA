@@ -25,6 +25,7 @@ D7_RULES: list[RRRule] = [
             "azure": "Crear ransomware response plan específico para Azure. Incluir procedimientos de aislamiento de suscripciones y restauración.",
             "gcp": "Crear ransomware response plan específico para GCP. Incluir procedimientos de aislamiento de proyectos y restauración.",
         },
+        ransomware_context="Un plan de respuesta específico para ransomware reduce drásticamente el tiempo de recuperación. Sin plan, las decisiones se toman bajo presión, aumentando errores y daños.",
     ),
 
     RRRule(
@@ -45,6 +46,7 @@ D7_RULES: list[RRRule] = [
             "azure": "Programar tabletop exercise trimestral con escenarios Azure-specific: compromiso de Entra ID, cifrado de Storage.",
             "gcp": "Programar tabletop exercise trimestral con escenarios GCP-specific: compromiso de service account, cifrado de Cloud Storage.",
         },
+        ransomware_context="Los tabletop exercises validan que el equipo sabe ejecutar el plan de respuesta a ransomware. Sin práctica, el plan puede fallar cuando más se necesita.",
     ),
 
     RRRule(
@@ -65,6 +67,7 @@ D7_RULES: list[RRRule] = [
             "azure": "Implementar security training usando Microsoft Security Awareness toolkit o plataforma equivalente.",
             "gcp": "Implementar security training que cubra amenazas cloud-specific. Incluir phishing simulations.",
         },
+        ransomware_context="El phishing es el vector de entrada #1 para ransomware. Security awareness training reduce significativamente la probabilidad de que un empleado caiga en phishing.",
     ),
 
     RRRule(
@@ -85,6 +88,7 @@ D7_RULES: list[RRRule] = [
             "azure": "Documentar roles IR con contactos. Integrar con Azure IR contacts en Defender for Cloud.",
             "gcp": "Documentar roles IR con contactos. Configurar Essential Contacts para categoría SECURITY.",
         },
+        ransomware_context="Durante un ataque de ransomware, cada minuto cuenta. Si los roles no están claros, la respuesta se retrasa y el atacante tiene más tiempo para causar daño.",
     ),
 
     RRRule(
@@ -105,5 +109,6 @@ D7_RULES: list[RRRule] = [
             "azure": "Crear communication plan con escalation matrix. Preparar templates pre-aprobados por legal.",
             "gcp": "Crear communication plan con templates y lista de distribución. Incluir procedimiento de notificación a Google si aplica.",
         },
+        ransomware_context="La comunicación descoordinada durante un ataque de ransomware puede causar más daño reputacional que el propio ataque. Templates pre-aprobados aceleran la respuesta.",
     ),
 ]

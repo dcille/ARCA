@@ -27,6 +27,7 @@ D2_RULES: list[RRRule] = [
             "azure": "Verificar Storage Service Encryption (SSE) activo. Habilitar Azure Disk Encryption para VMs. Verificar TDE en Azure SQL.",
             "gcp": "Cloud Storage tiene CSEK/CMEK disponible. Verificar encryption en Cloud SQL y Compute Engine disks.",
         },
+        ransomware_context="El cifrado at rest protege los datos contra acceso directo si el atacante obtiene acceso al almacenamiento subyacente, pero no previene cifrado por ransomware sobre datos ya cifrados.",
     ),
 
     RRRule(
@@ -50,6 +51,7 @@ D2_RULES: list[RRRule] = [
             "azure": "Crear keys en Azure Key Vault. Configurar Storage accounts y Managed Disks para usar CMK.",
             "gcp": "Crear keys en Cloud KMS. Configurar Cloud Storage y Cloud SQL para usar CMEK.",
         },
+        ransomware_context="CMK permite revocar el acceso a las claves de cifrado durante un ataque, impidiendo que el atacante descifre los datos exfiltrados y limitando el impacto del ransomware.",
     ),
 
     RRRule(
@@ -73,6 +75,7 @@ D2_RULES: list[RRRule] = [
             "azure": "Configurar rotation policy en Azure Key Vault keys con periodo máximo de 365 días.",
             "gcp": "Configurar automatic rotation en Cloud KMS con rotation period de máximo 365 días.",
         },
+        ransomware_context="La rotación de claves limita la ventana de exposición si una clave KMS es comprometida durante un ataque de ransomware, reduciendo los datos que el atacante puede descifrar.",
     ),
 
     RRRule(
@@ -96,6 +99,7 @@ D2_RULES: list[RRRule] = [
             "azure": "Habilitar 'Secure transfer required' en Storage Accounts. Configurar HTTPS Only en App Services.",
             "gcp": "Configurar SSL enforcement en Cloud SQL. Usar HTTPS load balancers. Configurar HTTPS redirect.",
         },
+        ransomware_context="Sin TLS/HTTPS, las comunicaciones pueden ser interceptadas para obtener credenciales o tokens que faciliten el acceso inicial para desplegar ransomware.",
     ),
 
     RRRule(
@@ -119,6 +123,7 @@ D2_RULES: list[RRRule] = [
             "azure": "Migrar a RBAC para Key Vault. Eliminar access policies excesivas. Asignar roles específicos (Key Vault Crypto User).",
             "gcp": "Revisar IAM bindings en Cloud KMS keyrings. Asignar roles específicos (cloudkms.cryptoKeyEncrypterDecrypter).",
         },
+        ransomware_context="Si el atacante obtiene acceso a las claves KMS, puede cifrar datos con nuevas claves y eliminar las originales, haciendo irrecuperables los datos. Access policies restrictivas limitan este riesgo.",
     ),
 
     RRRule(
@@ -142,6 +147,7 @@ D2_RULES: list[RRRule] = [
             "azure": "Habilitar Soft Delete y Purge Protection en Azure Key Vault. Retention period mínimo 90 días.",
             "gcp": "Configurar key version destroy scheduled duration. Implementar Organization Policy para prevenir key destruction.",
         },
+        ransomware_context="CRÍTICO: En un ataque de ransomware, el atacante intentará eliminar las claves KMS para hacer los backups cifrados irrecuperables. La protección contra eliminación es esencial.",
     ),
 
     RRRule(
@@ -164,6 +170,7 @@ D2_RULES: list[RRRule] = [
             "azure": "Verificar TDE habilitado en Azure SQL Database (default desde 2017). Configurar CMK si requerido.",
             "gcp": "Cloud SQL tiene encryption at rest por defecto. Configurar CMEK para control adicional.",
         },
+        ransomware_context="TDE protege los datos de bases de datos en disco. Sin cifrado, un atacante con acceso al storage puede leer datos sensibles directamente antes de cifrarlos con ransomware.",
     ),
 
     RRRule(
@@ -187,6 +194,7 @@ D2_RULES: list[RRRule] = [
             "azure": "Almacenar secrets en Azure Key Vault. Configurar expiration dates. Usar Managed Identity para acceso.",
             "gcp": "Usar Secret Manager para almacenar secrets. Configurar rotación y acceso via IAM.",
         },
+        ransomware_context="Secrets hardcodeados en código o variables de entorno son fáciles de exfiltrar durante un ataque y permiten al atacante acceder a más servicios para ampliar el impacto del ransomware.",
     ),
 
     RRRule(
@@ -209,6 +217,7 @@ D2_RULES: list[RRRule] = [
             "azure": "Configurar certificate auto-renewal en Key Vault. Crear alertas para certificados próximos a expirar.",
             "gcp": "Usar Google-managed SSL certificates para auto-renewal. Monitorear certificados self-managed.",
         },
+        ransomware_context="Certificados expirados pueden causar interrupciones de servicio que ocultan los indicadores de un ataque de ransomware en progreso.",
     ),
 
     RRRule(
@@ -230,6 +239,7 @@ D2_RULES: list[RRRule] = [
             "aws": "Habilitar EBS encryption by default: EC2 > EBS > Settings > Always encrypt new EBS volumes. Hacer por cada región.",
             "azure": "Configurar Azure Policy para requerir disk encryption en todas las VMs nuevas.",
         },
+        ransomware_context="Sin cifrado por defecto, los nuevos volúmenes creados durante la recuperación de un ataque podrían quedar sin cifrar, creando nuevas vulnerabilidades.",
     ),
 
     RRRule(
@@ -253,6 +263,7 @@ D2_RULES: list[RRRule] = [
             "azure": "Verificar que snapshots usen encryption. Usar Azure Disk Encryption para cifrar antes de snapshot.",
             "gcp": "Verificar que snapshots heredan encryption del disco origen. Usar CMEK para control adicional.",
         },
+        ransomware_context="Snapshots sin cifrar pueden ser copiados y accedidos por el atacante para exfiltrar datos antes del cifrado por ransomware.",
     ),
 
     RRRule(
@@ -276,6 +287,7 @@ D2_RULES: list[RRRule] = [
             "azure": "Habilitar 'Secure transfer required' en propiedades del Storage Account.",
             "gcp": "Configurar Uniform bucket-level access. Cloud Storage usa HTTPS por defecto.",
         },
+        ransomware_context="Acceso HTTP sin cifrar al storage permite interceptar datos en tránsito y credenciales, facilitando la exfiltración de datos previa al ataque de ransomware.",
     ),
 
     RRRule(
@@ -299,6 +311,7 @@ D2_RULES: list[RRRule] = [
             "azure": "Configurar Microsoft Purview Data Loss Prevention policies para clasificar y proteger datos sensibles.",
             "gcp": "Configurar Cloud DLP para escanear y clasificar datos en Cloud Storage, BigQuery y Datastore.",
         },
+        ransomware_context="DLP ayuda a identificar dónde están los datos sensibles, permitiendo priorizar su protección contra ransomware y detectar exfiltración previa al cifrado.",
     ),
 
     RRRule(
@@ -322,6 +335,7 @@ D2_RULES: list[RRRule] = [
             "azure": "Habilitar blob versioning en Storage Account > Data protection > Enable versioning for blobs.",
             "gcp": "Habilitar object versioning: gsutil versioning set on gs://<bucket-name>.",
         },
+        ransomware_context="CRÍTICO: El versioning permite recuperar versiones anteriores de objetos cifrados por ransomware. Sin versioning, los datos sobrescritos por ransomware son irrecuperables.",
     ),
 
     RRRule(
@@ -345,5 +359,6 @@ D2_RULES: list[RRRule] = [
             "azure": "Configurar Lifecycle management policies en Storage Account para tiering y deletion automáticos.",
             "gcp": "Configurar Object Lifecycle Management rules para cambio de storage class y deletion.",
         },
+        ransomware_context="Lifecycle policies ayudan a gestionar la retención de versiones de objetos, asegurando que existan copias recuperables de datos afectados por ransomware.",
     ),
 ]

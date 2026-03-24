@@ -28,6 +28,7 @@ D1_RULES: list[RRRule] = [
             "azure": "Configurar MFA en Entra ID > Security > MFA > Additional cloud-based MFA settings. Activar per-user MFA o Conditional Access policy.",
             "gcp": "Activar 2-Step Verification en Admin Console > Security > Authentication > 2-step verification. Aplicar a toda la organización.",
         },
+        ransomware_context="Credenciales sin MFA son el vector de entrada #1 en ataques de ransomware cloud. Los atacantes usan credenciales robadas via phishing para acceder a la consola y desplegar ransomware.",
     ),
 
     # ── RR-IAM-002: MFA for root/owner ───────────────────────────
@@ -52,6 +53,7 @@ D1_RULES: list[RRRule] = [
             "azure": "Configurar MFA para todos los Global Administrators via Conditional Access o per-user MFA en Entra ID.",
             "gcp": "Activar 2-Step Verification con llave de seguridad física para cuentas Super Admin en admin.google.com.",
         },
+        ransomware_context="La cuenta root comprometida permite al atacante eliminar todos los backups, desactivar logging y cifrar todos los datos. Es el peor escenario posible en un ataque de ransomware.",
     ),
 
     # ── RR-IAM-003: Access key rotation ──────────────────────────
@@ -74,6 +76,7 @@ D1_RULES: list[RRRule] = [
             "aws": "Rotar access keys cada 90 días: IAM > Users > Security credentials > Create access key (nueva) > Deactivate old key > Delete.",
             "gcp": "Eliminar service account keys de más de 90 días y migrar a Workload Identity Federation: gcloud iam service-accounts keys delete.",
         },
+        ransomware_context="Access keys de larga duración pueden ser exfiltradas y usadas meses después para lanzar un ataque de ransomware. La rotación limita la ventana de exposición.",
     ),
 
     # ── RR-IAM-004: Least privilege ──────────────────────────────
@@ -98,6 +101,7 @@ D1_RULES: list[RRRule] = [
             "azure": "Reemplazar rol Owner por roles más específicos (Contributor con exclusiones). Usar PIM para acceso just-in-time.",
             "gcp": "Reemplazar roles primitivos (Owner/Editor) por roles predefinidos específicos. Usar IAM Recommender para right-sizing.",
         },
+        ransomware_context="Políticas con permisos excesivos (Action:* o Resource:*) permiten que un atacante con credenciales comprometidas cifre datos, elimine backups y desactive controles de seguridad.",
     ),
 
     # ── RR-IAM-005: Service account privileges ───────────────────
@@ -122,6 +126,7 @@ D1_RULES: list[RRRule] = [
             "azure": "Auditar Service Principals con roles Owner/Contributor. Asignar roles específicos por recurso.",
             "gcp": "Revisar service accounts con roles Owner/Editor. Usar roles predefinidos específicos por servicio.",
         },
+        ransomware_context="Service accounts con privilegios administrativos son un objetivo de alto valor. Si se comprometen, permiten movimiento lateral automatizado y destrucción masiva de datos.",
     ),
 
     # ── RR-IAM-006: Session duration ─────────────────────────────
@@ -144,6 +149,7 @@ D1_RULES: list[RRRule] = [
             "aws": "Configurar MaxSessionDuration a 3600 (1h) para roles administrativos via update-role.",
             "azure": "Configurar Conditional Access > Session > Sign-in frequency a 1 hora para roles administrativos.",
         },
+        ransomware_context="Sesiones administrativas de larga duración dan más tiempo al atacante para ejecutar el ataque completo: reconocimiento, exfiltración, cifrado y eliminación de backups.",
     ),
 
     # ── RR-IAM-007: Cross-account access ─────────────────────────
@@ -168,6 +174,7 @@ D1_RULES: list[RRRule] = [
             "azure": "Configurar Cross-tenant access settings en Entra ID. Restringir invitaciones externas y B2B access.",
             "gcp": "Revisar IAM bindings con miembros de otros proyectos/organizaciones. Usar Organization Policy constraints.",
         },
+        ransomware_context="Trust policies mal configuradas permiten que un atacante que compromete una cuenta se mueva lateralmente a otras cuentas de la organización, ampliando el blast radius del ransomware.",
     ),
 
     # ── RR-IAM-008: SCPs / Organization policies ─────────────────
@@ -192,6 +199,7 @@ D1_RULES: list[RRRule] = [
             "azure": "Crear Azure Policy assignments que denieguen acciones críticas y requieran configuraciones de seguridad.",
             "gcp": "Configurar Organization Policy constraints: restrict resource locations, disable service account key creation.",
         },
+        ransomware_context="Las SCPs/Organization Policies son la última línea de defensa: incluso si un admin es comprometido, las SCPs pueden prevenir la eliminación de CloudTrail, backups o claves KMS.",
     ),
 
     # ── RR-IAM-009: Federated identity ───────────────────────────
@@ -216,6 +224,7 @@ D1_RULES: list[RRRule] = [
             "azure": "Revisar federated domains en Entra ID. Configurar token signing certificates y session controls.",
             "gcp": "Configurar Workforce Identity Federation con providers verificados. Limitar attribute conditions.",
         },
+        ransomware_context="Una configuración SSO/SAML débil puede permitir al atacante obtener tokens con privilegios elevados y persistir en el entorno durante el ataque.",
     ),
 
     # ── RR-IAM-010: Conditional access ───────────────────────────
@@ -240,6 +249,7 @@ D1_RULES: list[RRRule] = [
             "azure": "Crear Conditional Access policies en Entra ID para requerir MFA, dispositivo compliant, ubicación de confianza.",
             "gcp": "Configurar Access Context Manager con access levels basados en IP, dispositivo y geolocalización.",
         },
+        ransomware_context="El acceso condicional puede detectar y bloquear accesos desde ubicaciones o dispositivos inusuales, que son indicadores típicos de credenciales comprometidas usadas en ataques de ransomware.",
     ),
 
     # ── RR-IAM-011: JIT access ───────────────────────────────────
@@ -264,6 +274,7 @@ D1_RULES: list[RRRule] = [
             "azure": "Activar PIM (Privileged Identity Management) para roles Global Admin, Owner, Contributor. Requerir aprobación y MFA.",
             "gcp": "Implementar PAM (Privileged Access Manager) o usar temporal IAM bindings con condiciones de tiempo.",
         },
+        ransomware_context="Los roles administrativos permanentes son un objetivo de alto valor para ransomware. Con JIT, el atacante necesita no solo las credenciales sino también pasar el proceso de aprobación.",
     ),
 
     # ── RR-IAM-012: Credential anomalies ─────────────────────────
@@ -286,6 +297,7 @@ D1_RULES: list[RRRule] = [
             "aws": "Generar IAM Credential Report. Desactivar usuarios sin login >90 días con keys activas. Eliminar keys duplicadas.",
             "gcp": "Usar IAM Recommender para identificar service accounts y permisos no utilizados. Desactivar cuentas inactivas.",
         },
+        ransomware_context="Credenciales abandonadas o anómalas son vectores de entrada sigilosos. Los atacantes buscan cuentas olvidadas con keys activas para acceder sin ser detectados.",
     ),
 
     # ── RR-IAM-013: Unused permissions cleanup ───────────────────
@@ -310,6 +322,7 @@ D1_RULES: list[RRRule] = [
             "azure": "Usar Access Reviews en Entra ID para identificar y revocar asignaciones no utilizadas.",
             "gcp": "Aplicar recomendaciones de IAM Recommender. Revocar roles no utilizados en >90 días.",
         },
+        ransomware_context="Permisos no utilizados amplían la superficie de ataque. Un atacante que compromete una identidad hereda todos sus permisos, incluidos los innecesarios que facilitan el ataque.",
     ),
 
     # ── RR-IAM-014: Break-glass account ──────────────────────────
@@ -334,6 +347,7 @@ D1_RULES: list[RRRule] = [
             "azure": "Crear 2 cuentas emergency access en Entra ID excluidas de Conditional Access. Asignar Global Admin. Monitorear uso.",
             "gcp": "Crear cuenta Super Admin dedicada con 2FA hardware. Almacenar credenciales offline. Configurar alertas de uso.",
         },
+        ransomware_context="Durante un ataque de ransomware, el atacante puede bloquear las cuentas de los administradores. Una cuenta break-glass protegida es esencial para recuperar el control del entorno.",
     ),
 
     # ── RR-IAM-015: API key restrictions ─────────────────────────
@@ -353,6 +367,7 @@ D1_RULES: list[RRRule] = [
         remediation={
             "gcp": "Restringir API keys por API target y application restrictions (HTTP referrers, IP addresses) en Credentials page.",
         },
+        ransomware_context="API keys sin restricciones pueden ser usadas desde cualquier ubicación para acceder a servicios y datos, facilitando la exfiltración y cifrado por ransomware.",
     ),
 
     # ── RR-IAM-016: Workload Identity Federation ─────────────────
@@ -375,6 +390,7 @@ D1_RULES: list[RRRule] = [
             "aws": "Migrar de access keys a IRSA (IAM Roles for Service Accounts) para workloads EKS. Usar Instance Profiles para EC2.",
             "gcp": "Migrar de service account keys a Workload Identity Federation. Configurar WIF pools para CI/CD y workloads externos.",
         },
+        ransomware_context="Service account keys son credenciales estáticas que pueden ser exfiltradas. La federación de identidad elimina este vector de ataque al usar tokens temporales.",
     ),
 
     # ── RR-IAM-017: Password policy ──────────────────────────────
@@ -401,6 +417,7 @@ D1_RULES: list[RRRule] = [
             "azure": "Configurar Password Protection en Entra ID. Habilitar custom banned passwords y smart lockout.",
             "gcp": "Configurar Password Policy en Admin Console > Security > Password management con requisitos fuertes.",
         },
+        ransomware_context="Contraseñas débiles o reutilizadas facilitan ataques de credential stuffing, que son un vector común de entrada para operadores de ransomware.",
     ),
 
     # ── RR-IAM-018: Root account not used for daily operations ───
@@ -420,6 +437,7 @@ D1_RULES: list[RRRule] = [
         remediation={
             "aws": "Eliminar access keys de root: IAM > My Security Credentials > Access keys > Delete. Usar usuarios IAM para operaciones diarias.",
         },
+        ransomware_context="Si la cuenta root es usada diariamente, cualquier compromiso de esa sesión da al atacante acceso total para ejecutar el ataque de ransomware sin restricciones.",
     ),
 
     # ── RR-IAM-019: IAM users with multiple active keys ──────────
@@ -439,6 +457,7 @@ D1_RULES: list[RRRule] = [
         remediation={
             "aws": "Auditar usuarios con 2 keys activas. Desactivar y eliminar la key más antigua. Mantener máximo 1 key activa.",
         },
+        ransomware_context="Múltiples access keys activas dificultan la auditoría y pueden indicar keys olvidadas que el atacante puede explotar como vector de entrada.",
     ),
 
     # ── RR-IAM-020: Inline policies avoided ──────────────────────
@@ -459,6 +478,7 @@ D1_RULES: list[RRRule] = [
         remediation={
             "aws": "Migrar inline policies a managed policies. Usar aws iam list-user-policies para identificar y recrear como managed.",
         },
+        ransomware_context="Las inline policies dificultan la auditoría centralizada de permisos, lo que puede ocultar permisos excesivos explotables por ransomware.",
     ),
 
     # ── RR-IAM-021: Permission boundaries ────────────────────────
@@ -479,6 +499,7 @@ D1_RULES: list[RRRule] = [
         remediation={
             "aws": "Crear permission boundary policy que limite permisos máximos. Aplicar a roles de desarrollo y delegados via --permissions-boundary.",
         },
+        ransomware_context="Sin permission boundaries, un atacante que compromete un rol delegado puede escalar privilegios y crear nuevos roles con permisos para ejecutar ransomware.",
     ),
 
     # ── RR-IAM-022: Groups for permission assignment ─────────────
@@ -501,6 +522,7 @@ D1_RULES: list[RRRule] = [
             "aws": "Crear IAM Groups por función (admins, developers, readonly). Mover políticas de usuarios a grupos. Agregar usuarios a grupos.",
             "azure": "Usar grupos de seguridad de Entra ID para asignar roles. Evitar asignaciones directas a usuarios individuales.",
         },
+        ransomware_context="Permisos directos a usuarios dificultan la revocación rápida de acceso durante un incidente de ransomware y complican la auditoría de privilegios.",
     ),
 
     # ── RR-IAM-023: Inactive users disabled ──────────────────────
@@ -525,6 +547,7 @@ D1_RULES: list[RRRule] = [
             "azure": "Configurar Access Reviews automáticos en Entra ID para revisar y revocar acceso de usuarios inactivos.",
             "gcp": "Usar IAM Recommender para identificar service accounts inactivas. Desactivar con gcloud iam service-accounts disable.",
         },
+        ransomware_context="Cuentas inactivas son un vector de entrada silencioso para ransomware. Los atacantes las comprometen sin que nadie note actividad inusual.",
     ),
 
     # ── RR-IAM-024: Support role access restricted ───────────────
@@ -549,6 +572,7 @@ D1_RULES: list[RRRule] = [
             "azure": "Habilitar Customer Lockbox para requerir aprobación antes de que soporte de Microsoft acceda a datos.",
             "gcp": "Habilitar Access Transparency logging. Configurar Access Approval para requerir aprobación explícita.",
         },
+        ransomware_context="El acceso no controlado del soporte del proveedor puede ser un vector de ataque supply-chain que comprometa el entorno.",
     ),
 
     # ── RR-IAM-025: Security contacts configured ─────────────────
@@ -573,5 +597,6 @@ D1_RULES: list[RRRule] = [
             "azure": "Configurar email de contacto de seguridad en Defender for Cloud > Environment settings > Email notifications.",
             "gcp": "Configurar Essential Contacts para la categoría SECURITY en la organización/proyecto.",
         },
+        ransomware_context="Sin contactos de seguridad configurados, las notificaciones de compromiso del proveedor cloud no llegan al equipo correcto, retrasando la respuesta al ransomware.",
     ),
 ]

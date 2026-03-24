@@ -81,7 +81,14 @@ def _evaluate_standard_rule(
             status="warning",
             account_id=account_id,
             provider=provider,
-            evidence={"reason": "No CSPM checks mapped for this rule and provider"},
+            evidence={
+                "summary": f"No hay checks CSPM mapeados para esta regla en {provider.upper()}. "
+                           "No se puede evaluar automáticamente.",
+                "check_type": "automated",
+                "checks_evaluated": [],
+                "expected": "Checks CSPM disponibles para evaluación automática",
+                "actual": "Sin checks mapeados para este proveedor",
+            },
         )
 
     total_resources = 0
@@ -114,7 +121,14 @@ def _evaluate_standard_rule(
             status="warning",
             account_id=account_id,
             provider=provider,
-            evidence={"reason": "No findings found for mapped checks — checks may not have been executed"},
+            evidence={
+                "summary": f"No se encontraron resultados para los checks: {', '.join(check_ids)}. "
+                           "Los checks pueden no haberse ejecutado en el último scan.",
+                "check_type": "automated",
+                "checks_evaluated": check_ids,
+                "expected": "Resultados de los checks CSPM disponibles",
+                "actual": "No se encontraron findings para estos checks",
+            },
         )
 
     # Rule passes only if ALL resources pass
@@ -122,6 +136,13 @@ def _evaluate_standard_rule(
         status = "pass"
     else:
         status = "fail"
+
+    if status == "pass":
+        summary = (f"Todos los {total_resources} recursos evaluados cumplen con este control. "
+                   f"Checks ejecutados: {', '.join(check_ids)}.")
+    else:
+        summary = (f"{failed_resources} de {total_resources} recursos no cumplen con este control. "
+                   f"Checks ejecutados: {', '.join(check_ids)}.")
 
     return CheckEvaluation(
         rule_id=rule.rule_id,
@@ -134,6 +155,11 @@ def _evaluate_standard_rule(
         account_id=account_id,
         provider=provider,
         evidence={
+            "summary": summary,
+            "check_type": "automated",
+            "checks_evaluated": check_ids,
+            "expected": "Todos los recursos deben pasar los checks",
+            "actual": f"{passed_resources} passed, {failed_resources} failed de {total_resources} total",
             "total": total_resources,
             "passed": passed_resources,
             "failed": failed_resources,
@@ -180,7 +206,12 @@ def _evaluate_manual_rule(
             status="warning",
             account_id=account_id,
             provider=provider,
-            evidence={"reason": "Governance data not provided — please complete the Governance questionnaire"},
+            evidence={
+                "summary": "Datos de gobernanza no proporcionados. Complete el cuestionario de Governance Inputs para evaluar este control.",
+                "check_type": "manual",
+                "expected": "Respuesta del operador en el cuestionario de gobernanza",
+                "actual": "Pendiente de completar",
+            },
         )
 
     # Map rule_ids to governance data fields
@@ -208,8 +239,28 @@ def _evaluate_manual_rule(
             status="warning",
             account_id=account_id,
             provider=provider,
-            evidence={"reason": f"Field '{field_name}' not provided in governance data"},
+            evidence={
+                "summary": f"El campo '{field_name}' no ha sido completado en los datos de gobernanza.",
+                "check_type": "manual",
+                "expected": f"Valor para '{field_name}' en el cuestionario de gobernanza",
+                "actual": "Campo no completado",
+            },
         )
+
+    # Human-readable field labels
+    FIELD_LABELS = {
+        "ransomware_response_plan": "Plan de respuesta a ransomware",
+        "last_tabletop_exercise_date": "Fecha último tabletop exercise",
+        "security_training_completion": "Porcentaje de completion del security training",
+        "ir_roles_defined": "Roles y responsabilidades de IR definidos",
+        "communication_plan_exists": "Plan de comunicación existente",
+        "rto_rpo_documented": "RTO/RPO documentados",
+        "backup_restore_tested": "Pruebas de restauración realizadas",
+        "dr_plan_documented": "Plan de disaster recovery documentado",
+        "iac_scanning_integrated": "IaC scanning integrado en pipeline",
+        "siem_integration_configured": "Integración SIEM configurada",
+    }
+    field_label = FIELD_LABELS.get(field_name, field_name)
 
     # Boolean fields
     if isinstance(value, bool):
@@ -220,7 +271,12 @@ def _evaluate_manual_rule(
             status="pass" if value else "fail",
             account_id=account_id,
             provider=provider,
-            evidence={"field": field_name, "value": value},
+            evidence={
+                "summary": f"{field_label}: {'Sí' if value else 'No'}",
+                "check_type": "manual",
+                "expected": f"{field_label} debe estar confirmado (Sí)",
+                "actual": "Sí" if value else "No",
+            },
         )
 
     # Date fields (e.g. last tabletop exercise — must be within 6 months)
@@ -237,7 +293,12 @@ def _evaluate_manual_rule(
                 status="pass" if is_recent else "fail",
                 account_id=account_id,
                 provider=provider,
-                evidence={"field": field_name, "value": str(value), "threshold": "within 6 months"},
+                evidence={
+                    "summary": f"{field_label}: {str(value)[:10]} — {'dentro de los últimos 6 meses' if is_recent else 'hace más de 6 meses'}",
+                    "check_type": "manual",
+                    "expected": "Último ejercicio realizado dentro de los últimos 6 meses",
+                    "actual": f"Fecha registrada: {str(value)[:10]}",
+                },
             )
         except (ValueError, TypeError):
             pass
@@ -253,7 +314,12 @@ def _evaluate_manual_rule(
                 status="pass" if pct >= 90.0 else "fail",
                 account_id=account_id,
                 provider=provider,
-                evidence={"field": field_name, "value": pct, "threshold": "≥90%"},
+                evidence={
+                    "summary": f"{field_label}: {pct}% — {'cumple' if pct >= 90.0 else 'no cumple'} el umbral mínimo",
+                    "check_type": "manual",
+                    "expected": "Porcentaje de completion ≥ 90%",
+                    "actual": f"{pct}%",
+                },
             )
         except (ValueError, TypeError):
             pass
@@ -266,7 +332,12 @@ def _evaluate_manual_rule(
         status="pass" if value else "fail",
         account_id=account_id,
         provider=provider,
-        evidence={"field": field_name, "value": str(value)},
+        evidence={
+            "summary": f"{field_label}: {str(value)}",
+            "check_type": "manual",
+            "expected": f"{field_label} debe tener un valor válido",
+            "actual": str(value),
+        },
     )
 
 

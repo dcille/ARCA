@@ -107,6 +107,7 @@ async def get_rr_score(
             "checks_total": ds.get("checks_total", 0),
             "checks_passed": ds.get("checks_passed", 0),
             "checks_failed": ds.get("checks_failed", 0),
+            "checks_warning": ds.get("checks_warning", 0),
             "critical_fails": ds.get("critical_fails", 0),
         })
 
@@ -242,6 +243,7 @@ async def get_domain_rules(
             "rule_id": rule.rule_id,
             "name": rule.name,
             "description": rule.description,
+            "ransomware_context": rule.ransomware_context,
             "severity": rule.severity.value,
             "cloud_providers": rule.cloud_providers,
             "nist_category": rule.nist_category,
@@ -340,6 +342,7 @@ async def get_rr_finding_detail(
         "rule_id": finding.rule_id,
         "rule_name": rule.name if rule else finding.rule_id,
         "rule_description": rule.description if rule else "",
+        "ransomware_context": rule.ransomware_context if rule else "",
         "domain": finding.domain,
         "severity": finding.severity,
         "status": finding.status,
@@ -517,6 +520,7 @@ async def get_rr_rules(
             "rule_id": r.rule_id,
             "name": r.name,
             "description": r.description,
+            "ransomware_context": r.ransomware_context,
             "domain": r.domain.value,
             "severity": r.severity.value,
             "cloud_providers": r.cloud_providers,

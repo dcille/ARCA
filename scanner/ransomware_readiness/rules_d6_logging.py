@@ -27,6 +27,7 @@ D6_RULES: list[RRRule] = [
             "azure": "Verificar Activity Log habilitado (default). Configurar diagnostic settings para enviar a Log Analytics workspace.",
             "gcp": "Cloud Audit Logs están habilitados por defecto. Verificar que Admin Activity y Data Access logs están configurados.",
         },
+        ransomware_context="El logging de auditoría es esencial para detectar las primeras señales de un ataque de ransomware: accesos inusuales, cambios de permisos, y operaciones sobre datos críticos.",
     ),
 
     RRRule(
@@ -50,6 +51,7 @@ D6_RULES: list[RRRule] = [
             "azure": "Configurar Immutable Blob Storage para log storage accounts. Usar resource locks en diagnostic settings.",
             "gcp": "Configurar locked retention policy en Cloud Logging buckets. Usar Organization Policy para prevenir log deletion.",
         },
+        ransomware_context="CRÍTICO: Lo primero que hace un atacante de ransomware es intentar eliminar o modificar los logs para borrar sus huellas. Logs inmutables preservan la evidencia forense.",
     ),
 
     RRRule(
@@ -76,6 +78,7 @@ D6_RULES: list[RRRule] = [
             "azure": "Crear Azure Monitor alert rules para: Activity Log security events, role assignment changes, resource deletions.",
             "gcp": "Crear log-based alerting policies para: ownership changes, audit config changes, custom role changes, firewall changes.",
         },
+        ransomware_context="Las alertas de seguridad son la primera línea de detección de ransomware. Sin alertas, el ataque puede progresar sin ser detectado hasta que es demasiado tarde.",
     ),
 
     RRRule(
@@ -99,6 +102,7 @@ D6_RULES: list[RRRule] = [
             "azure": "Configurar retention en Log Analytics workspace a 365 días. Configurar archive policies.",
             "gcp": "Configurar custom retention en Cloud Logging buckets a 365 días. Usar log sinks a Cloud Storage para archival.",
         },
+        ransomware_context="La retención de 365 días es necesaria para investigación forense post-incidente. El ransomware puede tener un periodo de persistencia largo antes de activarse.",
     ),
 
     RRRule(
@@ -122,6 +126,7 @@ D6_RULES: list[RRRule] = [
             "azure": "Crear Log Analytics workspace central. Configurar diagnostic settings de todas las suscripciones al workspace central.",
             "gcp": "Crear organization-level log sink a Cloud Storage/BigQuery en proyecto de logging dedicado.",
         },
+        ransomware_context="Sin logging centralizado, el atacante puede eliminar logs locales de cuentas comprometidas. La centralización protege los logs en una ubicación separada.",
     ),
 
     RRRule(
@@ -145,6 +150,7 @@ D6_RULES: list[RRRule] = [
             "azure": "Configurar NSG Flow Logs con retención de 90 días en Network Watcher.",
             "gcp": "Habilitar VPC Flow Logs en subnets con log retention configurado.",
         },
+        ransomware_context="VPC Flow Logs permiten detectar y rastrear el movimiento lateral del ransomware entre subnets, identificando qué sistemas fueron comprometidos.",
     ),
 
     RRRule(
@@ -168,6 +174,7 @@ D6_RULES: list[RRRule] = [
             "azure": "Configurar DNS Analytics en Azure Monitor. Habilitar diagnostic logging en DNS zones.",
             "gcp": "Habilitar DNS logging en Cloud DNS policies. Exportar logs para análisis.",
         },
+        ransomware_context="DNS query logging detecta comunicaciones C2 del ransomware y exfiltración de datos via DNS tunneling, técnicas comunes en ransomware moderno.",
     ),
 
     RRRule(
@@ -191,6 +198,7 @@ D6_RULES: list[RRRule] = [
             "azure": "Habilitar Storage Analytics logging y diagnostic settings en Storage Accounts.",
             "gcp": "Cloud Storage access logs son via Cloud Audit Logs (habilitado por defecto para admin operations).",
         },
+        ransomware_context="Access logging en storage detecta accesos anómalos masivos a datos, que pueden indicar exfiltración previa al cifrado por ransomware (doble extorsión).",
     ),
 
     RRRule(
@@ -215,6 +223,7 @@ D6_RULES: list[RRRule] = [
             "azure": "Habilitar Microsoft Sentinel. Conectar Activity Logs, Defender alerts, y otros data connectors.",
             "gcp": "Exportar Cloud Logging a SIEM via Pub/Sub o BigQuery. Integrar con Chronicle SIEM.",
         },
+        ransomware_context="Un SIEM correlaciona eventos de múltiples fuentes para detectar patrones de ataque de ransomware que no serían visibles analizando cada fuente por separado.",
     ),
 
     RRRule(
@@ -238,5 +247,6 @@ D6_RULES: list[RRRule] = [
             "azure": "Crear Azure Monitor alert para cambios en diagnostic settings y Activity Log configuration.",
             "gcp": "Crear alerting policy para cambios en Cloud Audit Log configuration y sink modifications.",
         },
+        ransomware_context="CRÍTICO: Desactivar el logging es el primer paso de muchos ataques de ransomware. Alertas de cambio en logging permiten detectar el inicio del ataque.",
     ),
 ]

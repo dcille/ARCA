@@ -189,6 +189,7 @@ export default function RansomwareReadinessPage() {
               weight={d.weight}
               checks_passed={d.checks_passed}
               checks_failed={d.checks_failed}
+              checks_warning={d.checks_warning}
               critical_fails={d.critical_fails}
               nist_csf={d.nist_csf}
             />

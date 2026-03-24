@@ -117,7 +117,10 @@ def calculate_domain_score(
     med = sum(1 for e in evaluations if e.status == "fail" and e.severity == Severity.MEDIUM)
     low = sum(1 for e in evaluations if e.status == "fail" and e.severity == Severity.LOW)
 
-    base = (passed / total) * 100
+    # Base score: only count evaluated checks (pass + fail), exclude warnings
+    # Warnings mean checks couldn't be evaluated (no data) — they shouldn't penalize the score
+    evaluated = passed + failed
+    base = (passed / evaluated) * 100 if evaluated > 0 else 100.0
 
     adjustment = (
         crit * SEVERITY_PENALTY[Severity.CRITICAL]
