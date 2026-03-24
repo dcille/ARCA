@@ -119,7 +119,7 @@ export default function DomainDetailPage() {
                 <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${STATUS_STYLES[rule.status] || STATUS_STYLES.not_evaluated}`}>
                   {rule.status.toUpperCase()}
                 </span>
-                <Badge severity={rule.severity} />
+                <Badge type="severity" value={rule.severity} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-brand-navy">{rule.rule_id}: {rule.name}</p>
                   <p className="text-xs text-brand-gray-400 mt-0.5">
