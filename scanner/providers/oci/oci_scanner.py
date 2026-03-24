@@ -1,7 +1,7 @@
 """OCI (Oracle Cloud Infrastructure) Security Scanner.
 
 Implements security checks for OCI services following CIS Oracle Cloud
-Infrastructure Foundations Benchmark v2.0.
+Infrastructure Foundations Benchmark v2.0 and v3.1.
 """
 import logging
 from typing import Optional
@@ -55,6 +55,7 @@ class OCIScanner:
             "kubernetes_engine": self._check_kubernetes_engine,
             "load_balancer": self._check_load_balancer,
             "mysql": self._check_mysql,
+            "events": self._check_events,
         }
 
         for service_name, check_fn in check_methods.items():
@@ -100,7 +101,7 @@ class OCIScanner:
                             resource_name=user.name,
                             status_extended=f"API key for user {user.name} is {age.days} days old",
                             remediation="Rotate API keys every 90 days or less",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
             except Exception as e:
                 logger.warning(f"OCI IAM API key check failed: {e}")
@@ -120,7 +121,7 @@ class OCIScanner:
                             resource_name=user.name,
                             status_extended=f"MFA {'enabled' if user.is_mfa_activated else 'not enabled'} for {user.name}",
                             remediation="Enable MFA for all local IAM users",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
             except Exception as e:
                 logger.warning(f"OCI IAM MFA check failed: {e}")
@@ -146,7 +147,7 @@ class OCIScanner:
                             resource_name=user.name,
                             status_extended=f"Admin user {user.name} MFA: {'enabled' if user.is_mfa_activated else 'disabled'}",
                             remediation="Enable MFA for all users in the Administrators group",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
             except Exception as e:
                 logger.warning(f"OCI admin MFA check failed: {e}")
@@ -176,7 +177,7 @@ class OCIScanner:
                         resource_id=tenancy_id,
                         resource_name="Authentication Policy",
                         remediation="Update the IAM password policy to meet CIS requirements",
-                        compliance_frameworks=["CIS-OCI-2.0"],
+                        compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                     ).to_dict())
             except Exception as e:
                 logger.warning(f"OCI password policy check failed: {e}")
@@ -199,7 +200,7 @@ class OCIScanner:
                             resource_name=user.name,
                             status_extended=f"Secret key for {user.name} is {age.days} days old",
                             remediation="Rotate customer secret keys every 90 days",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
             except Exception as e:
                 logger.warning(f"OCI secret key check failed: {e}")
@@ -221,10 +222,182 @@ class OCIScanner:
                                 resource_name=policy.name,
                                 status_extended=f"Policy '{policy.name}' has 'manage all-resources' statement",
                                 remediation="Replace wildcard permissions with specific resource types",
-                                compliance_frameworks=["CIS-OCI-2.0"],
+                                compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                             ).to_dict())
             except Exception as e:
                 logger.warning(f"OCI policy wildcard check failed: {e}")
+
+            # CIS 3.1 1.10 - Auth tokens should be rotated every 90 days
+            try:
+                for user in users:
+                    auth_tokens = identity_client.list_auth_tokens(user.id).data
+                    for token in auth_tokens:
+                        from datetime import datetime, timezone
+                        age = datetime.now(timezone.utc) - token.time_created
+                        status = "FAIL" if age.days > 90 else "PASS"
+                        results.append(CheckResult(
+                            check_id="oci_iam_auth_token_rotation",
+                            check_title="IAM auth tokens should be rotated within 90 days",
+                            service="IAM",
+                            severity="high",
+                            status=status,
+                            resource_id=token.id,
+                            resource_name=user.name,
+                            status_extended=f"Auth token for {user.name} is {age.days} days old",
+                            remediation="Rotate auth tokens every 90 days or less",
+                            compliance_frameworks=["CIS-OCI-3.1"],
+                        ).to_dict())
+            except Exception as e:
+                logger.warning(f"OCI auth token rotation check failed: {e}")
+
+            # CIS 3.1 1.12 - Admin users should not have API keys
+            try:
+                groups = identity_client.list_groups(tenancy_id).data
+                admin_group = next((g for g in groups if g.name == "Administrators"), None)
+                if admin_group:
+                    members = identity_client.list_user_group_memberships(
+                        tenancy_id, group_id=admin_group.id
+                    ).data
+                    for member in members:
+                        user = identity_client.get_user(member.user_id).data
+                        api_keys = identity_client.list_api_keys(user.id).data
+                        active_keys = [k for k in api_keys if k.lifecycle_state == "ACTIVE"]
+                        results.append(CheckResult(
+                            check_id="oci_iam_admin_no_api_key",
+                            check_title="Tenancy administrator users should not have API keys",
+                            service="IAM",
+                            severity="critical",
+                            status="FAIL" if active_keys else "PASS",
+                            resource_id=user.id,
+                            resource_name=user.name,
+                            status_extended=f"Admin user {user.name} has {len(active_keys)} active API key(s)" if active_keys else f"Admin user {user.name} has no API keys",
+                            remediation="Remove API keys from tenancy administrator users and use service-level admins instead",
+                            compliance_frameworks=["CIS-OCI-3.1"],
+                        ).to_dict())
+            except Exception as e:
+                logger.warning(f"OCI admin API key check failed: {e}")
+
+            # CIS 3.1 1.13 - All IAM local users should have valid email
+            try:
+                for user in users:
+                    has_email = getattr(user, 'email', None) is not None and getattr(user, 'email', '') != ''
+                    results.append(CheckResult(
+                        check_id="oci_iam_user_valid_email",
+                        check_title="All IAM local users should have a valid email address",
+                        service="IAM",
+                        severity="medium",
+                        status="PASS" if has_email else "FAIL",
+                        resource_id=user.id,
+                        resource_name=user.name,
+                        status_extended=f"User {user.name} {'has' if has_email else 'does not have'} a valid email",
+                        remediation="Set a valid email address for all IAM local user accounts",
+                        compliance_frameworks=["CIS-OCI-3.1"],
+                    ).to_dict())
+            except Exception as e:
+                logger.warning(f"OCI user email check failed: {e}")
+
+            # CIS 3.1 1.17 - Only one active API key per user
+            try:
+                for user in users:
+                    api_keys = identity_client.list_api_keys(user.id).data
+                    active_keys = [k for k in api_keys if k.lifecycle_state == "ACTIVE"]
+                    if len(active_keys) > 1:
+                        results.append(CheckResult(
+                            check_id="oci_iam_single_api_key",
+                            check_title="Each IAM user should have only one active API key",
+                            service="IAM",
+                            severity="medium",
+                            status="FAIL",
+                            resource_id=user.id,
+                            resource_name=user.name,
+                            status_extended=f"User {user.name} has {len(active_keys)} active API keys",
+                            remediation="Remove extra API keys so each user has at most one active key",
+                            compliance_frameworks=["CIS-OCI-3.1"],
+                        ).to_dict())
+                    elif len(active_keys) <= 1:
+                        results.append(CheckResult(
+                            check_id="oci_iam_single_api_key",
+                            check_title="Each IAM user should have only one active API key",
+                            service="IAM",
+                            severity="medium",
+                            status="PASS",
+                            resource_id=user.id,
+                            resource_name=user.name,
+                            status_extended=f"User {user.name} has {len(active_keys)} active API key(s)",
+                            remediation="Remove extra API keys so each user has at most one active key",
+                            compliance_frameworks=["CIS-OCI-3.1"],
+                        ).to_dict())
+            except Exception as e:
+                logger.warning(f"OCI single API key check failed: {e}")
+
+            # CIS 3.1 1.5/1.6 - Password policy expiry and reuse
+            try:
+                password_policy = identity_client.get_authentication_policy(tenancy_id).data.password_policy
+                # Password expiry <= 365 days
+                results.append(CheckResult(
+                    check_id="oci_iam_password_expiry",
+                    check_title="IAM password policy should expire passwords within 365 days",
+                    service="IAM",
+                    severity="medium",
+                    status="PASS" if getattr(password_policy, 'is_password_expiry_enabled', False) else "FAIL",
+                    resource_id=tenancy_id,
+                    resource_name="Authentication Policy",
+                    remediation="Enable password expiry and set maximum password age to 365 days or less",
+                    compliance_frameworks=["CIS-OCI-3.1"],
+                ).to_dict())
+
+                # Password reuse prevention
+                num_previous = getattr(password_policy, 'num_previous_passwords_to_remember', 0) or 0
+                results.append(CheckResult(
+                    check_id="oci_iam_password_reuse",
+                    check_title="IAM password policy should prevent reuse of last 24 passwords",
+                    service="IAM",
+                    severity="medium",
+                    status="PASS" if num_previous >= 24 else "FAIL",
+                    resource_id=tenancy_id,
+                    resource_name="Authentication Policy",
+                    status_extended=f"Password reuse prevention remembers {num_previous} passwords",
+                    remediation="Set password policy to remember at least 24 previous passwords",
+                    compliance_frameworks=["CIS-OCI-3.1"],
+                ).to_dict())
+            except Exception as e:
+                logger.warning(f"OCI password policy advanced check failed: {e}")
+
+            # CIS 3.1 1.16 - Credentials unused for 45+ days should be disabled
+            try:
+                for user in users:
+                    from datetime import datetime, timezone, timedelta
+                    last_login = getattr(user, 'last_successful_login_time', None)
+                    if last_login:
+                        inactive_days = (datetime.now(timezone.utc) - last_login).days
+                        if inactive_days > 45 and user.lifecycle_state == "ACTIVE":
+                            results.append(CheckResult(
+                                check_id="oci_iam_credentials_unused",
+                                check_title="IAM credentials unused for 45+ days should be disabled",
+                                service="IAM",
+                                severity="high",
+                                status="FAIL",
+                                resource_id=user.id,
+                                resource_name=user.name,
+                                status_extended=f"User {user.name} last login was {inactive_days} days ago",
+                                remediation="Disable or remove user accounts inactive for more than 45 days",
+                                compliance_frameworks=["CIS-OCI-3.1"],
+                            ).to_dict())
+                        else:
+                            results.append(CheckResult(
+                                check_id="oci_iam_credentials_unused",
+                                check_title="IAM credentials unused for 45+ days should be disabled",
+                                service="IAM",
+                                severity="high",
+                                status="PASS",
+                                resource_id=user.id,
+                                resource_name=user.name,
+                                status_extended=f"User {user.name} last login was {inactive_days} days ago",
+                                remediation="Disable or remove user accounts inactive for more than 45 days",
+                                compliance_frameworks=["CIS-OCI-3.1"],
+                            ).to_dict())
+            except Exception as e:
+                logger.warning(f"OCI unused credentials check failed: {e}")
 
         except ImportError:
             logger.warning("OCI SDK (oci) not installed, skipping IAM checks")
@@ -277,7 +450,7 @@ class OCIScanner:
                                                     resource_name=sl.display_name,
                                                     status_extended=f"Security list '{sl.display_name}' allows 0.0.0.0/0 on port {port}",
                                                     remediation=f"Restrict port {port} access to specific CIDR ranges",
-                                                    compliance_frameworks=["CIS-OCI-2.0"],
+                                                    compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                                                 ).to_dict())
 
                     # CIS 2.3 - NSGs should not allow unrestricted ingress
@@ -297,7 +470,7 @@ class OCIScanner:
                                     resource_id=nsg.id,
                                     resource_name=nsg.display_name,
                                     remediation="Restrict NSG ingress rules to specific CIDR ranges",
-                                    compliance_frameworks=["CIS-OCI-2.0"],
+                                    compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                                 ).to_dict())
 
                     # CIS 2.6 - VCN Flow Logs enabled
@@ -315,7 +488,31 @@ class OCIScanner:
                                 resource_id=subnet.id,
                                 resource_name=subnet.display_name or vcn.display_name,
                                 remediation="Enable VCN flow logs via the OCI Logging service",
-                                compliance_frameworks=["CIS-OCI-2.0"],
+                                compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
+                            ).to_dict())
+
+                    # CIS 3.1 2.5 - Default security list should restrict all traffic
+                    for sl in security_lists:
+                        if "Default Security List" in (sl.display_name or ""):
+                            has_unrestricted = False
+                            for rule in (sl.ingress_security_rules or []):
+                                source = getattr(rule, 'source', '')
+                                if source == '0.0.0.0/0':
+                                    protocol = getattr(rule, 'protocol', '')
+                                    # ICMP is protocol 1; allow only ICMP from within VCN
+                                    if protocol != '1':
+                                        has_unrestricted = True
+                                        break
+                            results.append(CheckResult(
+                                check_id="oci_network_default_sl_restrict",
+                                check_title="Default security list should restrict all traffic except ICMP within VCN",
+                                service="Networking",
+                                severity="high",
+                                status="FAIL" if has_unrestricted else "PASS",
+                                resource_id=sl.id,
+                                resource_name=sl.display_name,
+                                remediation="Modify the default security list to restrict all ingress except ICMP within VCN CIDR",
+                                compliance_frameworks=["CIS-OCI-3.1"],
                             ).to_dict())
 
                 except Exception as e:
@@ -365,7 +562,7 @@ class OCIScanner:
                             resource_id=instance.id,
                             resource_name=instance.display_name,
                             remediation="Enable Secure Boot in instance launch options",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Instance metadata service v2
@@ -383,7 +580,7 @@ class OCIScanner:
                             resource_id=instance.id,
                             resource_name=instance.display_name,
                             remediation="Disable legacy IMDS endpoints to prevent SSRF attacks",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # In-transit encryption for boot volumes
@@ -396,7 +593,7 @@ class OCIScanner:
                             resource_id=instance.id,
                             resource_name=instance.display_name,
                             remediation="Enable in-transit encryption for boot volumes",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict()) if launch_opts else None
 
                 except Exception as e:
@@ -441,7 +638,7 @@ class OCIScanner:
                             resource_id=vol.id,
                             resource_name=vol.display_name,
                             remediation="Enable encryption with a customer-managed key in OCI Vault",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                     # Boot volumes
@@ -462,7 +659,7 @@ class OCIScanner:
                             resource_id=bv.id,
                             resource_name=bv.display_name,
                             remediation="Enable encryption with a customer-managed key in OCI Vault",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                 except Exception as e:
@@ -509,7 +706,7 @@ class OCIScanner:
                             resource_name=bucket.name,
                             status_extended=f"Bucket '{bucket.name}' has public access type: {bucket.public_access_type}",
                             remediation="Set bucket public access type to 'NoPublicAccess'",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # CIS 4.2 - Buckets should use customer-managed encryption keys
@@ -523,7 +720,7 @@ class OCIScanner:
                             resource_id=bucket.name,
                             resource_name=bucket.name,
                             remediation="Enable encryption with a customer-managed key in OCI Vault",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # CIS 4.3 - Versioning enabled
@@ -538,7 +735,7 @@ class OCIScanner:
                             resource_id=bucket.name,
                             resource_name=bucket.name,
                             remediation="Enable versioning on the Object Storage bucket",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Emit events
@@ -551,7 +748,7 @@ class OCIScanner:
                             resource_id=bucket.name,
                             resource_name=bucket.name,
                             remediation="Enable object event emission for audit logging",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                 except Exception as e:
@@ -597,7 +794,7 @@ class OCIScanner:
                             resource_id=adb.id,
                             resource_name=adb.display_name,
                             remediation="Enable auto-scaling for autonomous databases",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Customer-managed encryption
@@ -611,7 +808,7 @@ class OCIScanner:
                             resource_id=adb.id,
                             resource_name=adb.display_name,
                             remediation="Enable encryption with a Vault-managed key",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Private endpoint
@@ -628,7 +825,7 @@ class OCIScanner:
                             resource_id=adb.id,
                             resource_name=adb.display_name,
                             remediation="Configure a private endpoint or subnet for the autonomous database",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                     # DB Systems
@@ -648,7 +845,7 @@ class OCIScanner:
                             resource_id=dbs.id,
                             resource_name=dbs.display_name,
                             remediation="Enable automatic backups for the database system",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                 except Exception as e:
@@ -694,7 +891,7 @@ class OCIScanner:
                             resource_id=vault.id,
                             resource_name=vault.display_name,
                             remediation="Consider using Virtual Private vaults for HSM-backed key isolation",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Check keys in vault
@@ -714,7 +911,7 @@ class OCIScanner:
                                 resource_id=key.id,
                                 resource_name=key.display_name,
                                 remediation="Rotate master encryption keys at least annually",
-                                compliance_frameworks=["CIS-OCI-2.0"],
+                                compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                             ).to_dict())
 
                 except Exception as e:
@@ -752,7 +949,7 @@ class OCIScanner:
                     resource_name="Audit Configuration",
                     status_extended=f"Audit log retention: {retention} days" if retention else "Retention not configured",
                     remediation="Set audit log retention period to 365 days or more",
-                    compliance_frameworks=["CIS-OCI-2.0"],
+                    compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                 ).to_dict())
             except Exception as e:
                 logger.warning(f"OCI audit config check failed: {e}")
@@ -782,7 +979,7 @@ class OCIScanner:
                     resource_name="Logging Service",
                     status_extended=f"{total_log_groups} log group(s) found",
                     remediation="Create log groups and enable service logging for critical resources",
-                    compliance_frameworks=["CIS-OCI-2.0"],
+                    compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                 ).to_dict())
             except Exception as e:
                 logger.warning(f"OCI logging service check failed: {e}")
@@ -818,7 +1015,7 @@ class OCIScanner:
                     resource_id=tenancy_id,
                     resource_name="Cloud Guard",
                     remediation="Enable Cloud Guard in the OCI console for threat detection",
-                    compliance_frameworks=["CIS-OCI-2.0"],
+                    compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                 ).to_dict())
             except Exception as e:
                 # If we can't access Cloud Guard, it may not be enabled
@@ -832,7 +1029,7 @@ class OCIScanner:
                     resource_name="Cloud Guard",
                     status_extended=f"Could not verify Cloud Guard status: {e}",
                     remediation="Enable Cloud Guard in the OCI console for threat detection",
-                    compliance_frameworks=["CIS-OCI-2.0"],
+                    compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                 ).to_dict())
 
         except ImportError:
@@ -871,7 +1068,7 @@ class OCIScanner:
                             resource_id=topic.topic_id,
                             resource_name=topic.name,
                             remediation="Add subscriptions to notification topics for security alerts",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
                 except Exception:
                     pass
@@ -886,7 +1083,7 @@ class OCIScanner:
                 resource_id=tenancy_id,
                 resource_name="Notifications Service",
                 remediation="Create a notification topic and subscribe security admins",
-                compliance_frameworks=["CIS-OCI-2.0"],
+                compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
             ).to_dict())
 
         except ImportError:
@@ -929,7 +1126,7 @@ class OCIScanner:
                             resource_id=app.id,
                             resource_name=app.display_name,
                             remediation="Assign network security groups to the Functions application",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Functions app should have tracing enabled
@@ -944,7 +1141,7 @@ class OCIScanner:
                             resource_id=app.id,
                             resource_name=app.display_name,
                             remediation="Enable distributed tracing for the Functions application",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Check individual functions
@@ -965,7 +1162,7 @@ class OCIScanner:
                                 resource_id=fn.id,
                                 resource_name=fn.display_name,
                                 remediation="Configure provisioned concurrency for latency-sensitive functions",
-                                compliance_frameworks=["CIS-OCI-2.0"],
+                                compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                             ).to_dict())
 
                 except Exception as e:
@@ -1012,7 +1209,7 @@ class OCIScanner:
                             resource_name=ci.display_name,
                             status_extended=f"Restart policy: {restart_policy}",
                             remediation="Set a restart policy (ALWAYS or ON_FAILURE) for container instances",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Graceful shutdown timeout
@@ -1027,7 +1224,7 @@ class OCIScanner:
                             resource_name=ci.display_name,
                             status_extended=f"Graceful shutdown timeout: {timeout}s",
                             remediation="Configure a graceful shutdown timeout > 0 seconds",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                 except Exception as e:
@@ -1070,7 +1267,7 @@ class OCIScanner:
                             resource_id=str(getattr(repo, 'id', repo.display_name)),
                             resource_name=repo.display_name,
                             remediation="Set container repository visibility to private",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Image scanning
@@ -1084,7 +1281,7 @@ class OCIScanner:
                             resource_id=str(getattr(repo, 'id', repo.display_name)),
                             resource_name=repo.display_name,
                             remediation="Enable immutable artifacts to prevent image tag overwriting",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                 except Exception as e:
@@ -1137,7 +1334,7 @@ class OCIScanner:
                                 resource_id=fs.id,
                                 resource_name=fs.display_name,
                                 remediation="Enable encryption with a customer-managed key in OCI Vault",
-                                compliance_frameworks=["CIS-OCI-2.0"],
+                                compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                             ).to_dict())
 
                         # Mount targets and NSGs
@@ -1158,7 +1355,7 @@ class OCIScanner:
                                 resource_id=mt.id,
                                 resource_name=mt.display_name,
                                 remediation="Assign network security groups to mount targets",
-                                compliance_frameworks=["CIS-OCI-2.0"],
+                                compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                             ).to_dict())
 
                             # Export checks
@@ -1183,7 +1380,7 @@ class OCIScanner:
                                         resource_id=export.id,
                                         resource_name=export.path,
                                         remediation="Configure exports to require privileged NFS source ports",
-                                        compliance_frameworks=["CIS-OCI-2.0"],
+                                        compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                                     ).to_dict())
                             except Exception:
                                 pass
@@ -1234,7 +1431,7 @@ class OCIScanner:
                             resource_id=cluster.id,
                             resource_name=cluster.name,
                             remediation="Disable public IP for the cluster API endpoint",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Cluster NSGs
@@ -1248,7 +1445,7 @@ class OCIScanner:
                             resource_id=cluster.id,
                             resource_name=cluster.name,
                             remediation="Assign network security groups to the cluster endpoint",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Image verification policy
@@ -1263,7 +1460,7 @@ class OCIScanner:
                             resource_id=cluster.id,
                             resource_name=cluster.name,
                             remediation="Enable image verification policies for the OKE cluster",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Kubernetes version check
@@ -1278,7 +1475,7 @@ class OCIScanner:
                             resource_name=cluster.name,
                             status_extended=f"Kubernetes version: {k8s_version}",
                             remediation="Upgrade to the latest supported Kubernetes version",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Node pools
@@ -1300,7 +1497,7 @@ class OCIScanner:
                                     resource_id=np.id,
                                     resource_name=np.name,
                                     remediation="Assign network security groups to node pools",
-                                    compliance_frameworks=["CIS-OCI-2.0"],
+                                    compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                                 ).to_dict())
 
                         except Exception as e:
@@ -1349,7 +1546,7 @@ class OCIScanner:
                             resource_id=lb.id,
                             resource_name=lb.display_name,
                             remediation="Assign network security groups to the load balancer",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # All listeners should use HTTPS
@@ -1369,7 +1566,7 @@ class OCIScanner:
                                     resource_name=f"{lb.display_name}/{listener_name}",
                                     status_extended=f"Listener '{listener_name}' uses protocol {protocol}",
                                     remediation="Configure listeners to use HTTPS protocol with TLS certificates",
-                                    compliance_frameworks=["CIS-OCI-2.0"],
+                                    compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                                 ).to_dict())
 
                         if all_https and listeners:
@@ -1382,7 +1579,7 @@ class OCIScanner:
                                 resource_id=lb.id,
                                 resource_name=lb.display_name,
                                 remediation="Configure listeners to use HTTPS protocol with TLS certificates",
-                                compliance_frameworks=["CIS-OCI-2.0"],
+                                compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                             ).to_dict())
 
                         # Backend set health
@@ -1402,7 +1599,7 @@ class OCIScanner:
                                     resource_name=f"{lb.display_name}/{bs_name}",
                                     status_extended=f"Backend set '{bs_name}' health: {health_status}",
                                     remediation="Investigate and resolve unhealthy backend set status",
-                                    compliance_frameworks=["CIS-OCI-2.0"],
+                                    compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                                 ).to_dict())
                             except Exception:
                                 pass
@@ -1457,7 +1654,7 @@ class OCIScanner:
                             resource_id=dbs.id,
                             resource_name=dbs.display_name,
                             remediation="Enable automatic backups for the MySQL database system",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Point-in-time recovery
@@ -1472,7 +1669,7 @@ class OCIScanner:
                             resource_id=dbs.id,
                             resource_name=dbs.display_name,
                             remediation="Enable point-in-time recovery in the backup policy",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Crash recovery
@@ -1486,7 +1683,7 @@ class OCIScanner:
                             resource_id=dbs.id,
                             resource_name=dbs.display_name,
                             remediation="Enable crash recovery for the MySQL database system",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # Deletion protection
@@ -1501,7 +1698,7 @@ class OCIScanner:
                             resource_id=dbs.id,
                             resource_name=dbs.display_name,
                             remediation="Enable deletion protection for the MySQL database system",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                         # High availability
@@ -1515,7 +1712,7 @@ class OCIScanner:
                             resource_id=dbs.id,
                             resource_name=dbs.display_name,
                             remediation="Enable high availability for the MySQL database system",
-                            compliance_frameworks=["CIS-OCI-2.0"],
+                            compliance_frameworks=["CIS-OCI-2.0", "CIS-OCI-3.1"],
                         ).to_dict())
 
                 except Exception as e:
@@ -1525,5 +1722,126 @@ class OCIScanner:
             logger.warning("OCI SDK not installed, skipping MySQL checks")
         except Exception as e:
             logger.error(f"OCI MySQL checks failed: {e}")
+
+        return results
+
+    # ── Events Service Checks (CIS 3.1 4.x) ─────────────────────
+
+    def _check_events(self) -> list[dict]:
+        """Events service checks for CIS OCI 3.1 notification rules."""
+        results = []
+        try:
+            import oci
+            config = self._get_config()
+            events_client = oci.events.EventsClient(config)
+            identity_client = oci.identity.IdentityClient(config)
+            tenancy_id = config["tenancy"]
+
+            compartments = identity_client.list_compartments(tenancy_id, compartment_id_in_subtree=True).data
+            compartment_ids = [tenancy_id] + [c.id for c in compartments if c.lifecycle_state == "ACTIVE"]
+
+            # Collect all event rules across compartments
+            all_rules = []
+            for compartment_id in compartment_ids[:10]:
+                try:
+                    rules = events_client.list_rules(compartment_id).data
+                    all_rules.extend(rules)
+                except Exception:
+                    pass
+
+            # CIS 3.1 4.3-4.12: Check for event rules covering critical resource changes
+            critical_event_types = {
+                "identity_provider": {
+                    "title": "Identity Provider changes",
+                    "event_types": ["com.oraclecloud.identitycontrolplane.createidentityprovider",
+                                    "com.oraclecloud.identitycontrolplane.deleteidentityprovider",
+                                    "com.oraclecloud.identitycontrolplane.updateidentityprovider"],
+                },
+                "idp_group_mapping": {
+                    "title": "IdP group mapping changes",
+                    "event_types": ["com.oraclecloud.identitycontrolplane.createidpgroupmapping",
+                                    "com.oraclecloud.identitycontrolplane.deleteidpgroupmapping",
+                                    "com.oraclecloud.identitycontrolplane.updateidpgroupmapping"],
+                },
+                "iam_group": {
+                    "title": "IAM group changes",
+                    "event_types": ["com.oraclecloud.identitycontrolplane.creategroup",
+                                    "com.oraclecloud.identitycontrolplane.deletegroup",
+                                    "com.oraclecloud.identitycontrolplane.updategroup"],
+                },
+                "iam_policy": {
+                    "title": "IAM policy changes",
+                    "event_types": ["com.oraclecloud.identitycontrolplane.createpolicy",
+                                    "com.oraclecloud.identitycontrolplane.deletepolicy",
+                                    "com.oraclecloud.identitycontrolplane.updatepolicy"],
+                },
+                "user": {
+                    "title": "user changes",
+                    "event_types": ["com.oraclecloud.identitycontrolplane.createuser",
+                                    "com.oraclecloud.identitycontrolplane.deleteuser",
+                                    "com.oraclecloud.identitycontrolplane.updateuser"],
+                },
+                "vcn": {
+                    "title": "VCN changes",
+                    "event_types": ["com.oraclecloud.virtualnetwork.createvcn",
+                                    "com.oraclecloud.virtualnetwork.deletevcn",
+                                    "com.oraclecloud.virtualnetwork.updatevcn"],
+                },
+                "route_table": {
+                    "title": "route table changes",
+                    "event_types": ["com.oraclecloud.virtualnetwork.createroutetable",
+                                    "com.oraclecloud.virtualnetwork.deleteroutetable",
+                                    "com.oraclecloud.virtualnetwork.updateroutetable"],
+                },
+                "security_list": {
+                    "title": "security list changes",
+                    "event_types": ["com.oraclecloud.virtualnetwork.createsecuritylist",
+                                    "com.oraclecloud.virtualnetwork.deletesecuritylist",
+                                    "com.oraclecloud.virtualnetwork.updatesecuritylist"],
+                },
+                "nsg": {
+                    "title": "network security group changes",
+                    "event_types": ["com.oraclecloud.virtualnetwork.createnetworksecuritygroup",
+                                    "com.oraclecloud.virtualnetwork.deletenetworksecuritygroup",
+                                    "com.oraclecloud.virtualnetwork.updatenetworksecuritygroup"],
+                },
+                "network_gateway": {
+                    "title": "network gateway changes",
+                    "event_types": ["com.oraclecloud.virtualnetwork.createinternetgateway",
+                                    "com.oraclecloud.virtualnetwork.deleteinternetgateway",
+                                    "com.oraclecloud.virtualnetwork.createnatgateway",
+                                    "com.oraclecloud.virtualnetwork.deletenatgateway"],
+                },
+            }
+
+            for event_key, event_info in critical_event_types.items():
+                # Check if any rule covers these event types
+                covered = False
+                for rule in all_rules:
+                    if rule.lifecycle_state != "ACTIVE":
+                        continue
+                    rule_condition = getattr(rule, 'condition', '') or ''
+                    rule_condition_lower = rule_condition.lower()
+                    if any(et.lower() in rule_condition_lower for et in event_info["event_types"]):
+                        covered = True
+                        break
+
+                results.append(CheckResult(
+                    check_id="oci_events_rule_configured",
+                    check_title=f"Event rule should be configured for {event_info['title']}",
+                    service="Events",
+                    severity="medium",
+                    status="PASS" if covered else "FAIL",
+                    resource_id=tenancy_id,
+                    resource_name=f"Event Rule - {event_info['title']}",
+                    status_extended=f"Event rule for {event_info['title']}: {'configured' if covered else 'not found'}",
+                    remediation=f"Create an Event Rule to detect {event_info['title']} and route to a notification topic",
+                    compliance_frameworks=["CIS-OCI-3.1"],
+                ).to_dict())
+
+        except ImportError:
+            logger.warning("OCI SDK not installed, skipping events checks")
+        except Exception as e:
+            logger.error(f"OCI events checks failed: {e}")
 
         return results
