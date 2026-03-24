@@ -48,6 +48,9 @@ class GCPScanner:
             "pubsub": self._check_pubsub,
             "dns": self._check_dns,
             "dataproc": self._check_dataproc,
+            "cloudfunctions": self._check_cloud_functions,
+            "cloudrun": self._check_cloud_run,
+            "secretmanager": self._check_secret_manager,
         }
 
         for service_name, check_fn in check_methods.items():
@@ -2036,4 +2039,367 @@ class GCPScanner:
 
         except Exception as e:
             logger.warning(f"GCP Dataproc checks failed: {e}")
+        return results
+
+    # ------------------------------------------------------------------
+    # Cloud Functions checks (8)
+    # ------------------------------------------------------------------
+
+    def _check_cloud_functions(self) -> list[dict]:
+        results = []
+        try:
+            from googleapiclient.discovery import build
+            credentials = self._get_credentials()
+            cf_svc = build("cloudfunctions", "v2", credentials=credentials)
+
+            functions_resp = cf_svc.projects().locations().functions().list(
+                parent=f"projects/{self.project_id}/locations/-"
+            ).execute()
+
+            for func in functions_resp.get("functions", []):
+                func_name = func.get("name", "").split("/")[-1]
+                res_id = func.get("name", "")
+                svc_config = func.get("serviceConfig", {})
+                build_config = func.get("buildConfig", {})
+
+                # 1. Ingress restricted
+                ingress = svc_config.get("ingressSettings", "ALLOW_ALL")
+                results.append(CheckResult(
+                    check_id="gcp_function_ingress_restricted",
+                    check_title="Cloud Function restricts ingress traffic",
+                    service="cloudfunctions", severity="high",
+                    status="PASS" if ingress != "ALLOW_ALL" else "FAIL",
+                    resource_id=res_id, resource_name=func_name,
+                    status_extended=f"Function {func_name} ingress: {ingress}",
+                    remediation="Set ingress settings to ALLOW_INTERNAL_ONLY or ALLOW_INTERNAL_AND_GCLB",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 2. VPC connector
+                vpc_connector = svc_config.get("vpcConnector", "")
+                results.append(CheckResult(
+                    check_id="gcp_function_vpc_connector",
+                    check_title="Cloud Function uses a VPC connector",
+                    service="cloudfunctions", severity="medium",
+                    status="PASS" if vpc_connector else "FAIL",
+                    resource_id=res_id, resource_name=func_name,
+                    status_extended=f"Function {func_name} VPC connector: {vpc_connector or 'none'}",
+                    remediation="Attach a Serverless VPC Access connector to route traffic through your VPC",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 3. Runtime version not deprecated
+                runtime = build_config.get("runtime", "")
+                deprecated_runtimes = ["python37", "python38", "nodejs10", "nodejs12", "go111", "go113"]
+                is_deprecated = runtime in deprecated_runtimes
+                results.append(CheckResult(
+                    check_id="gcp_function_runtime_supported",
+                    check_title="Cloud Function uses a supported runtime version",
+                    service="cloudfunctions", severity="medium",
+                    status="FAIL" if is_deprecated else "PASS",
+                    resource_id=res_id, resource_name=func_name,
+                    status_extended=f"Function {func_name} runtime: {runtime}",
+                    remediation="Upgrade to a supported runtime version",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 4. No default service account
+                sa = svc_config.get("serviceAccountEmail", "")
+                uses_default = sa.endswith("@appspot.gserviceaccount.com") or \
+                    "compute@developer.gserviceaccount.com" in sa
+                results.append(CheckResult(
+                    check_id="gcp_function_custom_sa",
+                    check_title="Cloud Function uses a custom service account",
+                    service="cloudfunctions", severity="high",
+                    status="FAIL" if uses_default else "PASS",
+                    resource_id=res_id, resource_name=func_name,
+                    status_extended=f"Function {func_name} SA: {sa}",
+                    remediation="Assign a dedicated service account with least-privilege permissions",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 5. Secret environment variables (not in plaintext)
+                env_vars = svc_config.get("environmentVariables", {})
+                suspect_keys = [k for k in env_vars if any(
+                    s in k.upper() for s in ["SECRET", "PASSWORD", "KEY", "TOKEN", "API_KEY"]
+                )]
+                results.append(CheckResult(
+                    check_id="gcp_function_no_secret_envvars",
+                    check_title="Cloud Function does not store secrets in plaintext env vars",
+                    service="cloudfunctions", severity="critical",
+                    status="FAIL" if suspect_keys else "PASS",
+                    resource_id=res_id, resource_name=func_name,
+                    status_extended=f"Function {func_name} suspect env vars: {suspect_keys or 'none'}",
+                    remediation="Use Secret Manager references instead of plaintext environment variables",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 6. Max instances limit set
+                max_instances = svc_config.get("maxInstanceCount", 0)
+                results.append(CheckResult(
+                    check_id="gcp_function_max_instances",
+                    check_title="Cloud Function has max instances limit configured",
+                    service="cloudfunctions", severity="low",
+                    status="PASS" if max_instances > 0 else "FAIL",
+                    resource_id=res_id, resource_name=func_name,
+                    status_extended=f"Function {func_name} max instances: {max_instances or 'unlimited'}",
+                    remediation="Set a max instances limit to prevent runaway scaling and cost overruns",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+        except Exception as e:
+            logger.warning(f"GCP Cloud Functions checks failed: {e}")
+        return results
+
+    # ------------------------------------------------------------------
+    # Cloud Run checks (8)
+    # ------------------------------------------------------------------
+
+    def _check_cloud_run(self) -> list[dict]:
+        results = []
+        try:
+            from googleapiclient.discovery import build
+            credentials = self._get_credentials()
+            run_svc = build("run", "v2", credentials=credentials)
+
+            services_resp = run_svc.projects().locations().services().list(
+                parent=f"projects/{self.project_id}/locations/-"
+            ).execute()
+
+            for service in services_resp.get("services", []):
+                svc_name = service.get("name", "").split("/")[-1]
+                res_id = service.get("name", "")
+                template = service.get("template", {})
+
+                # 1. No public unauthenticated access
+                iam_resp = run_svc.projects().locations().services().getIamPolicy(
+                    resource=res_id
+                ).execute()
+                bindings = iam_resp.get("bindings", [])
+                is_public = any(
+                    "allUsers" in b.get("members", []) or
+                    "allAuthenticatedUsers" in b.get("members", [])
+                    for b in bindings if b.get("role") == "roles/run.invoker"
+                )
+                results.append(CheckResult(
+                    check_id="gcp_cloudrun_no_public_access",
+                    check_title="Cloud Run service does not allow unauthenticated access",
+                    service="cloudrun", severity="high",
+                    status="FAIL" if is_public else "PASS",
+                    resource_id=res_id, resource_name=svc_name,
+                    status_extended=f"Service {svc_name} public access: {is_public}",
+                    remediation="Remove allUsers/allAuthenticatedUsers from Cloud Run invoker role",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 2. Custom service account
+                sa = template.get("serviceAccount", "")
+                uses_default = not sa or sa.endswith("compute@developer.gserviceaccount.com")
+                results.append(CheckResult(
+                    check_id="gcp_cloudrun_custom_sa",
+                    check_title="Cloud Run service uses a custom service account",
+                    service="cloudrun", severity="high",
+                    status="FAIL" if uses_default else "PASS",
+                    resource_id=res_id, resource_name=svc_name,
+                    status_extended=f"Service {svc_name} SA: {sa or 'default compute SA'}",
+                    remediation="Assign a dedicated service account with minimal permissions",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 3. VPC egress configured
+                annotations = template.get("annotations", {})
+                vpc_access = annotations.get("run.googleapis.com/vpc-access-connector", "")
+                egress = annotations.get("run.googleapis.com/vpc-access-egress", "")
+                results.append(CheckResult(
+                    check_id="gcp_cloudrun_vpc_egress",
+                    check_title="Cloud Run service routes egress through VPC",
+                    service="cloudrun", severity="medium",
+                    status="PASS" if vpc_access and egress == "all-traffic" else "FAIL",
+                    resource_id=res_id, resource_name=svc_name,
+                    status_extended=f"Service {svc_name} VPC connector: {vpc_access or 'none'}, egress: {egress or 'default'}",
+                    remediation="Configure a VPC connector with all-traffic egress for network security",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 4. Ingress restricted
+                ingress = service.get("ingress", "INGRESS_TRAFFIC_ALL")
+                results.append(CheckResult(
+                    check_id="gcp_cloudrun_ingress_restricted",
+                    check_title="Cloud Run service restricts ingress traffic",
+                    service="cloudrun", severity="high",
+                    status="PASS" if ingress != "INGRESS_TRAFFIC_ALL" else "FAIL",
+                    resource_id=res_id, resource_name=svc_name,
+                    status_extended=f"Service {svc_name} ingress: {ingress}",
+                    remediation="Set ingress to INGRESS_TRAFFIC_INTERNAL_ONLY or INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 5. Binary authorization
+                binary_auth = service.get("binaryAuthorization", {})
+                ba_enabled = binary_auth.get("useDefault", False) or binary_auth.get("policy")
+                results.append(CheckResult(
+                    check_id="gcp_cloudrun_binary_auth",
+                    check_title="Cloud Run service has Binary Authorization enabled",
+                    service="cloudrun", severity="medium",
+                    status="PASS" if ba_enabled else "FAIL",
+                    resource_id=res_id, resource_name=svc_name,
+                    status_extended=f"Service {svc_name} Binary Authorization: {bool(ba_enabled)}",
+                    remediation="Enable Binary Authorization to ensure only trusted container images are deployed",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 6. CMEK encryption
+                encryption = template.get("encryptionKey", "")
+                results.append(CheckResult(
+                    check_id="gcp_cloudrun_cmek",
+                    check_title="Cloud Run service uses customer-managed encryption key",
+                    service="cloudrun", severity="medium",
+                    status="PASS" if encryption else "FAIL",
+                    resource_id=res_id, resource_name=svc_name,
+                    status_extended=f"Service {svc_name} CMEK: {encryption or 'Google-managed'}",
+                    remediation="Configure a CMEK from Cloud KMS for Cloud Run service encryption",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 7. Container secrets not in env vars
+                containers = template.get("containers", [{}])
+                for container in containers:
+                    env_list = container.get("env", [])
+                    suspect = [e["name"] for e in env_list if
+                               e.get("value") and any(
+                                   s in e["name"].upper()
+                                   for s in ["SECRET", "PASSWORD", "KEY", "TOKEN", "APIKEY"]
+                               )]
+                    results.append(CheckResult(
+                        check_id="gcp_cloudrun_no_secret_envvars",
+                        check_title="Cloud Run container does not store secrets in plaintext env vars",
+                        service="cloudrun", severity="critical",
+                        status="FAIL" if suspect else "PASS",
+                        resource_id=res_id, resource_name=svc_name,
+                        status_extended=f"Service {svc_name} suspect env vars: {suspect or 'none'}",
+                        remediation="Use Secret Manager volumes or references instead of plaintext env vars",
+                        compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                    ).to_dict())
+
+        except Exception as e:
+            logger.warning(f"GCP Cloud Run checks failed: {e}")
+        return results
+
+    # ------------------------------------------------------------------
+    # Secret Manager checks (6)
+    # ------------------------------------------------------------------
+
+    def _check_secret_manager(self) -> list[dict]:
+        results = []
+        try:
+            from googleapiclient.discovery import build
+            credentials = self._get_credentials()
+            sm_svc = build("secretmanager", "v1", credentials=credentials)
+
+            secrets_resp = sm_svc.projects().secrets().list(
+                parent=f"projects/{self.project_id}"
+            ).execute()
+
+            for secret in secrets_resp.get("secrets", []):
+                secret_name = secret.get("name", "").split("/")[-1]
+                res_id = secret.get("name", "")
+                labels = secret.get("labels", {})
+                replication = secret.get("replication", {})
+
+                # 1. CMEK encryption
+                has_cmek = False
+                if replication.get("userManaged"):
+                    replicas = replication["userManaged"].get("replicas", [])
+                    has_cmek = all(
+                        r.get("customerManagedEncryption", {}).get("kmsKeyName")
+                        for r in replicas
+                    )
+                elif replication.get("automatic"):
+                    has_cmek = bool(
+                        replication["automatic"].get("customerManagedEncryption", {}).get("kmsKeyName")
+                    )
+                results.append(CheckResult(
+                    check_id="gcp_secret_cmek",
+                    check_title="Secret is encrypted with customer-managed key",
+                    service="secretmanager", severity="medium",
+                    status="PASS" if has_cmek else "FAIL",
+                    resource_id=res_id, resource_name=secret_name,
+                    status_extended=f"Secret {secret_name} CMEK: {has_cmek}",
+                    remediation="Configure CMEK encryption for the secret using Cloud KMS",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 2. Rotation configured
+                rotation = secret.get("rotation", {})
+                has_rotation = bool(rotation.get("rotationPeriod") or rotation.get("nextRotationTime"))
+                results.append(CheckResult(
+                    check_id="gcp_secret_rotation",
+                    check_title="Secret has automatic rotation configured",
+                    service="secretmanager", severity="high",
+                    status="PASS" if has_rotation else "FAIL",
+                    resource_id=res_id, resource_name=secret_name,
+                    status_extended=f"Secret {secret_name} rotation: {'configured' if has_rotation else 'not configured'}",
+                    remediation="Configure automatic rotation with a rotation period and Cloud Function topic",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 3. Labels/ownership
+                has_owner = bool(labels.get("owner") or labels.get("team") or labels.get("managed-by"))
+                results.append(CheckResult(
+                    check_id="gcp_secret_labeled",
+                    check_title="Secret has ownership labels",
+                    service="secretmanager", severity="low",
+                    status="PASS" if has_owner else "FAIL",
+                    resource_id=res_id, resource_name=secret_name,
+                    status_extended=f"Secret {secret_name} ownership labels: {has_owner}",
+                    remediation="Add owner/team labels to track secret ownership and responsibility",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                ).to_dict())
+
+                # 4. IAM not overly permissive
+                try:
+                    iam_resp = sm_svc.projects().secrets().getIamPolicy(
+                        resource=res_id
+                    ).execute()
+                    bindings = iam_resp.get("bindings", [])
+                    overly_permissive = any(
+                        "allUsers" in b.get("members", []) or
+                        "allAuthenticatedUsers" in b.get("members", [])
+                        for b in bindings
+                    )
+                    results.append(CheckResult(
+                        check_id="gcp_secret_no_public_access",
+                        check_title="Secret is not accessible to allUsers or allAuthenticatedUsers",
+                        service="secretmanager", severity="critical",
+                        status="FAIL" if overly_permissive else "PASS",
+                        resource_id=res_id, resource_name=secret_name,
+                        status_extended=f"Secret {secret_name} public access: {overly_permissive}",
+                        remediation="Remove allUsers/allAuthenticatedUsers from secret IAM bindings",
+                        compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                    ).to_dict())
+                except Exception:
+                    pass
+
+                # 5. Version count (detect stale secrets with many unused versions)
+                try:
+                    versions_resp = sm_svc.projects().secrets().versions().list(
+                        parent=res_id
+                    ).execute()
+                    versions = versions_resp.get("versions", [])
+                    enabled_count = sum(1 for v in versions if v.get("state") == "ENABLED")
+                    results.append(CheckResult(
+                        check_id="gcp_secret_version_cleanup",
+                        check_title="Secret does not have excessive enabled versions",
+                        service="secretmanager", severity="low",
+                        status="FAIL" if enabled_count > 5 else "PASS",
+                        resource_id=res_id, resource_name=secret_name,
+                        status_extended=f"Secret {secret_name} enabled versions: {enabled_count}",
+                        remediation="Disable or destroy old secret versions to reduce exposure surface",
+                        compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                    ).to_dict())
+                except Exception:
+                    pass
+
+        except Exception as e:
+            logger.warning(f"GCP Secret Manager checks failed: {e}")
         return results

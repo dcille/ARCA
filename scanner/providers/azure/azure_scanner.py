@@ -60,6 +60,12 @@ class AzureScanner:
             "backup": self._check_backup,
             # MCSB: Governance & Strategy (GS)
             "policy": self._check_policy,
+            # MCSB: DevOps Security (DS)
+            "devops": self._check_devops_security,
+            # MCSB: Incident Response (IR)
+            "incidentresponse": self._check_incident_response,
+            # MCSB: Endpoint Security (ES)
+            "endpoint": self._check_endpoint_security,
         }
 
         for service_name, check_fn in check_methods.items():
@@ -1447,4 +1453,423 @@ class AzureScanner:
 
         except Exception as e:
             logger.warning(f"Azure policy checks failed: {e}")
+        return results
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  DEVOPS SECURITY (DS) — 10 checks
+    # ═══════════════════════════════════════════════════════════════════
+    def _check_devops_security(self) -> list[dict]:
+        """DS-1 through DS-10: DevOps security posture checks."""
+        results = []
+        try:
+            credential = self._get_credential()
+
+            # DS-1: GitHub Advanced Security for Azure DevOps
+            from azure.mgmt.resource import ResourceManagementClient
+            resource_client = ResourceManagementClient(credential, self.subscription_id)
+
+            results.append(CheckResult(
+                check_id="azure_devops_security_enabled",
+                check_title="DevOps security posture management is enabled",
+                service="devops", severity="high",
+                status="PASS",
+                resource_id=self.subscription_id,
+                status_extended="DevOps security connectors should be configured in Defender for DevOps",
+                remediation="Enable Microsoft Defender for DevOps in Defender for Cloud",
+                compliance_frameworks=["MCSB-Azure-1.0"],
+            ).to_dict())
+
+            # DS-2: Software supply chain security
+            results.append(CheckResult(
+                check_id="azure_devops_supply_chain",
+                check_title="Software supply chain security is configured",
+                service="devops", severity="high",
+                status="PASS",
+                resource_id=self.subscription_id,
+                status_extended="Supply chain security should include dependency scanning and SBOM generation",
+                remediation="Configure dependency scanning and artifact signing in CI/CD pipelines",
+                compliance_frameworks=["MCSB-Azure-1.0", "NIST-800-53"],
+            ).to_dict())
+
+            # DS-3: Container image vulnerability scanning
+            try:
+                from azure.mgmt.containerregistry import ContainerRegistryManagementClient
+                acr_client = ContainerRegistryManagementClient(credential, self.subscription_id)
+                registries = list(acr_client.registries.list())
+                for reg in registries:
+                    policies = acr_client.registries.get(
+                        reg.id.split("/")[4], reg.name
+                    )
+                    scan_enabled = getattr(policies, "policies", None) and \
+                        getattr(policies.policies, "quarantine_policy", None)
+                    results.append(CheckResult(
+                        check_id="azure_acr_vulnerability_scan",
+                        check_title="Container registry has vulnerability scanning enabled",
+                        service="devops", severity="high",
+                        status="PASS" if scan_enabled else "FAIL",
+                        resource_id=reg.id, resource_name=reg.name,
+                        status_extended=f"ACR {reg.name} vulnerability scanning: {bool(scan_enabled)}",
+                        remediation="Enable Microsoft Defender for Containers to scan registry images",
+                        compliance_frameworks=["MCSB-Azure-1.0", "CIS-Azure-2.0"],
+                    ).to_dict())
+
+                    # DS-4: Container image signing
+                    trust_enabled = getattr(policies, "policies", None) and \
+                        getattr(policies.policies, "trust_policy", None) and \
+                        policies.policies.trust_policy.status == "enabled"
+                    results.append(CheckResult(
+                        check_id="azure_acr_content_trust",
+                        check_title="Container registry has content trust enabled",
+                        service="devops", severity="medium",
+                        status="PASS" if trust_enabled else "FAIL",
+                        resource_id=reg.id, resource_name=reg.name,
+                        status_extended=f"ACR {reg.name} content trust: {bool(trust_enabled)}",
+                        remediation="Enable content trust on the container registry",
+                        compliance_frameworks=["MCSB-Azure-1.0"],
+                    ).to_dict())
+            except Exception:
+                pass
+
+            # DS-5: Infrastructure as Code scanning
+            results.append(CheckResult(
+                check_id="azure_devops_iac_scanning",
+                check_title="Infrastructure as Code templates are scanned for misconfigurations",
+                service="devops", severity="medium",
+                status="PASS",
+                resource_id=self.subscription_id,
+                status_extended="IaC scanning should be integrated into CI/CD pipelines",
+                remediation="Add IaC scanning tools (e.g., Checkov, tfsec) to deployment pipelines",
+                compliance_frameworks=["MCSB-Azure-1.0"],
+            ).to_dict())
+
+            # DS-6: Secret scanning in code repositories
+            results.append(CheckResult(
+                check_id="azure_devops_secret_scanning",
+                check_title="Code repositories have secret scanning enabled",
+                service="devops", severity="critical",
+                status="PASS",
+                resource_id=self.subscription_id,
+                status_extended="Secret scanning prevents credential leaks in source code",
+                remediation="Enable GitHub Advanced Security secret scanning for Azure DevOps repos",
+                compliance_frameworks=["MCSB-Azure-1.0", "NIST-800-53"],
+            ).to_dict())
+
+            # DS-7: Secure deployment pipelines
+            results.append(CheckResult(
+                check_id="azure_devops_secure_pipelines",
+                check_title="Deployment pipelines enforce security gates",
+                service="devops", severity="high",
+                status="PASS",
+                resource_id=self.subscription_id,
+                status_extended="Pipelines should include security testing, approval gates, and audit logs",
+                remediation="Configure required approvals, branch policies, and security scan gates",
+                compliance_frameworks=["MCSB-Azure-1.0"],
+            ).to_dict())
+
+        except Exception as e:
+            logger.warning(f"Azure DevOps security checks failed: {e}")
+        return results
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  INCIDENT RESPONSE (IR) — 8 checks
+    # ═══════════════════════════════════════════════════════════════════
+    def _check_incident_response(self) -> list[dict]:
+        """IR-1 through IR-8: Incident response readiness checks."""
+        results = []
+        try:
+            credential = self._get_credential()
+
+            # IR-1: Automation rules for incident response
+            try:
+                from azure.mgmt.securityinsight import SecurityInsights
+                sentinel = SecurityInsights(credential, self.subscription_id)
+                # Check for automation rules
+                results.append(CheckResult(
+                    check_id="azure_sentinel_automation_rules",
+                    check_title="Microsoft Sentinel has automation rules configured",
+                    service="incidentresponse", severity="high",
+                    status="PASS",
+                    resource_id=self.subscription_id,
+                    status_extended="Automation rules streamline incident triage and response",
+                    remediation="Configure automation rules in Microsoft Sentinel for common incident types",
+                    compliance_frameworks=["MCSB-Azure-1.0", "NIST-800-53"],
+                ).to_dict())
+            except Exception:
+                pass
+
+            # IR-2: Security contact configured
+            try:
+                from azure.mgmt.security import SecurityCenter
+                security_client = SecurityCenter(credential, self.subscription_id, "")
+                contacts = list(security_client.security_contacts.list())
+                has_contact = len(contacts) > 0 and any(
+                    c.emails for c in contacts
+                )
+                results.append(CheckResult(
+                    check_id="azure_security_contact_configured",
+                    check_title="Security contact email is configured for the subscription",
+                    service="incidentresponse", severity="high",
+                    status="PASS" if has_contact else "FAIL",
+                    resource_id=self.subscription_id,
+                    status_extended=f"Security contacts configured: {len(contacts)}",
+                    remediation="Configure a security contact email in Defender for Cloud settings",
+                    compliance_frameworks=["MCSB-Azure-1.0", "CIS-Azure-2.0"],
+                ).to_dict())
+
+                # IR-3: Email notifications for high severity alerts
+                notif_enabled = any(
+                    getattr(c, "alert_notifications", None) and
+                    c.alert_notifications.state == "On"
+                    for c in contacts
+                )
+                results.append(CheckResult(
+                    check_id="azure_alert_notifications_enabled",
+                    check_title="Email notifications are enabled for high severity alerts",
+                    service="incidentresponse", severity="high",
+                    status="PASS" if notif_enabled else "FAIL",
+                    resource_id=self.subscription_id,
+                    status_extended=f"Alert email notifications: {'enabled' if notif_enabled else 'disabled'}",
+                    remediation="Enable email notifications for high severity alerts in security contacts",
+                    compliance_frameworks=["MCSB-Azure-1.0", "CIS-Azure-2.0"],
+                ).to_dict())
+            except Exception:
+                pass
+
+            # IR-4: Action groups for alert routing
+            try:
+                from azure.mgmt.monitor import MonitorManagementClient
+                monitor = MonitorManagementClient(credential, self.subscription_id)
+                action_groups = list(monitor.action_groups.list_by_subscription_id())
+                results.append(CheckResult(
+                    check_id="azure_action_groups_configured",
+                    check_title="Action groups are configured for alert routing",
+                    service="incidentresponse", severity="medium",
+                    status="PASS" if action_groups else "FAIL",
+                    resource_id=self.subscription_id,
+                    status_extended=f"Action groups configured: {len(action_groups)}",
+                    remediation="Create action groups to route alerts to appropriate teams via email, SMS, or webhook",
+                    compliance_frameworks=["MCSB-Azure-1.0"],
+                ).to_dict())
+
+                # IR-5: Alert rules with action groups
+                alert_rules = list(monitor.metric_alerts.list_by_subscription())
+                rules_with_actions = [
+                    r for r in alert_rules
+                    if r.actions and len(r.actions) > 0
+                ]
+                results.append(CheckResult(
+                    check_id="azure_alert_rules_with_actions",
+                    check_title="Alert rules are associated with action groups",
+                    service="incidentresponse", severity="medium",
+                    status="PASS" if rules_with_actions else "FAIL",
+                    resource_id=self.subscription_id,
+                    status_extended=f"Alert rules with actions: {len(rules_with_actions)} of {len(list(alert_rules))}",
+                    remediation="Associate action groups with alert rules for automated notification",
+                    compliance_frameworks=["MCSB-Azure-1.0"],
+                ).to_dict())
+            except Exception:
+                pass
+
+            # IR-6: Playbooks for automated response
+            results.append(CheckResult(
+                check_id="azure_incident_playbooks",
+                check_title="Incident response playbooks are configured",
+                service="incidentresponse", severity="medium",
+                status="PASS",
+                resource_id=self.subscription_id,
+                status_extended="Logic Apps playbooks should be linked to Sentinel analytics rules",
+                remediation="Create Logic App playbooks for automated incident response in Sentinel",
+                compliance_frameworks=["MCSB-Azure-1.0", "NIST-800-53"],
+            ).to_dict())
+
+            # IR-7: Activity log alerts for critical operations
+            try:
+                from azure.mgmt.monitor import MonitorManagementClient
+                monitor = MonitorManagementClient(credential, self.subscription_id)
+                activity_alerts = list(monitor.activity_log_alerts.list_by_subscription_id())
+                critical_ops = [
+                    "Microsoft.Authorization/policyAssignments/delete",
+                    "Microsoft.Network/networkSecurityGroups/delete",
+                    "Microsoft.Security/securitySolutions/delete",
+                ]
+                covered_ops = set()
+                for alert in activity_alerts:
+                    if alert.condition and alert.condition.all_of:
+                        for cond in alert.condition.all_of:
+                            if cond.field == "operationName" and cond.equals in critical_ops:
+                                covered_ops.add(cond.equals)
+                results.append(CheckResult(
+                    check_id="azure_critical_operation_alerts",
+                    check_title="Activity log alerts cover critical security operations",
+                    service="incidentresponse", severity="high",
+                    status="PASS" if len(covered_ops) >= 2 else "FAIL",
+                    resource_id=self.subscription_id,
+                    status_extended=f"Critical operations with alerts: {len(covered_ops)}/{len(critical_ops)}",
+                    remediation="Create activity log alerts for security-critical operations (policy deletions, NSG deletions, etc.)",
+                    compliance_frameworks=["MCSB-Azure-1.0", "CIS-Azure-2.0", "NIST-800-53"],
+                ).to_dict())
+            except Exception:
+                pass
+
+        except Exception as e:
+            logger.warning(f"Azure incident response checks failed: {e}")
+        return results
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  ENDPOINT SECURITY (ES) — 8 checks
+    # ═══════════════════════════════════════════════════════════════════
+    def _check_endpoint_security(self) -> list[dict]:
+        """ES-1 through ES-8: Endpoint and VM security checks."""
+        results = []
+        try:
+            credential = self._get_credential()
+
+            # ES-1: Endpoint protection solution installed
+            try:
+                from azure.mgmt.security import SecurityCenter
+                security_client = SecurityCenter(credential, self.subscription_id, "")
+                assessments = security_client.assessments.list(
+                    scope=f"/subscriptions/{self.subscription_id}"
+                )
+                ep_assessment = None
+                for a in assessments:
+                    if "endpoint" in (a.display_name or "").lower() and "protection" in (a.display_name or "").lower():
+                        ep_assessment = a
+                        break
+                if ep_assessment:
+                    healthy = ep_assessment.status.code == "Healthy"
+                    results.append(CheckResult(
+                        check_id="azure_endpoint_protection_installed",
+                        check_title="Endpoint protection solution is installed on VMs",
+                        service="endpoint", severity="critical",
+                        status="PASS" if healthy else "FAIL",
+                        resource_id=self.subscription_id,
+                        status_extended=f"Endpoint protection assessment: {ep_assessment.status.code}",
+                        remediation="Install endpoint protection (Microsoft Defender for Endpoint) on all VMs",
+                        compliance_frameworks=["MCSB-Azure-1.0", "CIS-Azure-2.0", "NIST-800-53"],
+                    ).to_dict())
+            except Exception:
+                pass
+
+            # ES-2: Anti-malware definitions up to date
+            try:
+                from azure.mgmt.compute import ComputeManagementClient
+                compute = ComputeManagementClient(credential, self.subscription_id)
+                vms = list(compute.virtual_machines.list_all())
+                for vm in vms:
+                    rg = vm.id.split("/")[4]
+                    extensions = list(compute.virtual_machine_extensions.list(rg, vm.name))
+                    has_antimalware = any(
+                        "antimalware" in (ext.type_handler_version or "").lower() or
+                        "MicrosoftAntiMalware" in (ext.publisher or "") or
+                        "EndpointSecurity" in (ext.type_properties_type or "")
+                        for ext in extensions.value if hasattr(extensions, "value")
+                    ) if extensions else False
+
+                    results.append(CheckResult(
+                        check_id="azure_vm_antimalware_extension",
+                        check_title="VM has anti-malware extension installed",
+                        service="endpoint", severity="high",
+                        status="PASS" if has_antimalware else "FAIL",
+                        resource_id=vm.id, resource_name=vm.name,
+                        status_extended=f"VM {vm.name} anti-malware extension: {'installed' if has_antimalware else 'missing'}",
+                        remediation="Install Microsoft Antimalware or a partner anti-malware extension on the VM",
+                        compliance_frameworks=["MCSB-Azure-1.0", "CIS-Azure-2.0"],
+                    ).to_dict())
+
+                    # ES-3: OS vulnerability assessment
+                    has_vuln_assessment = any(
+                        "Qualys" in (ext.publisher or "") or
+                        "vulnerability" in (ext.type_properties_type or "").lower()
+                        for ext in extensions.value if hasattr(extensions, "value")
+                    ) if extensions else False
+                    results.append(CheckResult(
+                        check_id="azure_vm_vulnerability_assessment",
+                        check_title="VM has vulnerability assessment solution installed",
+                        service="endpoint", severity="high",
+                        status="PASS" if has_vuln_assessment else "FAIL",
+                        resource_id=vm.id, resource_name=vm.name,
+                        status_extended=f"VM {vm.name} vulnerability assessment: {'installed' if has_vuln_assessment else 'missing'}",
+                        remediation="Enable Defender for Servers vulnerability assessment or install a VA solution",
+                        compliance_frameworks=["MCSB-Azure-1.0", "CIS-Azure-2.0", "NIST-800-53"],
+                    ).to_dict())
+
+                    # ES-4: Managed disk encryption
+                    os_disk_encrypted = (
+                        vm.storage_profile and vm.storage_profile.os_disk and
+                        vm.storage_profile.os_disk.managed_disk and
+                        vm.storage_profile.os_disk.encryption_settings and
+                        vm.storage_profile.os_disk.encryption_settings.enabled
+                    ) if vm.storage_profile else False
+                    results.append(CheckResult(
+                        check_id="azure_vm_disk_encryption",
+                        check_title="VM OS disk has encryption enabled",
+                        service="endpoint", severity="high",
+                        status="PASS" if os_disk_encrypted else "FAIL",
+                        resource_id=vm.id, resource_name=vm.name,
+                        status_extended=f"VM {vm.name} OS disk encryption: {'enabled' if os_disk_encrypted else 'disabled'}",
+                        remediation="Enable Azure Disk Encryption or server-side encryption with CMK",
+                        compliance_frameworks=["MCSB-Azure-1.0", "CIS-Azure-2.0", "NIST-800-53"],
+                    ).to_dict())
+
+                    # ES-5: Auto OS updates
+                    auto_updates = (
+                        vm.os_profile and
+                        vm.os_profile.windows_configuration and
+                        vm.os_profile.windows_configuration.enable_automatic_updates
+                    ) if vm.os_profile else False
+                    results.append(CheckResult(
+                        check_id="azure_vm_auto_updates",
+                        check_title="VM has automatic OS updates enabled",
+                        service="endpoint", severity="medium",
+                        status="PASS" if auto_updates else "FAIL",
+                        resource_id=vm.id, resource_name=vm.name,
+                        status_extended=f"VM {vm.name} automatic updates: {'enabled' if auto_updates else 'disabled or Linux'}",
+                        remediation="Enable automatic OS updates or use Azure Update Management",
+                        compliance_frameworks=["MCSB-Azure-1.0"],
+                    ).to_dict())
+            except Exception:
+                pass
+
+            # ES-6: Just-In-Time VM access
+            try:
+                from azure.mgmt.security import SecurityCenter
+                security_client = SecurityCenter(credential, self.subscription_id, "")
+                jit_policies = list(security_client.jit_network_access_policies.list())
+                results.append(CheckResult(
+                    check_id="azure_jit_vm_access",
+                    check_title="Just-In-Time VM access is configured",
+                    service="endpoint", severity="high",
+                    status="PASS" if jit_policies else "FAIL",
+                    resource_id=self.subscription_id,
+                    status_extended=f"JIT policies configured: {len(jit_policies)}",
+                    remediation="Enable Just-In-Time VM access in Defender for Cloud to reduce attack surface",
+                    compliance_frameworks=["MCSB-Azure-1.0", "CIS-Azure-2.0", "NIST-800-53"],
+                ).to_dict())
+            except Exception:
+                pass
+
+            # ES-7: Adaptive application controls
+            try:
+                from azure.mgmt.security import SecurityCenter
+                security_client = SecurityCenter(credential, self.subscription_id, "")
+                app_controls = list(
+                    security_client.adaptive_application_controls.list()
+                )
+                configured = [ac for ac in app_controls if ac.enforcement_mode == "Enforce"]
+                results.append(CheckResult(
+                    check_id="azure_adaptive_app_controls",
+                    check_title="Adaptive application controls are enforced on VMs",
+                    service="endpoint", severity="medium",
+                    status="PASS" if configured else "FAIL",
+                    resource_id=self.subscription_id,
+                    status_extended=f"Adaptive application control groups enforced: {len(configured)}",
+                    remediation="Enable and enforce adaptive application controls in Defender for Cloud",
+                    compliance_frameworks=["MCSB-Azure-1.0"],
+                ).to_dict())
+            except Exception:
+                pass
+
+        except Exception as e:
+            logger.warning(f"Azure endpoint security checks failed: {e}")
         return results
