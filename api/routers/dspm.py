@@ -13,9 +13,14 @@ from api.services.auth_service import get_current_user
 from scanner.dspm.data_store_checks import (
     DSPM_CHECKS,
     DATA_STORE_TYPES,
+    PROVIDER_DATA_CHECK_MAPPING,
     get_dspm_checks_for_provider,
     get_dspm_data_stores,
+    get_data_check_ids,
+    get_data_checks_for_provider,
+    get_data_checks_by_category,
 )
+from scanner.attack_paths.graph_engine import AttackPathAnalyzer
 
 router = APIRouter()
 
@@ -38,16 +43,32 @@ async def dspm_overview(
         for store in provider_stores:
             data_services.add(store["service"])
 
-    # Count findings by data service
+    # Map scanner service names to DSPM data store service names
+    _SERVICE_ALIAS = {
+        "s3": ["s3"], "rds": ["rds"], "dynamodb": ["dynamodb"],
+        "redshift": ["redshift"], "efs": ["efs"], "elasticache": ["elasticache"],
+        "secretsmanager": ["secretsmanager", "secrets_manager"],
+        "elasticsearch": ["elasticsearch", "opensearch"],
+        "azure_blob": ["storage", "azure_blob"], "azure_sql": ["sql", "azure_sql", "database"],
+        "cosmosdb": ["cosmosdb", "cosmos"], "azure_files": ["azure_files"],
+        "keyvault": ["keyvault", "key_vault", "key vault"],
+        "gcs": ["gcs", "cloud_storage", "cloud storage", "storage"],
+        "cloudsql": ["cloudsql", "cloud_sql", "cloud sql"],
+        "bigquery": ["bigquery"], "firestore": ["firestore"],
+        "secretmanager": ["secretmanager", "secret_manager"],
+    }
+
+    # Count findings by data service (including aliases)
     findings_q = await db.execute(
-        select(Finding.service, Finding.status, func.count(Finding.id))
+        select(Finding.service, Finding.status, Finding.check_id, func.count(Finding.id))
         .join(Scan, Finding.scan_id == Scan.id)
         .where(Scan.user_id == current_user.id)
-        .group_by(Finding.service, Finding.status)
+        .group_by(Finding.service, Finding.status, Finding.check_id)
     )
     service_findings: dict[str, dict] = {}
-    for service, status, count in findings_q.all():
+    for service, status, check_id, count in findings_q.all():
         svc_lower = service.lower()
+        # Direct match
         if svc_lower not in service_findings:
             service_findings[svc_lower] = {"pass": 0, "fail": 0, "total": 0}
         if status == "PASS":
@@ -55,6 +76,17 @@ async def dspm_overview(
         else:
             service_findings[svc_lower]["fail"] += count
         service_findings[svc_lower]["total"] += count
+
+        # Also map to DSPM service aliases
+        for dspm_svc, aliases in _SERVICE_ALIAS.items():
+            if svc_lower in aliases and dspm_svc != svc_lower:
+                if dspm_svc not in service_findings:
+                    service_findings[dspm_svc] = {"pass": 0, "fail": 0, "total": 0}
+                if status == "PASS":
+                    service_findings[dspm_svc]["pass"] += count
+                else:
+                    service_findings[dspm_svc]["fail"] += count
+                service_findings[dspm_svc]["total"] += count
 
     # Build data store inventory across all providers
     data_inventory = []
@@ -142,6 +174,152 @@ async def dspm_data_stores(
         for s in stores:
             all_stores.append({**s, "provider": provider})
     return all_stores
+
+
+@router.get("/attack-paths")
+async def dspm_attack_paths(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Data-related attack paths derived from data store findings."""
+    data_check_ids = get_data_check_ids()
+
+    # Get all data-related findings
+    findings_q = await db.execute(
+        select(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(
+            Scan.user_id == current_user.id,
+            Finding.check_id.in_(data_check_ids),
+        )
+    )
+    findings = findings_q.scalars().all()
+
+    if not findings:
+        return {"attack_paths": [], "summary": {"total_paths": 0, "critical": 0, "high": 0}}
+
+    # Convert to dicts for the analyzer
+    finding_dicts = []
+    for f in findings:
+        finding_dicts.append({
+            "id": str(f.id),
+            "check_id": f.check_id,
+            "check_title": f.check_title or f.check_id,
+            "service": f.service,
+            "severity": f.severity,
+            "status": f.status,
+            "resource_id": f.resource_id or "",
+            "resource_name": f.resource_name or "",
+            "region": f.region or "",
+            "remediation": f.remediation or "",
+        })
+
+    analyzer = AttackPathAnalyzer(finding_dicts)
+    paths = analyzer.analyze()
+
+    result_paths = []
+    for p in paths:
+        result_paths.append({
+            "id": p.id,
+            "title": p.title,
+            "description": p.description,
+            "severity": p.severity,
+            "risk_score": p.risk_score,
+            "category": p.category,
+            "entry_point": p.entry_point,
+            "target": p.target,
+            "techniques": p.techniques,
+            "affected_resources": p.affected_resources,
+            "remediation": p.remediation,
+            "nodes": [
+                {"id": n.id, "type": n.node_type.value, "label": n.label, "service": n.service}
+                for n in p.nodes
+            ],
+            "edges": [
+                {"source": e.source_id, "target": e.target_id, "type": e.edge_type.value, "label": e.label}
+                for e in p.edges
+            ],
+        })
+
+    critical = sum(1 for p in result_paths if p["severity"] == "critical")
+    high = sum(1 for p in result_paths if p["severity"] == "high")
+
+    return {
+        "attack_paths": result_paths,
+        "summary": {
+            "total_paths": len(result_paths),
+            "critical": critical,
+            "high": high,
+        },
+    }
+
+
+@router.get("/findings")
+async def dspm_findings(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    category: Optional[str] = None,
+    provider: Optional[str] = None,
+    data_store: Optional[str] = None,
+):
+    """All data-related findings from provider scans, mapped to DSPM categories."""
+    data_check_ids = get_data_check_ids()
+
+    query = (
+        select(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(
+            Scan.user_id == current_user.id,
+            Finding.check_id.in_(data_check_ids),
+        )
+    )
+    findings_q = await db.execute(query)
+    findings = findings_q.scalars().all()
+
+    results = []
+    for f in findings:
+        mapping = PROVIDER_DATA_CHECK_MAPPING.get(f.check_id)
+        if not mapping:
+            continue
+        if category and mapping["category"] != category:
+            continue
+        if provider and mapping["provider"] != provider:
+            continue
+        if data_store and mapping["data_store"] != data_store:
+            continue
+
+        results.append({
+            "id": str(f.id),
+            "check_id": f.check_id,
+            "check_title": f.check_title or f.check_id,
+            "service": f.service,
+            "severity": f.severity,
+            "status": f.status,
+            "resource_id": f.resource_id or "",
+            "resource_name": f.resource_name or "",
+            "dspm_category": mapping["category"],
+            "dspm_data_store": mapping["data_store"],
+            "dspm_provider": mapping["provider"],
+            "remediation": f.remediation or "",
+        })
+
+    # Category summary
+    cat_summary: dict[str, dict] = {}
+    for r in results:
+        cat = r["dspm_category"]
+        if cat not in cat_summary:
+            cat_summary[cat] = {"total": 0, "pass": 0, "fail": 0}
+        cat_summary[cat]["total"] += 1
+        if r["status"] == "PASS":
+            cat_summary[cat]["pass"] += 1
+        else:
+            cat_summary[cat]["fail"] += 1
+
+    return {
+        "findings": sorted(results, key=lambda x: (x["status"] != "FAIL", x["severity"])),
+        "category_summary": cat_summary,
+        "total": len(results),
+    }
 
 
 def _calculate_risk_score(failed: int, total: int) -> str:

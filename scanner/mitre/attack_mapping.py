@@ -715,6 +715,231 @@ CHECK_TO_MITRE: dict[str, list[str]] = {
     "gcp_firewall_open_3389": [
         "T1021.001", "T1190", "T1563",
     ],
+    "gcp_iam_no_primitive_roles": [
+        "T1078.004", "T1098",
+    ],
+    "gcp_iam_no_sa_admin_key": [
+        "T1078.004", "T1552",
+    ],
+    "gcp_iam_sa_key_rotation": [
+        "T1552", "T1078.004",
+    ],
+    "gcp_iam_separation_of_duties": [
+        "T1098", "T1078.004",
+    ],
+    "gcp_iam_no_user_managed_sa_keys": [
+        "T1552", "T1078.004",
+    ],
+    "gcp_iam_api_keys_restricted": [
+        "T1552", "T1190",
+    ],
+    "gcp_iam_corp_login_required": [
+        "T1078.004", "T1566",
+    ],
+    "gcp_iam_sa_user_role": [
+        "T1078.004", "T1098",
+    ],
+    "gcp_iam_sa_token_creator_role": [
+        "T1078.004", "T1134",
+    ],
+    "gcp_iam_kms_separation_of_duties": [
+        "T1098", "T1486",
+    ],
+    "gcp_iam_api_keys_exist": [
+        "T1552",
+    ],
+    "gcp_iam_api_keys_rotated": [
+        "T1552", "T1078.004",
+    ],
+    "gcp_iam_essential_contacts": [
+        "T1562.008",
+    ],
+    "gcp_iam_secrets_in_functions": [
+        "T1552.001", "T1648",
+    ],
+    "gcp_compute_shielded_vm": [
+        "T1542", "T1195",
+    ],
+    "gcp_compute_disk_encryption_cmek": [
+        "T1530", "T1486",
+    ],
+    "gcp_compute_no_default_sa": [
+        "T1078.004", "T1098",
+    ],
+    "gcp_compute_serial_port_disabled": [
+        "T1021", "T1059",
+    ],
+    "gcp_compute_ip_forwarding_disabled": [
+        "T1557", "T1021",
+    ],
+    "gcp_compute_confidential_computing": [
+        "T1530",
+    ],
+    "gcp_compute_no_full_api_access": [
+        "T1078.004", "T1098",
+    ],
+    "gcp_compute_block_project_ssh": [
+        "T1021.004", "T1098",
+    ],
+    "gcp_storage_no_public_access": [
+        "T1530", "T1190",
+    ],
+    "gcp_storage_versioning": [
+        "T1485", "T1530",
+    ],
+    "gcp_storage_logging_enabled": [
+        "T1562.008", "T1070",
+    ],
+    "gcp_storage_retention_policy": [
+        "T1485",
+    ],
+    "gcp_storage_cmek_encryption": [
+        "T1530", "T1486",
+    ],
+    "gcp_sql_backup_enabled": [
+        "T1485", "T1490",
+    ],
+    "gcp_sql_pitr_enabled": [
+        "T1485", "T1490",
+    ],
+    "gcp_sql_no_public_networks": [
+        "T1190", "T1110",
+    ],
+    "gcp_sql_cmek_encryption": [
+        "T1530", "T1486",
+    ],
+    "gcp_sql_audit_logging": [
+        "T1562.008", "T1070",
+    ],
+    "gcp_sql_auto_storage_increase": [
+        "T1499",
+    ],
+    "gcp_logging_sinks_configured": [
+        "T1562.008",
+    ],
+    "gcp_logging_audit_logs_enabled": [
+        "T1562.008", "T1070",
+    ],
+    "gcp_logging_metric_filters": [
+        "T1562.008",
+    ],
+    "gcp_logging_bucket_retention": [
+        "T1070", "T1562.008",
+    ],
+    "gcp_logging_vpc_flow_logs": [
+        "T1562.008", "T1021",
+    ],
+    "gcp_logging_dns_logging": [
+        "T1071", "T1562.008",
+    ],
+    "gcp_logging_ownership_changes": [
+        "T1098", "T1562.008",
+    ],
+    "gcp_logging_audit_config_changes": [
+        "T1562.008", "T1070",
+    ],
+    "gcp_logging_custom_role_changes": [
+        "T1098", "T1078.004",
+    ],
+    "gcp_logging_firewall_changes": [
+        "T1562.004", "T1562.008",
+    ],
+    "gcp_logging_route_changes": [
+        "T1557", "T1562.008",
+    ],
+    "gcp_logging_vpc_changes": [
+        "T1562.008", "T1021",
+    ],
+    "gcp_logging_storage_iam_changes": [
+        "T1530", "T1562.008",
+    ],
+    "gcp_logging_sql_config_changes": [
+        "T1562.008", "T1530",
+    ],
+    "gcp_logging_cloud_asset_inventory": [
+        "T1580", "T1562.008",
+    ],
+    "gcp_logging_lb_logging": [
+        "T1562.008", "T1190",
+    ],
+    "gcp_kms_no_public_access": [
+        "T1552", "T1190",
+    ],
+    "gcp_kms_hsm_protection": [
+        "T1552", "T1486",
+    ],
+    "gcp_gke_master_auth_networks": [
+        "T1190", "T1021",
+    ],
+    "gcp_gke_pod_security_policy": [
+        "T1525", "T1611",
+    ],
+    "gcp_gke_shielded_nodes": [
+        "T1542", "T1525",
+    ],
+    "gcp_gke_workload_identity": [
+        "T1078.004", "T1552",
+    ],
+    "gcp_gke_binary_auth": [
+        "T1525", "T1195",
+    ],
+    "gcp_gke_cluster_logging": [
+        "T1562.008",
+    ],
+    "gcp_firewall_no_default_allow": [
+        "T1190", "T1021",
+    ],
+    "gcp_network_dns_sec": [
+        "T1071", "T1557",
+    ],
+    "gcp_network_private_google_access": [
+        "T1530", "T1021",
+    ],
+    "gcp_network_flow_logs_enabled": [
+        "T1562.008", "T1021",
+    ],
+    "gcp_network_no_default_network": [
+        "T1190", "T1021",
+    ],
+    "gcp_network_no_legacy_network": [
+        "T1190",
+    ],
+    "gcp_network_ssl_policy": [
+        "T1530", "T1557",
+    ],
+    "gcp_bigquery_dataset_no_public": [
+        "T1530", "T1190",
+    ],
+    "gcp_bigquery_cmek_encryption": [
+        "T1530", "T1486",
+    ],
+    "gcp_bigquery_table_encrypted": [
+        "T1530", "T1486",
+    ],
+    "gcp_bigquery_audit_logging": [
+        "T1562.008", "T1070",
+    ],
+    "gcp_bigquery_classification": [
+        "T1530",
+    ],
+    "gcp_pubsub_no_public_access": [
+        "T1530", "T1190",
+    ],
+    "gcp_pubsub_encrypted": [
+        "T1530",
+    ],
+    "gcp_dns_dnssec_enabled": [
+        "T1071", "T1557",
+    ],
+    "gcp_dns_rsasha1_disabled": [
+        "T1557",
+    ],
+    "gcp_dataproc_encrypted": [
+        "T1530",
+    ],
+    "gcp_dataproc_private": [
+        "T1190", "T1021",
+    ],
 }
 
 

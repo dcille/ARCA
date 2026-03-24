@@ -462,6 +462,64 @@ class ApiClient {
   async updateMemberRole(userId: string, role: string) {
     return this.request<any>('PUT', `/api/v1/organizations/current/members/${userId}/role`, { role })
   }
+
+  // Ransomware Readiness
+  async getRRScore(accountId?: string) {
+    const params = accountId ? { account_id: accountId } : undefined
+    return this.request<any>('GET', '/api/v1/ransomware-readiness/score', undefined, { params })
+  }
+
+  async getRRScoreHistory(days?: number, scope?: string, scopeId?: string) {
+    const params: Record<string, string> = {}
+    if (days) params.days = String(days)
+    if (scope) params.scope = scope
+    if (scopeId) params.scope_id = scopeId
+    return this.request<any[]>('GET', '/api/v1/ransomware-readiness/score/history', undefined, { params: Object.keys(params).length ? params : undefined })
+  }
+
+  async getRRDomains() {
+    return this.request<any[]>('GET', '/api/v1/ransomware-readiness/domains')
+  }
+
+  async getRRDomainRules(domainId: string) {
+    return this.request<any[]>('GET', `/api/v1/ransomware-readiness/domains/${domainId}/rules`)
+  }
+
+  async getRRFindings(params?: Record<string, string>) {
+    return this.request<any>('GET', '/api/v1/ransomware-readiness/findings', undefined, { params })
+  }
+
+  async getRRFindingDetail(findingId: string) {
+    return this.request<any>('GET', `/api/v1/ransomware-readiness/findings/${findingId}`)
+  }
+
+  async updateRRFinding(findingId: string, data: any) {
+    return this.request<any>('PATCH', `/api/v1/ransomware-readiness/findings/${findingId}`, data)
+  }
+
+  async getRRAccounts() {
+    return this.request<any[]>('GET', '/api/v1/ransomware-readiness/accounts')
+  }
+
+  async getRRAccountDetail(accountId: string) {
+    return this.request<any>('GET', `/api/v1/ransomware-readiness/accounts/${accountId}`)
+  }
+
+  async getRRRules(params?: Record<string, string>) {
+    return this.request<any[]>('GET', '/api/v1/ransomware-readiness/rules', undefined, { params })
+  }
+
+  async getRRGovernance() {
+    return this.request<any>('GET', '/api/v1/ransomware-readiness/governance')
+  }
+
+  async updateRRGovernance(data: any) {
+    return this.request<any>('PUT', '/api/v1/ransomware-readiness/governance', data)
+  }
+
+  async triggerRREvaluation() {
+    return this.request<any>('POST', '/api/v1/ransomware-readiness/evaluate')
+  }
 }
 
 export const api = new ApiClient()
