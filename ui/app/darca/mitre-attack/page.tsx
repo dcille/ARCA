@@ -8,6 +8,9 @@ import {
   ArrowPathIcon,
   FunnelIcon,
   ShieldCheckIcon,
+  ArrowDownTrayIcon,
+  ExclamationTriangleIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline'
 
 const TACTIC_COLORS: Record<string, string> = {
@@ -35,29 +38,42 @@ const ANALYSIS_PHASES = [
 function TechniqueCell({
   technique,
   onClick,
+  maxFails,
 }: {
   technique: any
   onClick: () => void
+  maxFails: number
 }) {
-  const bgColor =
-    technique.color === 'green'
-      ? 'bg-green-100 hover:bg-green-200 border-green-300'
-      : technique.color === 'red'
-      ? 'bg-red-100 hover:bg-red-200 border-red-300'
-      : 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+  // Heatmap intensity: deeper red for more failures
+  const failIntensity = maxFails > 0 ? Math.min(technique.fail_count / maxFails, 1) : 0
 
-  const textColor =
-    technique.color === 'green'
-      ? 'text-green-800'
-      : technique.color === 'red'
-      ? 'text-red-800'
-      : 'text-gray-500'
+  let bgColor: string
+  let textColor: string
+  if (technique.color === 'green') {
+    bgColor = 'bg-green-100 hover:bg-green-200 border-green-300'
+    textColor = 'text-green-800'
+  } else if (technique.color === 'red') {
+    // Intensity-based red: low failures → light, high failures → deep red
+    if (failIntensity > 0.7) {
+      bgColor = 'bg-red-300 hover:bg-red-400 border-red-500'
+      textColor = 'text-red-950'
+    } else if (failIntensity > 0.4) {
+      bgColor = 'bg-red-200 hover:bg-red-300 border-red-400'
+      textColor = 'text-red-900'
+    } else {
+      bgColor = 'bg-red-100 hover:bg-red-200 border-red-300'
+      textColor = 'text-red-800'
+    }
+  } else {
+    bgColor = 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+    textColor = 'text-gray-500'
+  }
 
   return (
     <button
       onClick={onClick}
       className={`w-full text-left px-2 py-1.5 rounded border text-[10px] leading-tight transition-colors ${bgColor} ${textColor}`}
-      title={technique.name}
+      title={`${technique.name} — ${technique.pass_count} pass, ${technique.fail_count} fail`}
     >
       <span className="font-semibold block truncate">{technique.id}</span>
       <span className="block truncate opacity-80">{technique.name}</span>
@@ -81,6 +97,8 @@ export default function MitreAttackPage() {
   const [providers, setProviders] = useState<any[]>([])
   const [selectedProvider, setSelectedProvider] = useState('')
   const [lastAnalyzed, setLastAnalyzed] = useState<string | null>(null)
+  const [coverageGaps, setCoverageGaps] = useState<any>(null)
+  const [showGaps, setShowGaps] = useState(false)
   const phaseTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
@@ -181,6 +199,40 @@ export default function MitreAttackPage() {
     setTechniqueDetail(null)
   }
 
+  const handleExportNavigator = async () => {
+    try {
+      const params: Record<string, string> = {}
+      if (selectedProvider) params.provider_id = selectedProvider
+      const layer = await api.getMitreNavigatorLayer(params)
+      const blob = new Blob([JSON.stringify(layer, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `darca-mitre-layer-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Export failed:', err)
+    }
+  }
+
+  const handleShowGaps = async () => {
+    if (showGaps) { setShowGaps(false); return }
+    try {
+      const params: Record<string, string> = {}
+      if (selectedProvider) params.provider_id = selectedProvider
+      const gaps = await api.getMitreCoverageGaps(params)
+      setCoverageGaps(gaps)
+      setShowGaps(true)
+    } catch (err) {
+      console.error('Coverage gaps failed:', err)
+    }
+  }
+
+  // Compute max fail count for heatmap intensity
+  const maxFails = matrixData?.matrix?.reduce((max: number, tactic: any) =>
+    Math.max(max, ...tactic.techniques.map((t: any) => t.fail_count || 0)), 0) || 1
+
   const hasMatrix = matrixData?.matrix?.length > 0
 
   return (
@@ -218,14 +270,38 @@ export default function MitreAttackPage() {
             )}
           </div>
 
-          <button
-            onClick={runAnalysis}
-            disabled={analyzing}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-green text-white text-sm font-semibold rounded-lg hover:bg-brand-green/90 transition-colors disabled:opacity-60 shadow-sm"
-          >
-            <ArrowPathIcon className={`w-4 h-4 ${analyzing ? 'animate-spin' : ''}`} />
-            {analyzing ? 'Analyzing...' : 'Run Analysis'}
-          </button>
+          <div className="flex items-center gap-2">
+            {hasMatrix && (
+              <>
+                <button
+                  onClick={handleShowGaps}
+                  className={`inline-flex items-center gap-2 px-4 py-2.5 border text-sm font-medium rounded-lg transition-colors ${
+                    showGaps
+                      ? 'bg-brand-blue/10 border-brand-blue/30 text-brand-blue'
+                      : 'border-brand-gray-200 text-brand-gray-600 hover:bg-brand-gray-50'
+                  }`}
+                >
+                  <ChartBarIcon className="w-4 h-4" />
+                  Coverage Gaps
+                </button>
+                <button
+                  onClick={handleExportNavigator}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 border border-brand-gray-200 rounded-lg hover:bg-brand-gray-50 text-sm font-medium text-brand-gray-600 transition-colors"
+                >
+                  <ArrowDownTrayIcon className="w-4 h-4" />
+                  Export Layer
+                </button>
+              </>
+            )}
+            <button
+              onClick={runAnalysis}
+              disabled={analyzing}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-green text-white text-sm font-semibold rounded-lg hover:bg-brand-green/90 transition-colors disabled:opacity-60 shadow-sm"
+            >
+              <ArrowPathIcon className={`w-4 h-4 ${analyzing ? 'animate-spin' : ''}`} />
+              {analyzing ? 'Analyzing...' : 'Run Analysis'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -389,6 +465,7 @@ export default function MitreAttackPage() {
                           key={tech.id}
                           technique={tech}
                           onClick={() => handleTechniqueClick(tech.id)}
+                          maxFails={maxFails}
                         />
                       ))}
                       {tactic.techniques.length === 0 && (
@@ -403,6 +480,63 @@ export default function MitreAttackPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Coverage Gaps Panel */}
+      {showGaps && coverageGaps && (
+        <div className="mt-6 card">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-brand-navy">MITRE ATT&CK Coverage Gap Analysis</h2>
+              <p className="text-sm text-brand-gray-400 mt-1">
+                Coverage Score: <span className={`font-bold ${
+                  coverageGaps.coverage_score >= 70 ? 'text-green-600' :
+                  coverageGaps.coverage_score >= 40 ? 'text-amber-500' : 'text-red-600'
+                }`}>{coverageGaps.coverage_score}%</span>
+                &nbsp;&middot;&nbsp;{coverageGaps.protected} protected &middot; {coverageGaps.at_risk} at risk &middot; {coverageGaps.not_covered} not covered
+              </p>
+            </div>
+            <button onClick={() => setShowGaps(false)} className="p-1.5 rounded-lg hover:bg-brand-gray-100 text-brand-gray-400">
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+          </div>
+
+          {coverageGaps.techniques_failing?.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-xs font-semibold text-red-600 uppercase tracking-wider mb-2">
+                At Risk Techniques ({coverageGaps.techniques_failing.length})
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {coverageGaps.techniques_failing.slice(0, 10).map((t: any) => (
+                  <button
+                    key={t.id}
+                    onClick={() => { handleTechniqueClick(t.id); setShowGaps(false) }}
+                    className="flex items-center gap-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-left hover:bg-red-100 transition-colors"
+                  >
+                    <span className="text-xs font-mono font-bold text-red-700">{t.id}</span>
+                    <span className="text-xs text-red-800 flex-1 truncate">{t.name}</span>
+                    <span className="text-[10px] font-mono text-red-600">{t.fail_count}F</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {coverageGaps.techniques_not_covered?.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                Not Covered ({coverageGaps.techniques_not_covered.length})
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {coverageGaps.techniques_not_covered.map((t: any) => (
+                  <span key={t.id} className="px-2 py-1 bg-gray-100 border border-gray-200 rounded text-[10px] text-gray-500 font-mono">
+                    {t.id} {t.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Technique Detail Panel */}

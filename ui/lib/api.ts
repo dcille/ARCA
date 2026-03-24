@@ -273,6 +273,37 @@ class ApiClient {
   async getAttackPath(id: string) {
     return this.request<any>('GET', `/api/v1/attack-paths/${id}`)
   }
+
+  async getAttackPathRuns(limit?: number) {
+    const params = limit ? { limit: String(limit) } : undefined
+    return this.request<any[]>('GET', '/api/v1/attack-paths/runs', undefined, { params })
+  }
+
+  async getAttackPathChokePoints(runId?: string) {
+    const params = runId ? { analysis_run_id: runId } : undefined
+    return this.request<any>('GET', '/api/v1/attack-paths/choke-points', undefined, { params })
+  }
+
+  async compareAttackPathRuns(run1: string, run2: string) {
+    return this.request<any>('GET', '/api/v1/attack-paths/compare', undefined, { params: { run1, run2 } })
+  }
+
+  // MITRE ATT&CK (extended)
+  async getMitreCoverageGaps(params?: Record<string, string>) {
+    return this.request<any>('GET', '/api/v1/mitre/coverage-gaps', undefined, { params })
+  }
+
+  async getMitreNavigatorLayer(params?: Record<string, string>) {
+    return this.request<any>('GET', '/api/v1/mitre/navigator-layer', undefined, { params })
+  }
+
+  async getMitreTechniqueChecks(techniqueId: string) {
+    return this.request<any>('GET', `/api/v1/mitre/technique/${techniqueId}/checks`)
+  }
+
+  async getMitreAttackPathsCoverage() {
+    return this.request<any>('GET', '/api/v1/mitre/attack-paths')
+  }
   // Reports
   async downloadReport(type: 'executive' | 'technical', params?: Record<string, string>) {
     const url = new URL(`/api/v1/reports/${type}`, window.location.origin)
