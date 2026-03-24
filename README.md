@@ -2,7 +2,7 @@
 
 **Cloud & SaaS Security Posture Management Platform**
 
-D-ARCA is a comprehensive CSPM platform that combines cloud infrastructure security scanning (AWS, Azure, GCP, Kubernetes) with SaaS application security assessment (ServiceNow, Microsoft 365, Salesforce, Snowflake). It provides a unified dashboard for monitoring, analyzing, and improving the security posture of your entire technology stack.
+D-ARCA is a comprehensive CSPM platform that combines cloud infrastructure security scanning (AWS, Azure, GCP, OCI, Alibaba Cloud, Kubernetes) with SaaS application security assessment (ServiceNow, Microsoft 365, Salesforce, Snowflake). It provides a unified dashboard for monitoring, analyzing, and improving the security posture of your entire technology stack — including compliance mapping, MITRE ATT&CK analysis, ransomware readiness assessment, and executive reporting.
 
 ---
 
@@ -13,6 +13,12 @@ D-ARCA is a comprehensive CSPM platform that combines cloud infrastructure secur
 - [Development Setup](#development-setup)
 - [Features](#features)
 - [Cloud Security Scanning](#cloud-security-scanning)
+  - [AWS](#aws-20-services-50-checks)
+  - [Azure](#azure-8-services-20-checks)
+  - [GCP](#gcp-8-services-15-checks)
+  - [Kubernetes](#kubernetes-4-categories-10-checks)
+  - [OCI](#oci--oracle-cloud-infrastructure-18-services-60-checks)
+  - [Alibaba Cloud](#alibaba-cloud-12-services-70-checks)
 - [SaaS Security Scanning](#saas-security-scanning)
 - [API Reference](#api-reference)
 - [Frontend Pages](#frontend-pages)
@@ -123,7 +129,7 @@ The API reloads on file changes automatically. The frontend runs on http://local
 - Recent scan history with status and pass/fail counts
 
 ### Cloud Provider Management
-- Add/remove cloud providers (AWS, Azure, GCP, Kubernetes)
+- Add/remove cloud providers (AWS, Azure, GCP, OCI, Alibaba Cloud, Kubernetes)
 - Credential storage with encryption at rest
 - Connection status tracking
 - Per-provider scan configuration
@@ -150,10 +156,33 @@ The API reloads on file changes automatically. The frontend runs on http://local
 - Statistics endpoint with aggregation
 
 ### Compliance Assessment
-- 10 compliance frameworks with check mapping
-- Per-framework pass rate calculation
-- Visual progress rings
-- Framework descriptions and metadata
+- 15+ compliance frameworks with control-level hierarchy (CIS, NIST, PCI-DSS, HIPAA, SOC2, GDPR, ISO-27001)
+- Per-framework pass rate calculation (per-unique-check, not per-resource)
+- Visual progress rings and Check Library with control descriptions
+- Framework descriptions, metadata, and per-cloud check mappings
+
+### MITRE ATT&CK Analysis
+- Interactive MITRE ATT&CK matrix visualization
+- Technique coverage mapping from scan findings
+- Run Analysis workflow with phased loading animation
+- Tactic/technique breakdown with protection status
+
+### Ransomware Readiness
+- 105 ransomware readiness rules across 7 domains
+- Scoring engine with weighted domain assessments
+- Protection, Detection, Recovery, and Governance categories
+- Executive-level readiness dashboard
+
+### Reports
+- Executive and technical PDF report generation
+- MITRE ATT&CK and compliance sections in reports
+- Severity breakdown, top findings, and remediation guidance
+- Downloadable PDF reports per scan or organization
+
+### Inventory
+- Cloud resource inventory with friendly service labels
+- Per-provider resource aggregation
+- Account summary with resource type breakdown
 
 ---
 
@@ -226,6 +255,50 @@ The API reloads on file changes automatically. The frontend runs on http://local
 | **Namespaces**     | Workload pods in default namespace                  |
 
 **Required credentials**: `kubeconfig` (YAML)
+
+### OCI — Oracle Cloud Infrastructure (18 services, 60+ checks)
+
+| Service               | Checks                                                    |
+|-----------------------|-----------------------------------------------------------|
+| **IAM**               | MFA, password policy (length/expiry/reuse), API key rotation, admin controls, unused credentials |
+| **Networking**        | Security lists (SSH/RDP), NSG unrestricted ingress, default SL restrict, VCN flow logs |
+| **Compute**           | IMDSv2, Secure Boot, in-transit encryption                |
+| **Object Storage**    | Public access, CMK encryption, versioning, event emission |
+| **Block/Boot Volume** | CMK encryption for block and boot volumes                 |
+| **File Storage**      | CMK encryption, export privileged ports, mount target NSG |
+| **Database**          | Autonomous DB private endpoint, autoscaling, CMK; DB System backups |
+| **MySQL**             | Backups, crash recovery, deletion protection, HA, PITR   |
+| **Vault**             | Key rotation, private vault type                          |
+| **Cloud Guard**       | Enabled in root compartment                               |
+| **Events**            | Event rules configured (IdP, IAM, VCN, route, SL, NSG, gateway changes) |
+| **Notifications**     | Topics and security subscriptions configured              |
+| **Logging**           | Log groups, audit retention                               |
+| **Load Balancer**     | HTTPS listeners, NSG assigned, backend health             |
+| **OKE (Kubernetes)**  | Public endpoint, NSG, image verification, K8s version     |
+| **Container Registry**| Public repos, immutable artifacts                         |
+| **Container Instances**| Restart policy, graceful shutdown                        |
+| **Functions**         | NSG assigned, tracing enabled, provisioned concurrency    |
+
+**Required credentials**: `user_ocid`, `tenancy_ocid`, `fingerprint`, `key_content` (PEM), `region`
+
+### Alibaba Cloud (12 services, 70+ checks)
+
+| Service               | Checks                                                    |
+|-----------------------|-----------------------------------------------------------|
+| **RAM**               | MFA, password policy (uppercase/lowercase/symbol/number/length/reuse/expiry/lockout), access key rotation, unused users, wildcard policies, groups-only attachments |
+| **ECS**               | Public IP, VPC network, deletion protection, disk encryption, security groups (all/SSH/RDP) |
+| **RDS**               | Public access, whitelist, TDE encryption, SSL, backup retention, SQL audit, PostgreSQL log parameters |
+| **OSS**               | Public access, encryption, logging, versioning, HTTPS-only, lifecycle rules |
+| **VPC**               | Flow logs, NACL association                               |
+| **KMS**               | Key rotation, CMK enabled state                           |
+| **ActionTrail**       | Enabled, multi-region, active logging, OSS bucket public access |
+| **SLB**               | HTTPS listeners, access logs                              |
+| **WAF**               | Instance active, protected domains                        |
+| **Security Center**   | Enabled, advanced edition, agents installed, notifications, vulnerability scanning |
+| **ACK (Kubernetes)**  | Log service, cloud monitor, RBAC, basic auth, network policy, private cluster |
+| **SLS (Log Service)** | 13 monitoring alert categories (CIS 2.10-2.22), log retention |
+
+**Required credentials**: `access_key_id`, `access_key_secret`
 
 ---
 
@@ -386,6 +459,35 @@ Query parameters: `severity`, `status`, `service`, `region`, `scan_id`, `limit`,
 | GET    | `/api/v1/saas/overview`                       | SaaS aggregate stats     |
 | GET    | `/api/v1/saas/findings/stats`                 | SaaS finding statistics  |
 
+### MITRE ATT&CK
+
+| Method | Endpoint                        | Description                       |
+|--------|---------------------------------|-----------------------------------|
+| GET    | `/api/v1/mitre/matrix`          | Get MITRE ATT&CK matrix with coverage |
+| GET    | `/api/v1/mitre/techniques`      | List techniques with findings     |
+
+### Reports
+
+| Method | Endpoint                               | Description                    |
+|--------|----------------------------------------|--------------------------------|
+| GET    | `/api/v1/reports/`                     | List generated reports         |
+| POST   | `/api/v1/reports/generate`             | Generate PDF report            |
+| GET    | `/api/v1/reports/{id}/download`        | Download report PDF            |
+
+### Inventory
+
+| Method | Endpoint                        | Description                       |
+|--------|---------------------------------|-----------------------------------|
+| GET    | `/api/v1/inventory/`            | List cloud resources              |
+| GET    | `/api/v1/inventory/summary`     | Resource summary by service/account |
+
+### Ransomware Readiness
+
+| Method | Endpoint                               | Description                    |
+|--------|----------------------------------------|--------------------------------|
+| GET    | `/api/v1/ransomware/assessment`        | Run ransomware readiness check |
+| GET    | `/api/v1/ransomware/score`             | Get readiness score and domains |
+
 ---
 
 ## Frontend Pages
@@ -396,10 +498,14 @@ Query parameters: `severity`, `status`, `service`, `region`, `scan_id`, `limit`,
 | **Sign Up**         | `/auth/sign-up`            | Account registration                           |
 | **Overview**        | `/darca/overview`          | Main dashboard with aggregate metrics          |
 | **Findings**        | `/darca/findings`          | Cloud findings browser with filters            |
-| **Compliance**      | `/darca/compliance`        | Compliance frameworks with progress rings      |
+| **Compliance**      | `/darca/compliance`        | Compliance frameworks with control-level library |
 | **Scans**           | `/darca/scans`             | Scan management (create, monitor, history)     |
-| **Cloud Providers** | `/darca/providers`         | Cloud provider management (AWS/Azure/GCP/K8s)  |
+| **Cloud Providers** | `/darca/providers`         | Cloud provider management (AWS/Azure/GCP/OCI/Alibaba/K8s) |
 | **SaaS Security**   | `/darca/saas-security`     | SaaS hub: overview, connections, findings      |
+| **MITRE ATT&CK**   | `/darca/mitre-attack`      | MITRE ATT&CK matrix and technique analysis     |
+| **Ransomware**      | `/darca/ransomware`        | Ransomware readiness assessment dashboard      |
+| **Reports**         | `/darca/reports`           | PDF report generation (executive/technical)    |
+| **Inventory**       | `/darca/inventory`         | Cloud resource inventory and account summary   |
 
 ### Color Palette
 
@@ -417,20 +523,31 @@ Query parameters: `severity`, `status`, `service`, `region`, `scan_id`, `limit`,
 
 ## Compliance Frameworks
 
-D-ARCA maps security checks to the following compliance frameworks:
+D-ARCA maps security checks to compliance frameworks at the **control level** — each framework defines theoretical controls (the actual standard's requirements) with mapped check IDs per cloud provider.
 
-| Framework       | Full Name                                              | Coverage          |
-|-----------------|--------------------------------------------------------|-------------------|
-| CIS-AWS-1.5     | CIS Amazon Web Services Foundations Benchmark v1.5     | 23 checks         |
-| CIS-Azure-2.0   | CIS Microsoft Azure Foundations Benchmark v2.0         | 15 checks         |
-| CIS-GCP-2.0     | CIS Google Cloud Platform Foundation Benchmark v2.0    | 11 checks         |
-| NIST-800-53     | NIST SP 800-53 Rev. 5                                  | All cloud checks  |
-| NIST-CSF        | NIST Cybersecurity Framework                           | All SaaS checks   |
-| ISO-27001       | ISO/IEC 27001:2022                                     | All SaaS checks   |
-| PCI-DSS-3.2.1   | Payment Card Industry Data Security Standard v3.2.1    | 12 checks         |
-| HIPAA           | HIPAA Security Rule                                    | 9 checks          |
-| SOC2            | SOC 2 Type II                                          | 6 checks          |
-| GDPR            | General Data Protection Regulation                     | 4 checks          |
+### CIS Benchmarks
+
+| Framework          | Full Name                                                      | Controls | Cloud     |
+|--------------------|----------------------------------------------------------------|----------|-----------|
+| CIS-AWS-1.5        | CIS Amazon Web Services Foundations Benchmark v1.5             | 30       | AWS       |
+| CIS-Azure-2.0      | CIS Microsoft Azure Foundations Benchmark v2.0                 | 20       | Azure     |
+| CIS-GCP-2.0        | CIS Google Cloud Platform Foundation Benchmark v2.0            | 15       | GCP       |
+| CIS-OCI-2.0        | CIS Oracle Cloud Infrastructure Foundations Benchmark v2.0     | 35       | OCI       |
+| CIS-OCI-3.1        | CIS Oracle Cloud Infrastructure Foundations Benchmark v3.1.0   | 50       | OCI       |
+| CIS-Alibaba-1.0    | CIS Alibaba Cloud Foundation Benchmark v1.0                    | 8        | Alibaba   |
+| CIS-Alibaba-2.0    | CIS Alibaba Cloud Foundation Benchmark v2.0.0                  | 85       | Alibaba   |
+
+### Regulatory & Industry Frameworks
+
+| Framework       | Full Name                                              | Controls | Scope           |
+|-----------------|--------------------------------------------------------|----------|-----------------|
+| PCI-DSS-3.2.1   | Payment Card Industry Data Security Standard v3.2.1    | 12       | Multi-cloud     |
+| HIPAA           | HIPAA Security Rule                                    | 9        | Multi-cloud     |
+| SOC2            | SOC 2 Type II (Trust Service Criteria)                 | 9        | Multi-cloud     |
+| GDPR            | General Data Protection Regulation                     | 7        | Multi-cloud     |
+| NIST-800-53     | NIST SP 800-53 Rev. 5                                  | 15       | Multi-cloud     |
+| NIST-CSF        | NIST Cybersecurity Framework                           | 5        | Multi-cloud     |
+| ISO-27001       | ISO/IEC 27001:2022 Annex A                             | 14       | Multi-cloud     |
 
 ---
 
@@ -486,11 +603,16 @@ ARCA/
 │   │   ├── providers.py              # CRUD cloud providers
 │   │   ├── scans.py                  # Create/list/get scans
 │   │   ├── findings.py               # List/filter/stats findings
-│   │   ├── compliance.py             # Frameworks & summary
+│   │   ├── compliance.py             # Frameworks, summary, control-level library
 │   │   ├── saas.py                   # SaaS connections, findings, overview
-│   │   └── dashboard.py              # Aggregate overview
+│   │   ├── dashboard.py              # Aggregate overview
+│   │   ├── reports.py                # PDF report generation (executive/technical)
+│   │   ├── mitre.py                  # MITRE ATT&CK matrix and technique mapping
+│   │   ├── inventory.py              # Cloud resource inventory
+│   │   └── ransomware.py             # Ransomware readiness assessment
 │   ├── services/                     # Business logic
-│   │   └── auth_service.py           # JWT, password hashing, encryption
+│   │   ├── auth_service.py           # JWT, password hashing, encryption
+│   │   └── report_service.py         # PDF report builder (ReportLab)
 │   └── tasks/                        # Celery background tasks
 │       ├── scan_tasks.py             # Cloud scan execution
 │       └── saas_tasks.py             # SaaS scan execution
@@ -500,11 +622,15 @@ ARCA/
 │   │   ├── cloud_scanner.py          # Scanner dispatcher
 │   │   ├── base_check.py             # CheckResult dataclass
 │   │   ├── aws/
-│   │   │   └── aws_scanner.py        # AWS checks (20 services)
+│   │   │   └── aws_scanner.py        # AWS checks (20 services, 50+ checks)
 │   │   ├── azure/
-│   │   │   └── azure_scanner.py      # Azure checks (8 services)
+│   │   │   └── azure_scanner.py      # Azure checks (8 services, 20+ checks)
 │   │   ├── gcp/
-│   │   │   └── gcp_scanner.py        # GCP checks (8 services)
+│   │   │   └── gcp_scanner.py        # GCP checks (8 services, 15+ checks)
+│   │   ├── oci/
+│   │   │   └── oci_scanner.py        # OCI checks (18 services, 60+ checks)
+│   │   ├── alibaba/
+│   │   │   └── alibaba_scanner.py    # Alibaba checks (12 services, 70+ checks)
 │   │   └── kubernetes/
 │   │       └── k8s_scanner.py        # K8s checks (4 categories)
 │   ├── saas/                         # SaaS application scanners
@@ -519,8 +645,11 @@ ARCA/
 │   │   │   └── salesforce_scanner.py # Salesforce checks (18)
 │   │   └── snowflake/
 │   │       └── snowflake_scanner.py  # Snowflake checks (21)
-│   └── compliance/
-│       └── frameworks.py             # Framework definitions & mappings
+│   ├── compliance/
+│   │   └── frameworks.py             # Framework definitions & control mappings (15+ frameworks)
+│   └── ransomware/                   # Ransomware readiness module
+│       ├── rules.py                  # 105 ransomware readiness rules
+│       └── scoring.py                # Scoring engine with domain weights
 │
 ├── ui/                               # Frontend (Next.js / React / Tailwind)
 │   ├── app/
@@ -534,10 +663,14 @@ ARCA/
 │   │       ├── layout.tsx            # Authenticated layout + sidebar
 │   │       ├── overview/page.tsx     # Main dashboard
 │   │       ├── findings/page.tsx     # Cloud findings browser
-│   │       ├── compliance/page.tsx   # Compliance frameworks
+│   │       ├── compliance/page.tsx   # Compliance frameworks + Check Library
 │   │       ├── scans/page.tsx        # Scan management
 │   │       ├── providers/page.tsx    # Cloud provider management
-│   │       └── saas-security/page.tsx# SaaS security hub
+│   │       ├── saas-security/page.tsx# SaaS security hub
+│   │       ├── mitre-attack/page.tsx # MITRE ATT&CK matrix analysis
+│   │       ├── ransomware/page.tsx   # Ransomware readiness dashboard
+│   │       ├── reports/page.tsx      # PDF report generation
+│   │       └── inventory/page.tsx    # Cloud resource inventory
 │   ├── components/
 │   │   ├── layout/
 │   │   │   ├── Sidebar.tsx           # Navigation sidebar
