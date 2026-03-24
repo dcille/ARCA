@@ -71,18 +71,21 @@ export default function Sidebar() {
   const pathname = usePathname()
   const { user, logout } = useAuthStore()
   const [unreadCount, setUnreadCount] = useState(0)
+  const [criticalCount, setCriticalCount] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
-    api.getNotificationCount()
-      .then(d => setUnreadCount(d.unread_count))
-      .catch(() => {})
-    const interval = setInterval(() => {
+    const fetchCounts = () => {
       api.getNotificationCount()
         .then(d => setUnreadCount(d.unread_count))
         .catch(() => {})
-    }, 30000)
+      api.getFindingsStats()
+        .then((d: any) => setCriticalCount(d?.severity_breakdown?.critical || 0))
+        .catch(() => {})
+    }
+    fetchCounts()
+    const interval = setInterval(fetchCounts, 30000)
     return () => clearInterval(interval)
   }, [])
 
@@ -135,7 +138,12 @@ export default function Sidebar() {
                     )}
                   >
                     <item.icon className="w-5 h-5 flex-shrink-0" />
-                    {!collapsed && <span>{item.name}</span>}
+                    {!collapsed && <span className="flex-1">{item.name}</span>}
+                    {!collapsed && item.name === 'Findings' && criticalCount > 0 && (
+                      <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-severity-critical text-white text-[10px] font-bold">
+                        {criticalCount > 99 ? '99+' : criticalCount}
+                      </span>
+                    )}
                   </Link>
                 )
               })}

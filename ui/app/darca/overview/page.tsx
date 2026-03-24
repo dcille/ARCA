@@ -6,7 +6,7 @@ import Header from '@/components/layout/Header'
 import StatCard from '@/components/ui/StatCard'
 import Badge from '@/components/ui/Badge'
 import { api } from '@/lib/api'
-import { formatDate, formatPercent } from '@/lib/utils'
+import { formatDate, formatPercent, getPassRateColor, getPassRateStroke } from '@/lib/utils'
 import {
   ShieldCheckIcon,
   CloudIcon,
@@ -17,14 +17,38 @@ import {
   ArrowTrendingUpIcon,
   ArrowRightIcon,
   ServerIcon,
+  PlusCircleIcon,
+  FireIcon,
 } from '@heroicons/react/24/outline'
 
-function SecurityScoreRing({ score }: { score: number }) {
+function SecurityScoreRing({ score, hasData }: { score: number; hasData: boolean }) {
   const radius = 54
   const circumference = 2 * Math.PI * radius
+
+  if (!hasData) {
+    return (
+      <div className="flex items-center gap-6">
+        <div className="relative w-36 h-36">
+          <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+            <circle cx="60" cy="60" r={radius} fill="none" stroke="#f0f0f0" strokeWidth="8" />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-2xl font-bold text-brand-gray-300">N/A</span>
+            <span className="text-[10px] text-brand-gray-300 font-medium uppercase">No Data</span>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <p className="text-sm text-brand-gray-400">
+            No scan data available yet. Configure a provider and run your first scan to see your security posture score.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   const offset = circumference - (score / 100) * circumference
-  const color = score >= 80 ? '#86BC25' : score >= 50 ? '#D97706' : '#DC2626'
-  const label = score >= 80 ? 'Good' : score >= 50 ? 'Fair' : 'Critical'
+  const color = getPassRateStroke(score)
+  const label = score >= 90 ? 'Good' : score >= 70 ? 'Fair' : score >= 50 ? 'Warning' : 'Critical'
 
   return (
     <div className="flex items-center gap-6">
@@ -49,9 +73,10 @@ function SecurityScoreRing({ score }: { score: number }) {
         </p>
         <div className="flex gap-3 mt-1">
           {[
-            { range: '80-100', label: 'Good', color: 'bg-status-pass' },
-            { range: '50-79', label: 'Fair', color: 'bg-amber-500' },
-            { range: '0-49', label: 'Critical', color: 'bg-status-fail' },
+            { range: '90-100', label: 'Good', color: 'bg-[#2E7D32]' },
+            { range: '70-89', label: 'Fair', color: 'bg-[#F9A825]' },
+            { range: '50-69', label: 'Warning', color: 'bg-[#E65100]' },
+            { range: '0-49', label: 'Critical', color: 'bg-[#C62828]' },
           ].map(({ range, label, color }) => (
             <span key={range} className="flex items-center gap-1.5 text-xs text-brand-gray-400">
               <span className={`w-2 h-2 rounded-full ${color}`} />
@@ -103,7 +128,59 @@ export default function OverviewPage() {
     )
   }
 
+  const hasProviders = providers.length > 0
+  const hasFindings = (data?.total_findings || 0) > 0
+  const hasData = hasProviders && (data?.total_scans || 0) > 0
   const severities = data?.severity_breakdown || {}
+
+  // Build top 5 risks from findings by severity
+  const topRisks: { service: string; severity: string; count: number }[] = []
+  if (data?.top_risks) {
+    topRisks.push(...data.top_risks.slice(0, 5))
+  } else if (data?.findings_by_service) {
+    // Fallback: use services with most findings
+    Object.entries(data.findings_by_service)
+      .sort(([, a]: any, [, b]: any) => b - a)
+      .slice(0, 5)
+      .forEach(([service, count]: any) => {
+        topRisks.push({ service, severity: 'high', count })
+      })
+  }
+
+  // Empty state: no providers configured
+  if (!hasProviders) {
+    return (
+      <div>
+        <Header title="Overview" subtitle="Security posture at a glance" />
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="w-20 h-20 rounded-full bg-brand-green/10 flex items-center justify-center mb-6">
+            <CloudIcon className="w-10 h-10 text-brand-green" />
+          </div>
+          <h2 className="text-xl font-semibold text-brand-navy mb-2">Welcome to D-ARCA</h2>
+          <p className="text-brand-gray-400 text-sm text-center max-w-md mb-6">
+            Get started by connecting your first cloud provider or SaaS application.
+            Once connected, you can run security scans and see your posture here.
+          </p>
+          <div className="flex gap-3">
+            <Link
+              href="/darca/providers"
+              className="btn-primary inline-flex items-center gap-2"
+            >
+              <PlusCircleIcon className="w-5 h-5" />
+              Add Cloud Provider
+            </Link>
+            <Link
+              href="/darca/saas-security"
+              className="btn-outline inline-flex items-center gap-2"
+            >
+              <GlobeAltIcon className="w-5 h-5" />
+              Connect SaaS
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -117,7 +194,12 @@ export default function OverviewPage() {
           { title: 'Total Scans', value: data?.total_scans || 0, icon: <ShieldCheckIcon className="w-6 h-6" /> },
           { title: 'Total Findings', value: data?.total_findings || 0, icon: <ExclamationTriangleIcon className="w-6 h-6" />, bg: 'bg-severity-medium/10 text-severity-medium' },
           { title: 'Attack Paths', value: attackSummary?.total_paths ?? 0, icon: <MapIcon className="w-6 h-6" />, color: (attackSummary?.total_paths ?? 0) > 0 ? 'text-severity-high' : 'text-status-pass', bg: (attackSummary?.total_paths ?? 0) > 0 ? 'bg-severity-high/10 text-severity-high' : 'bg-status-pass/10 text-status-pass' },
-          { title: 'Pass Rate', value: formatPercent(data?.pass_rate || 0), icon: <CheckCircleIcon className="w-6 h-6" />, color: (data?.pass_rate || 0) >= 80 ? 'text-status-pass' : (data?.pass_rate || 0) >= 50 ? 'text-status-pending' : 'text-status-fail' },
+          {
+            title: 'Pass Rate',
+            value: hasData ? formatPercent(data?.pass_rate || 0) : 'N/A',
+            icon: <CheckCircleIcon className="w-6 h-6" />,
+            color: hasData ? getPassRateColor(data?.pass_rate || 0) : 'text-brand-gray-300',
+          },
         ].map((stat, i) => (
           <div key={stat.title} className={`animate-fade-in stagger-${i + 1}`} style={{ opacity: 0 }}>
             <StatCard
@@ -133,12 +215,10 @@ export default function OverviewPage() {
 
       {/* Security Score + Severity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {data && (
-          <div className="card-static animate-fade-in" style={{ animationDelay: '0.15s', opacity: 0 }}>
-            <h3 className="text-lg font-semibold text-brand-navy mb-4">Security Posture Score</h3>
-            <SecurityScoreRing score={data.pass_rate || 0} />
-          </div>
-        )}
+        <div className="card-static animate-fade-in" style={{ animationDelay: '0.15s', opacity: 0 }}>
+          <h3 className="text-lg font-semibold text-brand-navy mb-4">Security Posture Score</h3>
+          <SecurityScoreRing score={data?.pass_rate || 0} hasData={hasData} />
+        </div>
 
         <div className="card-static animate-fade-in" style={{ animationDelay: '0.2s', opacity: 0 }}>
           <div className="flex items-center justify-between mb-4">
@@ -147,41 +227,85 @@ export default function OverviewPage() {
               View all <ArrowRightIcon className="w-3 h-3" />
             </Link>
           </div>
-          <div className="space-y-3">
-            {['critical', 'high', 'medium', 'low', 'informational'].map((sev) => {
-              const count = severities[sev] || 0
-              const total = data?.total_findings || 1
-              const pct = (count / total) * 100
+          {hasFindings ? (
+            <div className="space-y-3">
+              {['critical', 'high', 'medium', 'low', 'informational'].map((sev) => {
+                const count = severities[sev] || 0
+                const total = data?.total_findings || 1
+                const pct = (count / total) * 100
 
-              return (
-                <div key={sev} className="flex items-center gap-3">
-                  <Badge type="severity" value={sev} className="w-28 justify-center" />
-                  <div className="flex-1">
-                    <div className="w-full bg-brand-gray-100 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full transition-all duration-700 ease-out ${
-                          sev === 'critical' ? 'bg-severity-critical' :
-                          sev === 'high' ? 'bg-severity-high' :
-                          sev === 'medium' ? 'bg-severity-medium' :
-                          sev === 'low' ? 'bg-severity-low' :
-                          'bg-severity-informational'
-                        }`}
-                        style={{ width: `${Math.max(pct, 1)}%` }}
-                      />
+                return (
+                  <div key={sev} className="flex items-center gap-3">
+                    <Badge type="severity" value={sev} className="w-28 justify-center" />
+                    <div className="flex-1">
+                      <div className="w-full bg-brand-gray-100 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-700 ease-out ${
+                            sev === 'critical' ? 'bg-severity-critical' :
+                            sev === 'high' ? 'bg-severity-high' :
+                            sev === 'medium' ? 'bg-severity-medium' :
+                            sev === 'low' ? 'bg-severity-low' :
+                            'bg-severity-informational'
+                          }`}
+                          style={{ width: `${Math.max(pct, 1)}%` }}
+                        />
+                      </div>
                     </div>
+                    <span className="text-sm font-semibold text-brand-gray-600 w-12 text-right tabular-nums">
+                      {count}
+                    </span>
                   </div>
-                  <span className="text-sm font-semibold text-brand-gray-600 w-12 text-right tabular-nums">
-                    {count}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="py-8 text-center">
+              <ShieldCheckIcon className="w-10 h-10 text-brand-gray-200 mx-auto mb-2" />
+              <p className="text-sm text-brand-gray-400">No findings yet. Run a scan to see severity breakdown.</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Services + Attack Paths */}
+      {/* Top 5 Risks + Services + Attack Paths */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Top 5 Risks */}
+        <div className="card-static animate-fade-in" style={{ animationDelay: '0.22s', opacity: 0 }}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <FireIcon className="w-5 h-5 text-severity-critical" />
+              <h3 className="text-lg font-semibold text-brand-navy">Top Risks</h3>
+            </div>
+            <Link href="/darca/findings?status=FAIL" className="text-xs text-brand-green hover:underline flex items-center gap-1">
+              View all <ArrowRightIcon className="w-3 h-3" />
+            </Link>
+          </div>
+          {topRisks.length > 0 ? (
+            <div className="space-y-2">
+              {topRisks.map((risk, i) => (
+                <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-brand-gray-50 border border-brand-gray-100">
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+                    i === 0 ? 'bg-severity-critical' : i === 1 ? 'bg-severity-high' : 'bg-severity-medium'
+                  }`}>
+                    {i + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-brand-navy truncate">{risk.service}</p>
+                  </div>
+                  <span className="text-sm font-bold text-brand-navy tabular-nums">{risk.count}</span>
+                  <span className="text-[10px] text-brand-gray-400">findings</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-8 text-center">
+              <CheckCircleIcon className="w-10 h-10 text-status-pass mx-auto mb-2" />
+              <p className="text-sm text-brand-gray-400">No risks detected. Great job!</p>
+            </div>
+          )}
+        </div>
+
+        {/* Top Services by Findings */}
         <div className="card-static animate-fade-in" style={{ animationDelay: '0.25s', opacity: 0 }}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-brand-navy">Top Services by Findings</h3>
@@ -214,41 +338,45 @@ export default function OverviewPage() {
                 })}
             </div>
           ) : (
-            <p className="text-brand-gray-400 text-sm">No findings yet. Run a scan to get started.</p>
+            <div className="py-8 text-center">
+              <ServerIcon className="w-10 h-10 text-brand-gray-200 mx-auto mb-2" />
+              <p className="text-brand-gray-400 text-sm">No findings yet. Run a scan to get started.</p>
+            </div>
           )}
         </div>
-
-        {attackSummary && (attackSummary.total_paths > 0) && (
-          <div className="card-static animate-fade-in" style={{ animationDelay: '0.3s', opacity: 0 }}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-brand-navy">Attack Paths by Severity</h3>
-              <Link href="/darca/attack-paths" className="text-xs text-brand-green hover:underline flex items-center gap-1">
-                View all <ArrowRightIcon className="w-3 h-3" />
-              </Link>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { key: 'critical', field: 'critical_paths' },
-                { key: 'high', field: 'high_paths' },
-                { key: 'medium', field: 'medium_paths' },
-                { key: 'low', field: 'low_paths' },
-              ].map(({ key, field }) => {
-                const count = attackSummary[field] || 0
-                return (
-                  <div key={key} className="text-center p-4 rounded-xl bg-brand-gray-50 border border-brand-gray-100">
-                    <p className={`text-3xl font-bold tabular-nums ${
-                      key === 'critical' ? 'text-severity-critical' :
-                      key === 'high' ? 'text-severity-high' :
-                      key === 'medium' ? 'text-severity-medium' : 'text-severity-low'
-                    }`}>{count}</p>
-                    <p className="text-xs text-brand-gray-400 uppercase font-semibold mt-1">{key}</p>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Attack Paths */}
+      {attackSummary && (attackSummary.total_paths > 0) && (
+        <div className="card-static mb-8 animate-fade-in" style={{ animationDelay: '0.3s', opacity: 0 }}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-brand-navy">Attack Paths by Severity</h3>
+            <Link href="/darca/attack-paths" className="text-xs text-brand-green hover:underline flex items-center gap-1">
+              View all <ArrowRightIcon className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { key: 'critical', field: 'critical_paths' },
+              { key: 'high', field: 'high_paths' },
+              { key: 'medium', field: 'medium_paths' },
+              { key: 'low', field: 'low_paths' },
+            ].map(({ key, field }) => {
+              const count = attackSummary[field] || 0
+              return (
+                <div key={key} className="text-center p-4 rounded-xl bg-brand-gray-50 border border-brand-gray-100">
+                  <p className={`text-3xl font-bold tabular-nums ${
+                    key === 'critical' ? 'text-severity-critical' :
+                    key === 'high' ? 'text-severity-high' :
+                    key === 'medium' ? 'text-severity-medium' : 'text-severity-low'
+                  }`}>{count}</p>
+                  <p className="text-xs text-brand-gray-400 uppercase font-semibold mt-1">{key}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Pass Rate Trend */}
       {trends?.scan_history && trends.scan_history.length > 1 && (
@@ -263,7 +391,7 @@ export default function OverviewPage() {
           <div className="flex items-end gap-[3px] h-40">
             {trends.scan_history.map((s: any, i: number) => {
               const rate = s.pass_rate || 0
-              const barColor = rate >= 80 ? 'bg-status-pass' : rate >= 50 ? 'bg-amber-400' : 'bg-status-fail'
+              const barColor = rate >= 90 ? 'bg-[#2E7D32]' : rate >= 70 ? 'bg-[#F9A825]' : rate >= 50 ? 'bg-[#E65100]' : 'bg-[#C62828]'
               return (
                 <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative" title={`${s.date}: ${rate}% (${s.passed}/${s.total_checks})`}>
                   <span className="text-[9px] text-brand-gray-400 opacity-0 group-hover:opacity-100 transition-opacity font-medium">
@@ -283,9 +411,10 @@ export default function OverviewPage() {
             })}
           </div>
           <div className="flex items-center justify-end mt-3 gap-4 text-xs text-brand-gray-400">
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-status-pass" /> &ge;80%</span>
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400" /> 50-79%</span>
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-status-fail" /> &lt;50%</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#2E7D32]" /> &ge;90%</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#F9A825]" /> 70-89%</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#E65100]" /> 50-69%</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#C62828]" /> &lt;50%</span>
           </div>
         </div>
       )}

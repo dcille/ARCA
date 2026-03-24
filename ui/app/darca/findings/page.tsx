@@ -4,7 +4,7 @@ import { Fragment, useEffect, useState, useMemo, useRef } from 'react'
 import Header from '@/components/layout/Header'
 import Badge from '@/components/ui/Badge'
 import { api } from '@/lib/api'
-import { formatDate } from '@/lib/utils'
+import { formatDate, getPassRateColor } from '@/lib/utils'
 
 const PROVIDER_LABELS: Record<string, { label: string; color: string }> = {
   aws: { label: 'AWS', color: 'bg-amber-100 text-amber-800' },
@@ -380,7 +380,8 @@ export default function FindingsPage() {
   const [findings, setFindings] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [filters, setFilters] = useState({ severity: '', status: '', service: '' })
+  const [filters, setFilters] = useState({ severity: '', status: '', service: '', provider_type: '' })
+  const [exporting, setExporting] = useState(false)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
   const toggleRow = (id: string) => {
@@ -402,6 +403,7 @@ export default function FindingsPage() {
       if (filters.severity) params.severity = filters.severity
       if (filters.status) params.status = filters.status
       if (filters.service) params.service = filters.service
+      if (filters.provider_type) params.provider_type = filters.provider_type
       const [data, statsData] = await Promise.all([
         api.getFindings(params),
         api.getFindingsStats(),
@@ -426,7 +428,7 @@ export default function FindingsPage() {
       />
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-6">
+      <div className="flex flex-wrap items-center gap-3 mb-6">
         <select
           value={filters.severity}
           onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
@@ -450,6 +452,17 @@ export default function FindingsPage() {
           <option value="FAIL">FAIL</option>
         </select>
 
+        <select
+          value={filters.provider_type}
+          onChange={(e) => setFilters({ ...filters, provider_type: e.target.value })}
+          className="select-field"
+        >
+          <option value="">All Providers</option>
+          {Object.entries(PROVIDER_LABELS).map(([key, { label }]) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
+        </select>
+
         <input
           type="text"
           placeholder="Filter by service..."
@@ -457,6 +470,23 @@ export default function FindingsPage() {
           onChange={(e) => setFilters({ ...filters, service: e.target.value })}
           className="input-field w-48"
         />
+
+        <div className="ml-auto flex gap-2">
+          <button
+            onClick={async () => {
+              setExporting(true)
+              try { await api.exportFindings('csv', filters as any) } catch (e) { console.error(e) }
+              setExporting(false)
+            }}
+            disabled={exporting}
+            className="inline-flex items-center gap-1.5 px-3 py-2 border border-brand-gray-300 rounded-lg text-sm font-medium text-brand-gray-700 hover:bg-brand-gray-50 disabled:opacity-50"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </button>
+        </div>
       </div>
 
       {/* Stats Summary */}
@@ -468,10 +498,7 @@ export default function FindingsPage() {
           </div>
           <div className="bg-white rounded-lg border border-brand-gray-200 px-4 py-3">
             <p className="text-xs text-brand-gray-400 uppercase font-semibold">Pass Rate</p>
-            <p className={`text-2xl font-bold ${
-              stats.pass_rate >= 80 ? 'text-status-pass' :
-              stats.pass_rate >= 50 ? 'text-amber-500' : 'text-status-fail'
-            }`}>{stats.pass_rate}%</p>
+            <p className={`text-2xl font-bold ${getPassRateColor(stats.pass_rate)}`}>{stats.pass_rate}%</p>
           </div>
           {['critical', 'high', 'medium', 'low'].map((sev) => (
             <div key={sev} className="bg-white rounded-lg border border-brand-gray-200 px-4 py-3">

@@ -70,3 +70,25 @@ export function formatDate(date: string | null): string {
 export function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`
 }
+
+/** Dynamic color classes based on pass rate thresholds */
+export function getPassRateColor(rate: number): string {
+  if (rate >= 90) return 'text-[#2E7D32]'
+  if (rate >= 70) return 'text-[#F9A825]'
+  if (rate >= 50) return 'text-[#E65100]'
+  return 'text-[#C62828]'
+}
+
+export function getPassRateBg(rate: number): string {
+  if (rate >= 90) return 'bg-[#2E7D32]'
+  if (rate >= 70) return 'bg-[#F9A825]'
+  if (rate >= 50) return 'bg-[#E65100]'
+  return 'bg-[#C62828]'
+}
+
+export function getPassRateStroke(rate: number): string {
+  if (rate >= 90) return '#2E7D32'
+  if (rate >= 70) return '#F9A825'
+  if (rate >= 50) return '#E65100'
+  return '#C62828'
+}
