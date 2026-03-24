@@ -67,6 +67,19 @@ DATA_STORE_TYPES = {
         {"service": "kms", "label": "Cloud KMS", "type": "key_management"},
         {"service": "dataproc", "label": "Dataproc", "type": "data_processing"},
     ],
+    "oci": [
+        {"service": "oci_objectstorage", "label": "OCI Object Storage", "type": "object_storage"},
+        {"service": "oci_autonomous_db", "label": "OCI Autonomous Database", "type": "relational_db"},
+        {"service": "oci_mysql", "label": "OCI MySQL HeatWave", "type": "relational_db"},
+        {"service": "oci_filestorage", "label": "OCI File Storage", "type": "file_storage"},
+        {"service": "oci_blockvolume", "label": "OCI Block Volume", "type": "block_storage"},
+        {"service": "oci_vault", "label": "OCI Vault", "type": "key_management"},
+    ],
+    "alibaba": [
+        {"service": "ali_oss", "label": "Alibaba OSS", "type": "object_storage"},
+        {"service": "ali_rds", "label": "Alibaba RDS", "type": "relational_db"},
+        {"service": "ali_kms", "label": "Alibaba KMS", "type": "key_management"},
+    ],
 }
 
 
@@ -361,6 +374,52 @@ PROVIDER_DATA_CHECK_MAPPING: dict[str, dict] = {
     "gcp_firestore_cmek": {"category": "encryption", "data_store": "firestore", "provider": "gcp"},
     # Secret Manager
     "gcp_secretmanager_rotation": {"category": "access", "data_store": "secretmanager", "provider": "gcp"},
+
+    # ── OCI Data Checks ──────────────────────────────────────────
+    # Object Storage
+    "oci_objectstorage_bucket_public_access": {"category": "access", "data_store": "oci_objectstorage", "provider": "oci"},
+    "oci_objectstorage_bucket_cmk_encryption": {"category": "encryption", "data_store": "oci_objectstorage", "provider": "oci"},
+    "oci_objectstorage_bucket_versioning": {"category": "retention", "data_store": "oci_objectstorage", "provider": "oci"},
+    "oci_objectstorage_bucket_emit_events": {"category": "logging", "data_store": "oci_objectstorage", "provider": "oci"},
+    # Autonomous Database
+    "oci_db_autonomous_cmk_encryption": {"category": "encryption", "data_store": "oci_autonomous_db", "provider": "oci"},
+    "oci_db_autonomous_private_endpoint": {"category": "access", "data_store": "oci_autonomous_db", "provider": "oci"},
+    "oci_db_system_backup_enabled": {"category": "backup", "data_store": "oci_autonomous_db", "provider": "oci"},
+    # MySQL HeatWave
+    "oci_mysql_backup_enabled": {"category": "backup", "data_store": "oci_mysql", "provider": "oci"},
+    "oci_mysql_pitr_enabled": {"category": "backup", "data_store": "oci_mysql", "provider": "oci"},
+    "oci_mysql_crash_recovery": {"category": "backup", "data_store": "oci_mysql", "provider": "oci"},
+    "oci_mysql_deletion_protection": {"category": "backup", "data_store": "oci_mysql", "provider": "oci"},
+    "oci_mysql_high_availability": {"category": "backup", "data_store": "oci_mysql", "provider": "oci"},
+    # File Storage
+    "oci_filestorage_cmk_encryption": {"category": "encryption", "data_store": "oci_filestorage", "provider": "oci"},
+    "oci_filestorage_mount_target_nsg": {"category": "access", "data_store": "oci_filestorage", "provider": "oci"},
+    "oci_filestorage_export_privileged_port": {"category": "access", "data_store": "oci_filestorage", "provider": "oci"},
+    # Block Volume
+    "oci_storage_volume_cmk_encryption": {"category": "encryption", "data_store": "oci_blockvolume", "provider": "oci"},
+    "oci_storage_boot_volume_cmk_encryption": {"category": "encryption", "data_store": "oci_blockvolume", "provider": "oci"},
+    # Vault
+    "oci_vault_private_type": {"category": "access", "data_store": "oci_vault", "provider": "oci"},
+    "oci_vault_key_rotation": {"category": "encryption", "data_store": "oci_vault", "provider": "oci"},
+
+    # ── Alibaba Data Checks ──────────────────────────────────────
+    # OSS (Object Storage Service)
+    "ali_oss_no_public_access": {"category": "access", "data_store": "ali_oss", "provider": "alibaba"},
+    "ali_oss_encryption_enabled": {"category": "encryption", "data_store": "ali_oss", "provider": "alibaba"},
+    "ali_oss_logging_enabled": {"category": "logging", "data_store": "ali_oss", "provider": "alibaba"},
+    "ali_oss_versioning_enabled": {"category": "retention", "data_store": "ali_oss", "provider": "alibaba"},
+    "ali_oss_https_only": {"category": "encryption", "data_store": "ali_oss", "provider": "alibaba"},
+    "ali_oss_lifecycle_configured": {"category": "retention", "data_store": "ali_oss", "provider": "alibaba"},
+    # RDS
+    "ali_rds_no_public_access": {"category": "access", "data_store": "ali_rds", "provider": "alibaba"},
+    "ali_rds_encryption_enabled": {"category": "encryption", "data_store": "ali_rds", "provider": "alibaba"},
+    "ali_rds_backup_retention": {"category": "backup", "data_store": "ali_rds", "provider": "alibaba"},
+    "ali_rds_ssl_enabled": {"category": "encryption", "data_store": "ali_rds", "provider": "alibaba"},
+    "ali_rds_not_open_world": {"category": "access", "data_store": "ali_rds", "provider": "alibaba"},
+    "ali_rds_audit_enabled": {"category": "logging", "data_store": "ali_rds", "provider": "alibaba"},
+    # KMS
+    "ali_kms_key_rotation": {"category": "encryption", "data_store": "ali_kms", "provider": "alibaba"},
+    "ali_kms_cmk_enabled": {"category": "encryption", "data_store": "ali_kms", "provider": "alibaba"},
 }
 
 
