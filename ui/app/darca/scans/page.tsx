@@ -12,7 +12,26 @@ import {
   TrashIcon,
   PauseCircleIcon,
   PlayCircleIcon,
+  PauseIcon,
+  PlayIcon,
+  PencilIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline'
+
+interface Schedule {
+  id: string
+  name: string
+  scan_type: string
+  frequency: string
+  enabled: boolean
+  provider_id: string | null
+  connection_id: string | null
+  services: string[] | null
+  regions: string[] | null
+  last_run_at: string | null
+  next_run_at: string | null
+  created_at: string
+}
 
 export default function ScansPage() {
   const [scans, setScans] = useState<any[]>([])
@@ -20,16 +39,25 @@ export default function ScansPage() {
   const [providers, setProviders] = useState<any[]>([])
   const [connections, setConnections] = useState<any[]>([])
   const [showModal, setShowModal] = useState(false)
-  const [showScheduleModal, setShowScheduleModal] = useState(false)
-  const [schedules, setSchedules] = useState<any[]>([])
+  const [schedules, setSchedules] = useState<Schedule[]>([])
   const [scanType, setScanType] = useState('cloud')
   const [selectedProvider, setSelectedProvider] = useState('')
   const [selectedConnection, setSelectedConnection] = useState('')
-  const [scheduleName, setScheduleName] = useState('')
-  const [scheduleFrequency, setScheduleFrequency] = useState('daily')
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Schedule form state
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [editScheduleId, setEditScheduleId] = useState<string | null>(null)
+  const [scheduleForm, setScheduleForm] = useState({
+    name: '',
+    scan_type: 'cloud',
+    frequency: 'daily',
+    provider_id: '',
+    services: '',
+    regions: '',
+  })
 
   const hasActiveScans = useCallback(
     (scanList: any[]) => scanList.some((s) => s.status === 'pending' || s.status === 'running'),
@@ -92,6 +120,94 @@ export default function ScansPage() {
     } catch (err: any) {
       toast.error(err.message || 'Failed to start scan')
     }
+  }
+
+  // Schedule handlers
+  const resetScheduleForm = () => {
+    setScheduleForm({ name: '', scan_type: 'cloud', frequency: 'daily', provider_id: '', services: '', regions: '' })
+    setShowScheduleModal(false)
+    setEditScheduleId(null)
+  }
+
+  const handleCreateSchedule = async () => {
+    try {
+      const payload: any = {
+        name: scheduleForm.name,
+        scan_type: scheduleForm.scan_type,
+        frequency: scheduleForm.frequency,
+      }
+      if (scheduleForm.provider_id) payload.provider_id = scheduleForm.provider_id
+      if (scheduleForm.services.trim()) payload.services = scheduleForm.services.split(',').map(s => s.trim()).filter(Boolean)
+      if (scheduleForm.regions.trim()) payload.regions = scheduleForm.regions.split(',').map(s => s.trim()).filter(Boolean)
+
+      await api.createSchedule(payload)
+      toast.success('Schedule created')
+      resetScheduleForm()
+      loadData()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create schedule')
+    }
+  }
+
+  const handleUpdateSchedule = async () => {
+    if (!editScheduleId) return
+    try {
+      const payload: any = { name: scheduleForm.name, frequency: scheduleForm.frequency }
+      if (scheduleForm.services.trim()) payload.services = scheduleForm.services.split(',').map(s => s.trim()).filter(Boolean)
+      if (scheduleForm.regions.trim()) payload.regions = scheduleForm.regions.split(',').map(s => s.trim()).filter(Boolean)
+      await api.updateSchedule(editScheduleId, payload)
+      toast.success('Schedule updated')
+      resetScheduleForm()
+      loadData()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update schedule')
+    }
+  }
+
+  const handleToggleSchedule = async (s: Schedule) => {
+    try {
+      await api.updateSchedule(s.id, { enabled: !s.enabled })
+      toast.success(s.enabled ? 'Schedule paused' : 'Schedule enabled')
+      loadData()
+    } catch (err: any) {
+      toast.error(err.message)
+    }
+  }
+
+  const handleDeleteSchedule = async (id: string) => {
+    if (!confirm('Delete this schedule?')) return
+    try {
+      await api.deleteSchedule(id)
+      toast.success('Schedule deleted')
+      loadData()
+    } catch (err: any) {
+      toast.error(err.message)
+    }
+  }
+
+  const startEditSchedule = (s: Schedule) => {
+    setEditScheduleId(s.id)
+    setScheduleForm({
+      name: s.name,
+      scan_type: s.scan_type,
+      frequency: s.frequency,
+      provider_id: s.provider_id || '',
+      services: s.services?.join(', ') || '',
+      regions: s.regions?.join(', ') || '',
+    })
+    setShowScheduleModal(true)
+  }
+
+  const freqLabel: Record<string, string> = {
+    daily: 'Daily',
+    weekly: 'Weekly',
+    monthly: 'Monthly',
+  }
+
+  const freqColor: Record<string, string> = {
+    daily: 'bg-blue-100 text-blue-700',
+    weekly: 'bg-purple-100 text-purple-700',
+    monthly: 'bg-amber-100 text-amber-700',
   }
 
   const columns = [
@@ -222,140 +338,203 @@ export default function ScansPage() {
             Scheduled Scans
           </h3>
           <button
-            onClick={() => setShowScheduleModal(true)}
-            className="px-3 py-1.5 text-sm font-medium text-brand-green border border-brand-green rounded-lg hover:bg-brand-green/5 transition-colors"
+            onClick={() => { resetScheduleForm(); setShowScheduleModal(true) }}
+            className="btn-primary flex items-center gap-2 text-sm"
           >
-            Add Schedule
+            <PlusIcon className="w-4 h-4" />
+            New Schedule
           </button>
         </div>
 
+        {/* Schedule Stats */}
+        {schedules.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="card text-center">
+              <p className="text-2xl font-bold text-brand-navy">{schedules.length}</p>
+              <p className="text-xs text-brand-gray-400 uppercase font-semibold mt-1">Total Schedules</p>
+            </div>
+            <div className="card text-center">
+              <p className="text-2xl font-bold text-brand-green">{schedules.filter(s => s.enabled).length}</p>
+              <p className="text-xs text-brand-gray-400 uppercase font-semibold mt-1">Active</p>
+            </div>
+            <div className="card text-center">
+              <p className="text-2xl font-bold text-brand-gray-400">{schedules.filter(s => !s.enabled).length}</p>
+              <p className="text-xs text-brand-gray-400 uppercase font-semibold mt-1">Paused</p>
+            </div>
+            <div className="card text-center">
+              <p className="text-2xl font-bold text-blue-600">{schedules.filter(s => s.frequency === 'daily').length}</p>
+              <p className="text-xs text-brand-gray-400 uppercase font-semibold mt-1">Daily Scans</p>
+            </div>
+          </div>
+        )}
+
+        {/* Schedule List */}
         {schedules.length > 0 ? (
           <div className="space-y-3">
-            {schedules.map((sch: any) => (
-              <div key={sch.id} className="card flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    'w-3 h-3 rounded-full',
-                    sch.enabled ? 'bg-brand-green' : 'bg-brand-gray-300'
-                  )} />
-                  <div>
-                    <p className="text-sm font-medium text-brand-navy">{sch.name}</p>
-                    <p className="text-xs text-brand-gray-400">
-                      {sch.scan_type === 'cloud' ? 'Cloud' : 'SaaS'} &middot; {sch.frequency}
-                      {sch.next_run_at && ` · Next: ${formatDate(sch.next_run_at)}`}
-                    </p>
+            {schedules.map((s) => (
+              <div key={s.id} className={`card hover:shadow-md transition-shadow ${!s.enabled ? 'opacity-60' : ''}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-2.5 rounded-lg ${s.enabled ? 'bg-brand-green/10' : 'bg-brand-gray-100'}`}>
+                      <ClockIcon className={`w-5 h-5 ${s.enabled ? 'text-brand-green' : 'text-brand-gray-400'}`} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-semibold text-brand-navy">{s.name}</h4>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${freqColor[s.frequency] || 'bg-brand-gray-100 text-brand-gray-600'}`}>
+                          {freqLabel[s.frequency] || s.frequency}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-brand-gray-100 text-brand-gray-600">
+                          {s.scan_type === 'cloud' ? 'Cloud' : 'SaaS'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-xs text-brand-gray-400">
+                        {s.last_run_at && (
+                          <span>Last run: {new Date(s.last_run_at).toLocaleDateString()}</span>
+                        )}
+                        {s.next_run_at && (
+                          <span>Next run: {new Date(s.next_run_at).toLocaleDateString()}</span>
+                        )}
+                        {s.services && s.services.length > 0 && (
+                          <span>Services: {s.services.join(', ')}</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={async () => {
-                      try {
-                        await api.updateSchedule(sch.id, { enabled: !sch.enabled })
-                        toast.success(sch.enabled ? 'Schedule paused' : 'Schedule resumed')
-                        loadData()
-                      } catch (e: any) { toast.error(e.message) }
-                    }}
-                    className="p-1.5 rounded-lg hover:bg-brand-gray-100 text-brand-gray-400"
-                    title={sch.enabled ? 'Pause' : 'Resume'}
-                  >
-                    {sch.enabled ? <PauseCircleIcon className="w-5 h-5" /> : <PlayCircleIcon className="w-5 h-5" />}
-                  </button>
-                  <button
-                    onClick={async () => {
-                      try {
-                        await api.deleteSchedule(sch.id)
-                        toast.success('Schedule deleted')
-                        loadData()
-                      } catch (e: any) { toast.error(e.message) }
-                    }}
-                    className="p-1.5 rounded-lg hover:bg-red-50 text-brand-gray-400 hover:text-red-500"
-                    title="Delete"
-                  >
-                    <TrashIcon className="w-5 h-5" />
-                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleToggleSchedule(s)}
+                      className="p-2 rounded-lg hover:bg-brand-gray-100 text-brand-gray-400 hover:text-brand-navy transition-colors"
+                      title={s.enabled ? 'Pause' : 'Resume'}
+                    >
+                      {s.enabled ? <PauseIcon className="w-4 h-4" /> : <PlayIcon className="w-4 h-4" />}
+                    </button>
+                    <button
+                      onClick={() => startEditSchedule(s)}
+                      className="p-2 rounded-lg hover:bg-brand-gray-100 text-brand-gray-400 hover:text-brand-navy transition-colors"
+                      title="Edit"
+                    >
+                      <PencilIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteSchedule(s.id)}
+                      className="p-2 rounded-lg hover:bg-red-50 text-brand-gray-400 hover:text-red-500 transition-colors"
+                      title="Delete"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="card text-center py-8">
-            <ClockIcon className="w-10 h-10 mx-auto text-brand-gray-300 mb-2" />
-            <p className="text-sm text-brand-gray-400">No scheduled scans. Add one to automate your security assessments.</p>
+          <div className="card text-center py-16">
+            <ClockIcon className="w-12 h-12 text-brand-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-brand-navy mb-2">No Schedules Yet</h3>
+            <p className="text-brand-gray-400 mb-6">
+              Create automated schedules to run security scans on a recurring basis.
+            </p>
+            <button onClick={() => setShowScheduleModal(true)} className="btn-primary">
+              Create Your First Schedule
+            </button>
           </div>
         )}
       </div>
 
-      {/* Schedule Modal */}
+      {/* Schedule Create/Edit Modal */}
       {showScheduleModal && (
         <div className="modal-backdrop">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-brand-navy mb-4">Create Scan Schedule</h3>
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg">
+            <h3 className="text-lg font-semibold text-brand-navy mb-4">
+              {editScheduleId ? 'Edit Schedule' : 'Create Schedule'}
+            </h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Name</label>
+                <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Schedule Name</label>
                 <input
                   type="text"
-                  value={scheduleName}
-                  onChange={(e) => setScheduleName(e.target.value)}
-                  placeholder="e.g., Daily AWS Scan"
+                  value={scheduleForm.name}
+                  onChange={(e) => setScheduleForm({ ...scheduleForm, name: e.target.value })}
                   className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm"
+                  placeholder="e.g., Nightly AWS Scan"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Scan Type</label>
-                <div className="flex gap-3">
-                  <button onClick={() => setScanType('cloud')} className={`flex-1 py-2 px-4 rounded-lg border-2 text-sm font-medium transition-colors ${scanType === 'cloud' ? 'border-brand-green bg-brand-green/5 text-brand-green' : 'border-brand-gray-200 text-brand-gray-500'}`}>Cloud</button>
-                  <button onClick={() => setScanType('saas')} className={`flex-1 py-2 px-4 rounded-lg border-2 text-sm font-medium transition-colors ${scanType === 'saas' ? 'border-brand-teal bg-brand-teal/5 text-brand-teal' : 'border-brand-gray-200 text-brand-gray-500'}`}>SaaS</button>
-                </div>
-              </div>
-              {scanType === 'cloud' ? (
-                <div>
-                  <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Provider</label>
-                  <select value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm">
-                    <option value="">Select...</option>
-                    {providers.map((p) => <option key={p.id} value={p.id}>{p.alias} ({p.provider_type})</option>)}
-                  </select>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Connection</label>
-                  <select value={selectedConnection} onChange={(e) => setSelectedConnection(e.target.value)} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm">
-                    <option value="">Select...</option>
-                    {connections.map((c) => <option key={c.id} value={c.id}>{c.alias} ({c.provider_type})</option>)}
-                  </select>
-                </div>
+
+              {!editScheduleId && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Scan Type</label>
+                    <select
+                      value={scheduleForm.scan_type}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, scan_type: e.target.value })}
+                      className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="cloud">Cloud Infrastructure</option>
+                      <option value="saas">SaaS Applications</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Provider (optional)</label>
+                    <select
+                      value={scheduleForm.provider_id}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, provider_id: e.target.value })}
+                      className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="">All Providers</option>
+                      {providers.map(p => (
+                        <option key={p.id} value={p.id}>{p.alias} ({p.provider_type.toUpperCase()})</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
               )}
+
               <div>
                 <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Frequency</label>
-                <select value={scheduleFrequency} onChange={(e) => setScheduleFrequency(e.target.value)} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm">
+                <select
+                  value={scheduleForm.frequency}
+                  onChange={(e) => setScheduleForm({ ...scheduleForm, frequency: e.target.value })}
+                  className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm"
+                >
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
                   <option value="monthly">Monthly</option>
                 </select>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Services (comma-separated, optional)</label>
+                <input
+                  type="text"
+                  value={scheduleForm.services}
+                  onChange={(e) => setScheduleForm({ ...scheduleForm, services: e.target.value })}
+                  className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm"
+                  placeholder="e.g., iam, s3, ec2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Regions (comma-separated, optional)</label>
+                <input
+                  type="text"
+                  value={scheduleForm.regions}
+                  onChange={(e) => setScheduleForm({ ...scheduleForm, regions: e.target.value })}
+                  className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm"
+                  placeholder="e.g., us-east-1, eu-west-1"
+                />
+              </div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowScheduleModal(false)} className="flex-1 btn-outline">Cancel</button>
+              <button onClick={resetScheduleForm} className="flex-1 btn-outline">Cancel</button>
               <button
-                onClick={async () => {
-                  try {
-                    await api.createSchedule({
-                      name: scheduleName,
-                      scan_type: scanType,
-                      frequency: scheduleFrequency,
-                      provider_id: scanType === 'cloud' ? selectedProvider : undefined,
-                      connection_id: scanType === 'saas' ? selectedConnection : undefined,
-                    })
-                    toast.success('Schedule created!')
-                    setShowScheduleModal(false)
-                    setScheduleName('')
-                    loadData()
-                  } catch (e: any) { toast.error(e.message) }
-                }}
-                disabled={!scheduleName}
+                onClick={editScheduleId ? handleUpdateSchedule : handleCreateSchedule}
+                disabled={!scheduleForm.name}
                 className="flex-1 btn-primary disabled:opacity-50"
               >
-                Create Schedule
+                {editScheduleId ? 'Update' : 'Create'}
               </button>
             </div>
           </div>

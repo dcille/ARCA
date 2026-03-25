@@ -25,7 +25,6 @@ import {
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
   ShieldExclamationIcon,
-  ClockIcon,
   ClipboardDocumentListIcon,
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/auth'
@@ -62,7 +61,6 @@ const sections: NavSection[] = [
     label: 'Operations',
     items: [
       { name: 'Scans', href: '/darca/scans', icon: ShieldCheckIcon },
-      { name: 'Schedules', href: '/darca/schedules', icon: ClockIcon },
       { name: 'Notifications', href: '/darca/notifications', icon: BellIcon },
       { name: 'Reports', href: '/darca/reports', icon: DocumentArrowDownIcon },
       { name: 'Integrations', href: '/darca/integrations', icon: BoltIcon },
