@@ -23,8 +23,15 @@ function barColor(score: number): string {
 }
 
 export default function DomainCard({ id, name, score, weight, checks_passed, checks_failed, checks_warning = 0, critical_fails, nist_csf }: Props) {
-  const total = checks_passed + checks_failed
-  const pct = total > 0 ? Math.round((score / 100) * 100) : 0
+  const evaluated = checks_passed + checks_failed
+  const allWarning = evaluated === 0 && checks_warning > 0
+  const noData = evaluated === 0 && checks_warning === 0
+  const pct = Math.round((score / 100) * 100)
+
+  // Score color: gray when no real data
+  const scoreColor = noData || allWarning
+    ? 'text-brand-gray-400'
+    : score >= 70 ? 'text-emerald-600' : score >= 40 ? 'text-amber-600' : 'text-red-600'
 
   return (
     <Link
@@ -36,10 +43,21 @@ export default function DomainCard({ id, name, score, weight, checks_passed, che
           <p className="text-xs text-brand-gray-400 font-medium">{id} &middot; {nist_csf}</p>
           <p className="text-sm font-semibold text-brand-navy mt-0.5">{name}</p>
         </div>
-        <span className="text-2xl font-bold text-brand-navy tabular-nums">{Math.round(score)}</span>
+        <div className="text-right">
+          <span className={`text-2xl font-bold tabular-nums ${scoreColor}`}>{Math.round(score)}</span>
+          {allWarning && (
+            <p className="text-[10px] text-amber-600 font-medium">Sin datos</p>
+          )}
+          {noData && (
+            <p className="text-[10px] text-brand-gray-400 font-medium">Sin evaluar</p>
+          )}
+        </div>
       </div>
       <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
-        <div className={`h-2 rounded-full transition-all duration-700 ${barColor(score)}`} style={{ width: `${pct}%` }} />
+        <div
+          className={`h-2 rounded-full transition-all duration-700 ${allWarning || noData ? 'bg-gray-300' : barColor(score)}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
       <div className="flex items-center gap-3 text-xs text-brand-gray-400">
         <span className="text-emerald-600 font-medium">{checks_passed} passed</span>

@@ -96,14 +96,15 @@ def calculate_domain_score(
 
     total = len(evaluations)
     if total == 0:
+        # No rules at all for this domain — score is 0 (no data to evaluate)
         meta = DOMAIN_METADATA[domain]
         return DomainScoreDetail(
             domain=domain,
             name=meta["name"],
             weight=DOMAIN_WEIGHTS[domain],
-            base_score=100.0,
+            base_score=0.0,
             severity_adjustment=0.0,
-            final_score=100.0,
+            final_score=0.0,
             checks_total=0, checks_passed=0, checks_failed=0, checks_warning=0,
             critical_fails=0, high_fails=0, medium_fails=0, low_fails=0,
         )
@@ -117,10 +118,23 @@ def calculate_domain_score(
     med = sum(1 for e in evaluations if e.status == "fail" and e.severity == Severity.MEDIUM)
     low = sum(1 for e in evaluations if e.status == "fail" and e.severity == Severity.LOW)
 
-    # Base score: only count evaluated checks (pass + fail), exclude warnings
-    # Warnings mean checks couldn't be evaluated (no data) — they shouldn't penalize the score
+    # Base score calculation:
+    # - Warnings represent checks that couldn't be evaluated (no data / not run).
+    # - They should NOT grant a perfect score — inability to verify is a risk.
+    # - Include warnings in the denominator: they count as "not passing".
+    # - Only passed checks contribute positively.
     evaluated = passed + failed
-    base = (passed / evaluated) * 100 if evaluated > 0 else 100.0
+    all_checks = passed + failed + warning
+
+    if all_checks == 0:
+        base = 0.0
+    elif evaluated == 0:
+        # All checks are warnings (no actual pass/fail data) — score based on
+        # warning ratio to show this domain has no verified compliance
+        base = 0.0
+    else:
+        # Score = passed / all_checks (warnings count against the score)
+        base = (passed / all_checks) * 100
 
     adjustment = (
         crit * SEVERITY_PENALTY[Severity.CRITICAL]
