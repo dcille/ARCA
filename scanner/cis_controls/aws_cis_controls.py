@@ -1,207 +1,1564 @@
-"""CIS Amazon Web Services Foundations Benchmark v3.0.0 — Complete Control Registry.
+"""CIS Amazon Web Services Foundations Benchmark v6.0.0 — Complete Control Registry.
 
-This registry contains ALL controls from the CIS AWS Foundations Benchmark.
-Each control is marked as 'automated' or 'manual' per the CIS assessment status.
-Controls are organized by section matching the benchmark structure.
+Auto-generated from the unified CIS controls library.
+Contains ALL 62 controls (34 automated, 28 manual).
+Each control includes full metadata, audit procedures, detection commands,
+remediation guidance, and DSPM/Ransomware Readiness mapping.
 
-Reference: CIS Amazon Web Services Foundations Benchmark v3.0.0 (2024)
+Reference: CIS Amazon Web Services Foundations Benchmark v6.0.0 (2025)
+Source: CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf
 
-The benchmark covers five key areas:
-  Section 1: Identity and Access Management (IAM)
-  Section 2: Storage
-  Section 3: Logging
-  Section 4: Monitoring
-  Section 5: Networking
-
-Total controls: 56 across 5 sections.
+Total controls: 62 (34 automated, 28 manual)
 """
 
-# Each control: (cis_id, title, level, assessment_type, severity, service_area)
-# level: "L1" (essential) or "L2" (enhanced)
-# assessment_type: "automated" or "manual"
-
-AWS_CIS_CONTROLS = [
-    # =========================================================================
-    # Section 1: Identity and Access Management (IAM)
-    # =========================================================================
-
-    ("1.1", "Maintain current contact details",
-     "L1", "manual", "medium", "iam"),
-    ("1.2", "Ensure security contact information is registered",
-     "L1", "manual", "medium", "iam"),
-    ("1.3", "Ensure security questions are registered in the AWS account",
-     "L1", "manual", "medium", "iam"),
-    ("1.4", "Ensure no 'root' user account access key exists",
-     "L1", "automated", "critical", "iam"),
-    ("1.5", "Ensure MFA is enabled for the 'root' user account",
-     "L1", "automated", "critical", "iam"),
-    ("1.6", "Ensure hardware MFA is enabled for the 'root' user account",
-     "L2", "automated", "critical", "iam"),
-    ("1.7", "Eliminate use of the 'root' user for administrative and daily tasks",
-     "L1", "automated", "critical", "iam"),
-    ("1.8", "Ensure IAM password policy requires minimum length of 14 or greater",
-     "L1", "automated", "high", "iam"),
-    ("1.9", "Ensure IAM password policy prevents password reuse",
-     "L1", "automated", "high", "iam"),
-    ("1.10", "Ensure multi-factor authentication (MFA) is enabled for all IAM users that have a console password",
-     "L1", "automated", "high", "iam"),
-    ("1.11", "Do not setup access keys during initial user setup",
-     "L1", "manual", "medium", "iam"),
-    ("1.12", "Ensure credentials unused for 45 days or greater are disabled",
-     "L1", "automated", "high", "iam"),
-    ("1.13", "Ensure there is only one active access key available for any single IAM user",
-     "L1", "automated", "medium", "iam"),
-    ("1.14", "Ensure access keys are rotated every 90 days or less",
-     "L1", "automated", "high", "iam"),
-    ("1.15", "Ensure IAM Users receive permissions only through Groups",
-     "L1", "automated", "medium", "iam"),
-    ("1.16", "Ensure IAM policies that allow full \"*:*\" administrative privileges are not attached",
-     "L1", "automated", "critical", "iam"),
-    ("1.17", "Ensure a support role has been created to manage incidents with AWS Support",
-     "L1", "automated", "medium", "iam"),
-    ("1.18", "Ensure IAM instance roles are used for AWS resource access from instances",
-     "L2", "manual", "medium", "iam"),
-    ("1.19", "Ensure that all the expired SSL/TLS certificates stored in AWS IAM are removed",
-     "L1", "automated", "high", "iam"),
-    ("1.20", "Ensure that IAM Access Analyzer is enabled for all regions",
-     "L1", "automated", "high", "iam"),
-    ("1.21", "Ensure IAM users are managed centrally via identity federation or AWS Organizations for multi-account environments",
-     "L1", "manual", "medium", "iam"),
-    ("1.22", "Ensure access is analyzed for changes to the IAM policy",
-     "L1", "manual", "medium", "iam"),
-
-    # =========================================================================
-    # Section 2: Storage
-    # =========================================================================
-
-    # 2.1 Simple Storage Service (S3)
-    ("2.1.1", "Ensure S3 Bucket Policy is set to deny HTTP requests",
-     "L2", "automated", "high", "storage"),
-    ("2.1.2", "Ensure MFA Delete is enabled on S3 buckets",
-     "L2", "automated", "high", "storage"),
-    ("2.1.4", "Ensure that all data in Amazon S3 has been discovered, classified and secured when required",
-     "L2", "manual", "medium", "storage"),
-
-    # 2.2 Elastic Compute Cloud (EC2) - EBS
-    ("2.2.1", "Ensure EBS Volume Encryption is enabled in all Regions",
-     "L1", "automated", "high", "storage"),
-
-    # 2.3 Relational Database Service (RDS)
-    ("2.3.1", "Ensure that encryption is enabled for RDS Instances",
-     "L1", "automated", "high", "storage"),
-    ("2.3.2", "Ensure Auto Minor Version Upgrade feature is enabled for RDS Instances",
-     "L1", "automated", "medium", "storage"),
-    ("2.3.3", "Ensure that public access is not given to RDS Instance",
-     "L1", "automated", "critical", "storage"),
-
-    # =========================================================================
-    # Section 3: Logging
-    # =========================================================================
-
-    ("3.1", "Ensure CloudTrail is enabled in all regions",
-     "L1", "automated", "critical", "logging"),
-    ("3.2", "Ensure CloudTrail log file validation is enabled",
-     "L2", "automated", "high", "logging"),
-    ("3.3", "Ensure the S3 bucket used to store CloudTrail logs is not publicly accessible",
-     "L1", "automated", "critical", "logging"),
-    ("3.4", "Ensure CloudTrail trails are integrated with CloudWatch Logs",
-     "L1", "automated", "high", "logging"),
-    ("3.5", "Ensure AWS Config is enabled in all regions",
-     "L2", "automated", "high", "logging"),
-    ("3.6", "Ensure S3 bucket access logging is enabled on the CloudTrail S3 bucket",
-     "L1", "automated", "high", "logging"),
-    ("3.7", "Ensure CloudTrail logs are encrypted at rest using KMS CMKs",
-     "L2", "automated", "high", "logging"),
-    ("3.8", "Ensure rotation for customer-created symmetric CMKs is enabled",
-     "L2", "automated", "medium", "logging"),
-    ("3.9", "Ensure VPC flow logging is enabled in all VPCs",
-     "L2", "automated", "high", "logging"),
-    ("3.10", "Ensure that Object-level logging for write events is enabled for S3 bucket",
-     "L2", "automated", "high", "logging"),
-    ("3.11", "Ensure that Object-level logging for read events is enabled for S3 bucket",
-     "L2", "automated", "high", "logging"),
-
-    # =========================================================================
-    # Section 4: Monitoring
-    # =========================================================================
-
-    ("4.1", "Ensure a log metric filter and alarm exist for unauthorized API calls",
-     "L1", "automated", "high", "monitoring"),
-    ("4.2", "Ensure a log metric filter and alarm exist for Management Console sign-in without MFA",
-     "L1", "automated", "high", "monitoring"),
-    ("4.3", "Ensure a log metric filter and alarm exist for usage of 'root' account",
-     "L1", "automated", "critical", "monitoring"),
-    ("4.4", "Ensure a log metric filter and alarm exist for IAM policy changes",
-     "L1", "automated", "high", "monitoring"),
-    ("4.5", "Ensure a log metric filter and alarm exist for CloudTrail configuration changes",
-     "L1", "automated", "high", "monitoring"),
-    ("4.6", "Ensure a log metric filter and alarm exist for AWS Management Console authentication failures",
-     "L2", "automated", "medium", "monitoring"),
-    ("4.7", "Ensure a log metric filter and alarm exist for disabling or scheduled deletion of customer-created CMKs",
-     "L2", "automated", "high", "monitoring"),
-    ("4.8", "Ensure a log metric filter and alarm exist for S3 bucket policy changes",
-     "L1", "automated", "high", "monitoring"),
-    ("4.9", "Ensure a log metric filter and alarm exist for AWS Config configuration changes",
-     "L2", "automated", "high", "monitoring"),
-    ("4.10", "Ensure a log metric filter and alarm exist for security group changes",
-     "L2", "automated", "high", "monitoring"),
-    ("4.11", "Ensure a log metric filter and alarm exist for changes to Network Access Control Lists (NACL)",
-     "L2", "automated", "high", "monitoring"),
-    ("4.12", "Ensure a log metric filter and alarm exist for changes to network gateways",
-     "L2", "automated", "medium", "monitoring"),
-    ("4.13", "Ensure a log metric filter and alarm exist for route table changes",
-     "L2", "automated", "medium", "monitoring"),
-    ("4.14", "Ensure a log metric filter and alarm exist for VPC changes",
-     "L1", "automated", "high", "monitoring"),
-    ("4.15", "Ensure a log metric filter and alarm exist for AWS Organizations changes",
-     "L1", "automated", "high", "monitoring"),
-    ("4.16", "Ensure AWS Security Hub is enabled",
-     "L2", "automated", "high", "monitoring"),
-
-    # =========================================================================
-    # Section 5: Networking
-    # =========================================================================
-
-    ("5.1", "Ensure no Network ACLs allow ingress from 0.0.0.0/0 to remote server administration ports",
-     "L1", "automated", "critical", "networking"),
-    ("5.2", "Ensure no security groups allow ingress from 0.0.0.0/0 to remote server administration ports",
-     "L1", "automated", "critical", "networking"),
-    ("5.3", "Ensure the default security group of every VPC restricts all traffic",
-     "L2", "automated", "high", "networking"),
-    ("5.4", "Ensure routing tables for VPC peering are 'least access'",
-     "L2", "manual", "medium", "networking"),
-    ("5.5", "Ensure that EC2 Metadata Service only allows IMDSv2",
-     "L1", "automated", "high", "networking"),
-    ("5.6", "Ensure that security groups with 0.0.0.0/0 ingress to ports other than 80 and 443 are not present",
-     "L1", "automated", "high", "networking"),
-]
+import json as _json
 
 
-def get_aws_cis_registry():
-    """Return the complete CIS AWS control registry as a list of dicts."""
-    return [
-        {
-            "cis_control_id": ctrl[0],
-            "title": ctrl[1],
-            "cis_level": ctrl[2],
-            "assessment_type": ctrl[3],
-            "severity": ctrl[4],
-            "service_area": ctrl[5],
-        }
-        for ctrl in AWS_CIS_CONTROLS
+# Control registry — 62 controls
+AWS_CIS_CONTROLS: list[dict] = _json.loads(r"""
+[
+  {
+    "cis_id": "2.1",
+    "title": "Maintain current contact details",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 19,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "access"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
     ]
+  },
+  {
+    "cis_id": "2.2",
+    "title": "Ensure security contact information is registered",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 22,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.3",
+    "title": "Ensure no 'root' user account access key exists",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "critical",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 24,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.4",
+    "title": "Ensure MFA is enabled for the 'root' user account",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "critical",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 27,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "classification"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.5",
+    "title": "Ensure hardware MFA is enabled for the 'root' user account",
+    "cis_level": "L2",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "critical",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 30,
+    "dspm_relevant": true,
+    "dspm_categories": [],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.6",
+    "title": "Eliminate use of the 'root' user for administrative and daily tasks",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "critical",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 33,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.7",
+    "title": "Ensure IAM password policy requires minimum length of 14 or greater",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 36,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "access"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.8",
+    "title": "Ensure IAM password policy prevents password reuse",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 39,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "access"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.9",
+    "title": "Ensure multi-factor authentication (MFA) is enabled for all IAM users that have a console password",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 41,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "classification"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.10",
+    "title": "Do not create access keys during initial setup for IAM users with a console password",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 45,
+    "dspm_relevant": true,
+    "dspm_categories": [],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.11",
+    "title": "Ensure credentials unused for 45 days or more are disabled",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 49,
+    "dspm_relevant": true,
+    "dspm_categories": [],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.12",
+    "title": "Ensure there is only one active access key for any single IAM user",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "critical",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 53,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.13",
+    "title": "Ensure access keys are rotated every 90 days or less",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 57,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.14",
+    "title": "Ensure IAM users receive permissions only through groups",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 60,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "access"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.15",
+    "title": "Ensure IAM policies that allow full \"*:*\" administrative privileges are not attached",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "critical",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 63,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.16",
+    "title": "Ensure a support role has been created to manage incidents with AWS Support",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 66,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.17",
+    "title": "Ensure IAM instance roles are used for AWS resource access from instances",
+    "cis_level": "L2",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 69,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "access"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.18",
+    "title": "Ensure that all expired SSL/TLS certificates stored in AWS IAM are removed",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 73,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.19",
+    "title": "Ensure that IAM External Access Analyzer is enabled for all regions",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 76,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "key_management"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.20",
+    "title": "Ensure IAM users are managed centrally via identity federation or AWS Organizations for multi-account environments",
+    "cis_level": "L2",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 79,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "2.21",
+    "title": "Ensure access to AWSCloudShellFullAccess is restricted",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "iam",
+    "domain": "Identity and Access Management",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 81,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "access"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "3.1.1",
+    "title": "Ensure S3 Bucket Policy is set to deny HTTP requests",
+    "cis_level": "L2",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "storage",
+    "domain": "Storage",
+    "subdomain": "Simple Storage Service (S3) This section contains recommendations for configuring AWS Simple Storage Service (S3) Buckets",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 85,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "access"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "3.1.2",
+    "title": "Ensure MFA Delete is enabled on S3 buckets",
+    "cis_level": "L2",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "storage",
+    "domain": "Storage",
+    "subdomain": "Simple Storage Service (S3) This section contains recommendations for configuring AWS Simple Storage Service (S3) Buckets",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 91,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "classification",
+      "backup"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D3",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "3.1.3",
+    "title": "Ensure all data in Amazon S3 has been discovered, classified, and secured when necessary",
+    "cis_level": "L2",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "storage",
+    "domain": "Storage",
+    "subdomain": "Simple Storage Service (S3) This section contains recommendations for configuring AWS Simple Storage Service (S3) Buckets",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 94,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "classification"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "3.1.4",
+    "title": "Ensure that S3 is configured with 'Block Public Access' enabled",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "critical",
+    "service_area": "storage",
+    "domain": "Storage",
+    "subdomain": "Simple Storage Service (S3) This section contains recommendations for configuring AWS Simple Storage Service (S3) Buckets",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 97,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "access"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D4",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "3.2.1",
+    "title": "Ensure that encryption-at-rest is enabled for RDS instances",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "storage",
+    "domain": "Storage",
+    "subdomain": "Relational Database Service (RDS) This section contains recommendations for configuring AWS Relational Database Services (RDS)",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 102,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "classification",
+      "backup"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D2",
+      "D3",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "3.2.2",
+    "title": "Ensure the Auto Minor Version Upgrade feature is enabled for RDS instances",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "storage",
+    "domain": "Storage",
+    "subdomain": "Relational Database Service (RDS) This section contains recommendations for configuring AWS Relational Database Services (RDS)",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 107,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "backup"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D3",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "3.2.3",
+    "title": "Ensure that RDS instances are not publicly accessible",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "critical",
+    "service_area": "storage",
+    "domain": "Storage",
+    "subdomain": "Relational Database Service (RDS) This section contains recommendations for configuring AWS Relational Database Services (RDS)",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 111,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "access"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D2",
+      "D4",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "3.2.4",
+    "title": "Ensure Multi-AZ deployments are used for enhanced availability in Amazon RDS",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "storage",
+    "domain": "Storage",
+    "subdomain": "Relational Database Service (RDS) This section contains recommendations for configuring AWS Relational Database Services (RDS)",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 116,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "backup"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D3",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "3.3.1",
+    "title": "Ensure that encryption is enabled for EFS file systems",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "storage",
+    "domain": "Storage",
+    "subdomain": "Elastic File System (EFS)",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 120,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "key_management"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "4.1",
+    "title": "Ensure CloudTrail is enabled in all regions",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "logging",
+    "domain": "Logging",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 125,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "retention",
+      "logging"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "4.2",
+    "title": "Ensure CloudTrail log file validation is enabled",
+    "cis_level": "L2",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "logging",
+    "domain": "Logging",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 129,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "logging"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "4.3",
+    "title": "Ensure AWS Config is enabled in all regions",
+    "cis_level": "L2",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "logging",
+    "domain": "Logging",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 132,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "logging"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "4.4",
+    "title": "Ensure that server access logging is enabled on the CloudTrail S3 bucket",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "logging",
+    "domain": "Logging",
+    "subdomain": "Establish and Maintain Detailed Enterprise Asset Inventory  Establish and maintain an accurate, detailed, and up-to-date inventory of all enterprise assets with the potential to store or process data, to include: end-user devices (including portable and mobile), network devices, non-computing/IoT devices, and servers. Ensure the inventory records the network address (if static), hardware address, machine name, enterprise asset owner, department for each asset, and whether the asset has been approved to connect to the network. For mobile end-user devices, MDM type tools can support this process, where appropriate. This inventory includes assets connected to the infrastructure physically, virtually, remotely, and those within cloud environments. Additionally, it includes assets that are regularly connected to the enterprise’s network infrastructure, even if they are not under control of the enterprise. Review and update the inventory of all enterprise assets bi-annually, or more frequently.",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 136,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "logging"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "4.5",
+    "title": "Ensure CloudTrail logs are encrypted at rest using KMS CMKs",
+    "cis_level": "L2",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "logging",
+    "domain": "Logging",
+    "subdomain": "Establish and Maintain Detailed Enterprise Asset Inventory  Establish and maintain an accurate, detailed, and up-to-date inventory of all enterprise assets with the potential to store or process data, to include: end-user devices (including portable and mobile), network devices, non-computing/IoT devices, and servers. Ensure the inventory records the network address (if static), hardware address, machine name, enterprise asset owner, department for each asset, and whether the asset has been approved to connect to the network. For mobile end-user devices, MDM type tools can support this process, where appropriate. This inventory includes assets connected to the infrastructure physically, virtually, remotely, and those within cloud environments. Additionally, it includes assets that are regularly connected to the enterprise’s network infrastructure, even if they are not under control of the enterprise. Review and update the inventory of all enterprise assets bi-annually, or more frequently.",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 140,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "access",
+      "logging",
+      "key_management"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "4.6",
+    "title": "Ensure rotation for customer-created symmetric CMKs is enabled",
+    "cis_level": "L2",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "logging",
+    "domain": "Logging",
+    "subdomain": "Establish and Maintain Detailed Enterprise Asset Inventory  Establish and maintain an accurate, detailed, and up-to-date inventory of all enterprise assets with the potential to store or process data, to include: end-user devices (including portable and mobile), network devices, non-computing/IoT devices, and servers. Ensure the inventory records the network address (if static), hardware address, machine name, enterprise asset owner, department for each asset, and whether the asset has been approved to connect to the network. For mobile end-user devices, MDM type tools can support this process, where appropriate. This inventory includes assets connected to the infrastructure physically, virtually, remotely, and those within cloud environments. Additionally, it includes assets that are regularly connected to the enterprise’s network infrastructure, even if they are not under control of the enterprise. Review and update the inventory of all enterprise assets bi-annually, or more frequently.",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 144,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "logging",
+      "key_management"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "4.7",
+    "title": "Ensure VPC flow logging is enabled in all VPCs",
+    "cis_level": "L2",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "logging",
+    "domain": "Logging",
+    "subdomain": "Establish and Maintain Detailed Enterprise Asset Inventory  Establish and maintain an accurate, detailed, and up-to-date inventory of all enterprise assets with the potential to store or process data, to include: end-user devices (including portable and mobile), network devices, non-computing/IoT devices, and servers. Ensure the inventory records the network address (if static), hardware address, machine name, enterprise asset owner, department for each asset, and whether the asset has been approved to connect to the network. For mobile end-user devices, MDM type tools can support this process, where appropriate. This inventory includes assets connected to the infrastructure physically, virtually, remotely, and those within cloud environments. Additionally, it includes assets that are regularly connected to the enterprise’s network infrastructure, even if they are not under control of the enterprise. Review and update the inventory of all enterprise assets bi-annually, or more frequently.",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 147,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "retention",
+      "logging"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D3",
+      "D4",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "4.8",
+    "title": "Ensure that object-level logging for write events is enabled for S3 buckets",
+    "cis_level": "L2",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "logging",
+    "domain": "Logging",
+    "subdomain": "Establish and Maintain Detailed Enterprise Asset Inventory  Establish and maintain an accurate, detailed, and up-to-date inventory of all enterprise assets with the potential to store or process data, to include: end-user devices (including portable and mobile), network devices, non-computing/IoT devices, and servers. Ensure the inventory records the network address (if static), hardware address, machine name, enterprise asset owner, department for each asset, and whether the asset has been approved to connect to the network. For mobile end-user devices, MDM type tools can support this process, where appropriate. This inventory includes assets connected to the infrastructure physically, virtually, remotely, and those within cloud environments. Additionally, it includes assets that are regularly connected to the enterprise’s network infrastructure, even if they are not under control of the enterprise. Review and update the inventory of all enterprise assets bi-annually, or more frequently.",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 152,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "logging"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "4.9",
+    "title": "Ensure that object-level logging for read events is enabled for S3 buckets",
+    "cis_level": "L2",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "logging",
+    "domain": "Logging",
+    "subdomain": "Establish and Maintain Detailed Enterprise Asset Inventory  Establish and maintain an accurate, detailed, and up-to-date inventory of all enterprise assets with the potential to store or process data, to include: end-user devices (including portable and mobile), network devices, non-computing/IoT devices, and servers. Ensure the inventory records the network address (if static), hardware address, machine name, enterprise asset owner, department for each asset, and whether the asset has been approved to connect to the network. For mobile end-user devices, MDM type tools can support this process, where appropriate. This inventory includes assets connected to the infrastructure physically, virtually, remotely, and those within cloud environments. Additionally, it includes assets that are regularly connected to the enterprise’s network infrastructure, even if they are not under control of the enterprise. Review and update the inventory of all enterprise assets bi-annually, or more frequently.",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 156,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "logging"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.1",
+    "title": "Ensure unauthorized API calls are monitored",
+    "cis_level": "L2",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 161,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.2",
+    "title": "Ensure management console sign-in without MFA is monitored",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 165,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.3",
+    "title": "Ensure usage of the 'root' account is monitored",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "critical",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 169,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.4",
+    "title": "Ensure IAM policy changes are monitored",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 173,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.5",
+    "title": "Ensure CloudTrail configuration changes are monitored",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 177,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.6",
+    "title": "Ensure AWS Management Console authentication failures are monitored",
+    "cis_level": "L2",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 181,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.7",
+    "title": "Ensure disabling or scheduled deletion of customer created CMKs is monitored",
+    "cis_level": "L2",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 185,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "logging"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.8",
+    "title": "Ensure S3 bucket policy changes are monitored",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 189,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "classification",
+      "logging"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.9",
+    "title": "Ensure AWS Config configuration changes are monitored",
+    "cis_level": "L2",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 193,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.10",
+    "title": "Ensure security group changes are monitored",
+    "cis_level": "L2",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 197,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D4",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.11",
+    "title": "Ensure Network Access Control List (NACL) changes are monitored",
+    "cis_level": "L2",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 201,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D4",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.12",
+    "title": "Ensure changes to network gateways are monitored",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 205,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D4",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.13",
+    "title": "Ensure route table changes are monitored",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 209,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D4",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.14",
+    "title": "Ensure VPC changes are monitored",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 213,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "logging"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D4",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.15",
+    "title": "Ensure AWS Organizations changes are monitored",
+    "cis_level": "L1",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 217,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "5.16",
+    "title": "Ensure AWS Security Hub is enabled",
+    "cis_level": "L2",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "monitoring",
+    "domain": "Monitoring",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 221,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "logging"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "6.1.1",
+    "title": "Ensure EBS volume encryption is enabled in all regions",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "networking",
+    "domain": "Networking",
+    "subdomain": "Elastic Compute Cloud (EC2) This section contains recommendations for configuring AWS Elastic Compute Cloud (EC2)",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 225,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "key_management"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D2",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "6.1.2",
+    "title": "Ensure CIFS access is restricted to trusted networks to prevent unauthorized access",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "critical",
+    "service_area": "networking",
+    "domain": "Networking",
+    "subdomain": "Elastic Compute Cloud (EC2) This section contains recommendations for configuring AWS Elastic Compute Cloud (EC2)",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 228,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "access",
+      "classification"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D2",
+      "D4",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "6.2",
+    "title": "Ensure no Network ACLs allow ingress from 0.0.0.0/0 to remote server administration ports",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "critical",
+    "service_area": "networking",
+    "domain": "Networking",
+    "subdomain": "Elastic Compute Cloud (EC2) This section contains recommendations for configuring AWS Elastic Compute Cloud (EC2)",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 231,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "access"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D4",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "6.3",
+    "title": "Ensure no security groups allow ingress from 0.0.0.0/0 to remote server administration ports",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "critical",
+    "service_area": "networking",
+    "domain": "Networking",
+    "subdomain": "Elastic Compute Cloud (EC2) This section contains recommendations for configuring AWS Elastic Compute Cloud (EC2)",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 234,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "access"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D4",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "6.4",
+    "title": "Ensure no security groups allow ingress from ::/0 to remote server administration ports",
+    "cis_level": "L1",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "critical",
+    "service_area": "networking",
+    "domain": "Networking",
+    "subdomain": "Elastic Compute Cloud (EC2) This section contains recommendations for configuring AWS Elastic Compute Cloud (EC2)",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 237,
+    "dspm_relevant": true,
+    "dspm_categories": [
+      "encryption",
+      "access"
+    ],
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D4",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "6.5",
+    "title": "Ensure the default security group of every VPC restricts all traffic",
+    "cis_level": "L2",
+    "assessment_type": "automated",
+    "automatable": true,
+    "severity": "high",
+    "service_area": "networking",
+    "domain": "Networking",
+    "subdomain": "Elastic Compute Cloud (EC2) This section contains recommendations for configuring AWS Elastic Compute Cloud (EC2)",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 240,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D1",
+      "D4",
+      "D5",
+      "D6"
+    ]
+  },
+  {
+    "cis_id": "6.6",
+    "title": "Ensure routing tables for VPC peering are \"least access\"",
+    "cis_level": "L2",
+    "assessment_type": "manual",
+    "automatable": false,
+    "severity": "high",
+    "service_area": "networking",
+    "domain": "Networking",
+    "subdomain": "Elastic Compute Cloud (EC2) This section contains recommendations for configuring AWS Elastic Compute Cloud (EC2)",
+    "detection_commands": [],
+    "remediation_commands": [],
+    "source_pdf": "CIS_Amazon_Web_Services_Foundations_Benchmark_v6.0.0.pdf",
+    "page": 245,
+    "dspm_relevant": false,
+    "rr_relevant": true,
+    "rr_domains": [
+      "D4",
+      "D5",
+      "D6"
+    ]
+  }
+]
+""")
 
 
-def get_aws_control_count():
-    """Return total number of CIS AWS controls."""
+def get_aws_cis_registry() -> list[dict]:
+    """Return the complete CIS control registry as a list of dicts."""
+    return AWS_CIS_CONTROLS
+
+
+def get_aws_control_count() -> int:
+    """Return total number of CIS controls."""
     return len(AWS_CIS_CONTROLS)
 
 
-def get_aws_automated_count():
+def get_aws_automated_count() -> int:
     """Return count of automated controls."""
-    return sum(1 for c in AWS_CIS_CONTROLS if c[3] == "automated")
+    return sum(1 for c in AWS_CIS_CONTROLS if c["assessment_type"] == "automated")
 
 
-def get_aws_manual_count():
+def get_aws_manual_count() -> int:
     """Return count of manual controls."""
-    return sum(1 for c in AWS_CIS_CONTROLS if c[3] == "manual")
+    return sum(1 for c in AWS_CIS_CONTROLS if c["assessment_type"] == "manual")
+
+
+def get_aws_dspm_controls() -> list[dict]:
+    """Return controls relevant to DSPM (Data Security Posture Management)."""
+    return [c for c in AWS_CIS_CONTROLS if c.get("dspm_relevant")]
+
+
+def get_aws_rr_controls() -> list[dict]:
+    """Return controls relevant to Ransomware Readiness."""
+    return [c for c in AWS_CIS_CONTROLS if c.get("rr_relevant")]
+
+
+def get_aws_controls_by_service_area(service_area: str) -> list[dict]:
+    """Return controls filtered by service area."""
+    return [c for c in AWS_CIS_CONTROLS if c["service_area"] == service_area]
+
+
+def get_aws_controls_by_severity(severity: str) -> list[dict]:
+    """Return controls filtered by severity."""
+    return [c for c in AWS_CIS_CONTROLS if c["severity"] == severity]

@@ -25,7 +25,7 @@ import json
 import logging
 
 from scanner.saas.base_saas_check import BaseSaaSScanner, SaaSCheckResult
-from scanner.cis_controls.google_workspace_cis_controls import GW_CIS_CONTROLS
+from scanner.cis_controls.google_workspace_cis_controls import GOOGLE_WORKSPACE_CIS_CONTROLS as GW_CIS_CONTROLS
 
 logger = logging.getLogger(__name__)
 
@@ -1072,7 +1072,12 @@ class GoogleWorkspaceScanner(BaseSaaSScanner):
         fw = ["CIS-GW-1.3.0", "NIST-CSF", "ISO-27001", "AICPA-TSC", "CIS"]
 
         for ctrl in GW_CIS_CONTROLS:
-            cis_id, title, level, assess_type, severity, area = ctrl
+            cis_id = ctrl["cis_id"]
+            title = ctrl["title"]
+            level = ctrl["cis_level"]
+            assess_type = ctrl["assessment_type"]
+            severity = ctrl["severity"]
+            area = ctrl["service_area"]
             if cis_id not in covered_cis_ids:
                 manual_results.append(SaaSCheckResult(
                     check_id=f"gws_cis_{cis_id.replace('.', '_')}",
@@ -1085,7 +1090,7 @@ class GoogleWorkspaceScanner(BaseSaaSScanner):
                         f"CIS {cis_id} [{level}] - {assess_type.upper()} assessment. "
                         f"This control requires {'manual verification by an administrator' if assess_type == 'manual' else 'automated check implementation'}."
                     ),
-                    remediation=f"Refer to CIS Google Workspace Foundations Benchmark v1.3.0, control {cis_id}.",
+                    remediation=ctrl.get("remediation", f"Refer to CIS Google Workspace Foundations Benchmark v1.3.0, control {cis_id}."),
                     compliance_frameworks=fw,
                     assessment_type=assess_type,
                     cis_control_id=cis_id,

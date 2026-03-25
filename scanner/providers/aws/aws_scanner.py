@@ -2102,7 +2102,12 @@ class AWSScanner:
         fw = ["CIS-AWS-3.0.0", "NIST-800-53", "SOC2"]
 
         for ctrl in AWS_CIS_CONTROLS:
-            cis_id, title, level, assessment_type, severity, service_area = ctrl
+            cis_id = ctrl["cis_id"]
+            title = ctrl["title"]
+            level = ctrl["cis_level"]
+            assessment_type = ctrl["assessment_type"]
+            severity = ctrl["severity"]
+            service_area = ctrl["service_area"]
             if cis_id not in covered_cis_ids:
                 manual_results.append(CheckResult(
                     check_id=f"aws_cis_{cis_id.replace('.', '_')}",
@@ -2115,7 +2120,7 @@ class AWSScanner:
                         f"CIS {cis_id} [{level}] - {assessment_type.upper()} assessment. "
                         f"This control requires {'manual verification' if assessment_type == 'manual' else 'automated check implementation'}."
                     ),
-                    remediation=f"Refer to CIS Amazon Web Services Foundations Benchmark v3.0.0, control {cis_id}.",
+                    remediation=ctrl.get("remediation", f"Refer to CIS Amazon Web Services Foundations Benchmark v6.0.0, control {cis_id}."),
                     compliance_frameworks=fw,
                     assessment_type=assessment_type,
                     cis_control_id=cis_id,

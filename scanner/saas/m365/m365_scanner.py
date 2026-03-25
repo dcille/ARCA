@@ -1612,9 +1612,15 @@ class M365Scanner(BaseSaaSScanner):
         fw = ["CIS-M365-3.1.0", "CIS-M365-4.0.0", "SOC2", "ISO-27001"]
 
         for ctrl in M365_CIS_CONTROLS:
-            cis_id, title, level, profile, assess_type, severity, area = ctrl
+            cis_id = ctrl["cis_id"]
+            title = ctrl["title"]
+            level = ctrl["cis_level"]
+            profile = ctrl.get("m365_profile", "E3")
+            assess_type = ctrl["assessment_type"]
+            severity = ctrl["severity"]
+            area = ctrl["service_area"]
             if cis_id not in covered_cis_ids:
-                status = "MANUAL" if assess_type == "manual" else "MANUAL"
+                status = "MANUAL"
                 manual_results.append(SaaSCheckResult(
                     check_id=f"m365_cis_{cis_id.replace('.', '_')}",
                     check_title=f"{title} (CIS {cis_id})",
@@ -1626,7 +1632,7 @@ class M365Scanner(BaseSaaSScanner):
                         f"CIS {cis_id} [{level}/{profile}] - {assess_type.upper()} assessment. "
                         f"This control requires {'manual verification' if assess_type == 'manual' else 'automated check implementation'}."
                     ),
-                    remediation=f"Refer to CIS Microsoft 365 Foundations Benchmark v3.1.0/v4.0.0, control {cis_id}.",
+                    remediation=ctrl.get("remediation", f"Refer to CIS Microsoft 365 Foundations Benchmark v4.0.0, control {cis_id}."),
                     compliance_frameworks=fw,
                     assessment_type=assess_type,
                     cis_control_id=cis_id,

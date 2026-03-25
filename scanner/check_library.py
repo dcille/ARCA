@@ -39,7 +39,8 @@ class CheckDefinition:
                 f"Invalid severity '{self.severity}'. "
                 f"Must be one of: {', '.join(sorted(valid_severities))}"
             )
-        valid_providers = {"aws", "azure", "gcp", "oci", "alibaba", "ibm_cloud"}
+        valid_providers = {"aws", "azure", "gcp", "oci", "alibaba", "ibm_cloud",
+                          "google_workspace", "microsoft_365", "snowflake"}
         if self.provider not in valid_providers:
             raise ValueError(
                 f"Invalid provider '{self.provider}'. "
