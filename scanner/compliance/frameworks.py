@@ -5463,6 +5463,238 @@ FRAMEWORKS = {
             },
         ],
     },
+
+    # ═══════════════════════════════════════════════════════════════════
+    # CIS Microsoft 365 Foundations Benchmark v6.0.1
+    # ═══════════════════════════════════════════════════════════════════
+    "CIS-M365-6.0.1": {
+        "name": "CIS Microsoft 365 Foundations Benchmark v6.0.1",
+        "description": "Center for Internet Security best-practice configuration guidelines for Microsoft 365 covering Admin Center, Defender, Purview, Intune, Entra, Exchange, SharePoint, Teams, and Fabric",
+        "category": "cis",
+        "controls": [
+            {
+                "id": "1.1.1",
+                "title": "Ensure Administrative accounts are cloud-only",
+                "description": "Privileged admin accounts must be cloud-only (not synced from on-prem AD) and must not have app-based licenses assigned. Synced accounts inherit on-prem vulnerabilities like pass-the-hash and Golden Ticket attacks.",
+                "checks": {"m365": ["m365_cis_admin_cloud_only"]},
+            },
+            {
+                "id": "1.2.1",
+                "title": "Ensure sign-in to shared mailboxes is blocked",
+                "description": "Shared mailboxes must have direct sign-in blocked. Direct sign-in bypasses MFA/Conditional Access, creates unattributable actions, and expands the attack surface.",
+                "checks": {"m365": ["m365_cis_shared_mailbox_signin_blocked"]},
+            },
+            {
+                "id": "1.3.1",
+                "title": "Ensure idle session timeout is set to 3 hours or less for unmanaged devices",
+                "description": "Browser sessions on unmanaged devices must have an idle timeout of 3 hours or less to prevent data exposure from lost, stolen, or unattended devices.",
+                "checks": {"m365": ["m365_cis_idle_session_timeout"]},
+            },
+            {
+                "id": "2.1.1",
+                "title": "Ensure Safe Attachments policy is enabled with anti-phishing protections",
+                "description": "Anti-phishing policies must set phish threshold ≥3, enable impersonation protection, enable mailbox intelligence, and honor sender DMARC policy to prevent BEC and spear-phishing.",
+                "checks": {"m365": ["m365_cis_anti_phishing_advanced"]},
+            },
+            {
+                "id": "2.4.1",
+                "title": "Ensure Microsoft Defender for Cloud Apps is connected",
+                "description": "Defender for Cloud Apps must be connected with M365 and Azure app connectors with file monitoring enabled for shadow IT discovery and anomalous behavior detection.",
+                "checks": {"m365": ["m365_cis_defender_cloud_apps"]},
+            },
+            {
+                "id": "3.1.1",
+                "title": "Ensure Microsoft 365 audit log search is Enabled",
+                "description": "UnifiedAuditLogIngestionEnabled must be True. Audit logging records all user and admin activity across M365 services, essential for incident investigation.",
+                "checks": {"m365": ["m365_cis_audit_log_enabled"]},
+            },
+            {
+                "id": "3.2.1",
+                "title": "Ensure DLP policies are enabled",
+                "description": "Data Loss Prevention policies in Purview must detect and prevent exfiltration of sensitive data via email, SharePoint, OneDrive, Teams, and endpoints.",
+                "checks": {"m365": ["m365_cis_dlp_policies_enabled"]},
+            },
+            {
+                "id": "3.3.1",
+                "title": "Ensure sensitivity label policies are published",
+                "description": "Sensitivity labels must be created and published to users for document/email classification with encryption, watermarks, and access restrictions.",
+                "checks": {"m365": ["m365_cis_sensitivity_labels_published"]},
+            },
+            {
+                "id": "4.1",
+                "title": "Ensure device compliance secureByDefault is True",
+                "description": "Intune must mark devices without a compliance policy as noncompliant (secureByDefault=True) to prevent unmanaged device access via Conditional Access.",
+                "checks": {"m365": ["m365_cis_device_compliance_secure"]},
+            },
+            {
+                "id": "4.2",
+                "title": "Ensure personal device enrollment is blocked",
+                "description": "BYOD enrollment should be restricted to prevent mixing corporate and personal data on unmanaged devices.",
+                "checks": {"m365": ["m365_cis_personal_enrollment_blocked"]},
+            },
+            {
+                "id": "5.3.1",
+                "title": "Ensure PIM requires approval for Privileged Role Administrator",
+                "description": "PIM must require an approval workflow for activating the Privileged Role Administrator role to prevent self-activation of the most powerful Entra role.",
+                "checks": {"m365": ["m365_cis_pim_approval_required"]},
+            },
+            {
+                "id": "6.1.1",
+                "title": "Ensure mailbox auditing is not disabled",
+                "description": "AuditDisabled must be False for all mailboxes. Mailbox audit logs record owner, delegate, and admin actions for forensic investigation.",
+                "checks": {"m365": ["m365_cis_mailbox_audit_enabled"]},
+            },
+            {
+                "id": "6.2.1",
+                "title": "Ensure external email tagging is enabled",
+                "description": "ExternalInOutlook must be Enabled to prepend a visual indicator to external emails, helping users identify phishing.",
+                "checks": {"m365": ["m365_cis_external_email_tagging"]},
+            },
+            {
+                "id": "6.3.1",
+                "title": "Ensure users cannot install Outlook add-ins",
+                "description": "My Custom Apps, My Marketplace Apps, and My ReadWriteMailbox Apps roles must be unchecked to prevent unrestricted add-ins from reading/modifying email.",
+                "checks": {"m365": ["m365_cis_outlook_addins_restricted"]},
+            },
+            {
+                "id": "6.5.1",
+                "title": "Ensure modern authentication for Exchange Online is enabled",
+                "description": "OAuth 2.0 modern authentication must be enabled for Exchange Online, replacing deprecated basic authentication.",
+                "checks": {"m365": ["m365_cis_modern_auth_exchange"]},
+            },
+            {
+                "id": "7.2.1",
+                "title": "Ensure SharePoint default sharing link permission is View",
+                "description": "Default sharing links should grant View (read-only) permission to prevent accidental edit access to shared documents.",
+                "checks": {"m365": ["m365_cis_sharepoint_default_link_view"]},
+            },
+            {
+                "id": "7.3.1",
+                "title": "Ensure OneDrive sync is restricted to domain-joined computers",
+                "description": "OneDrive sync must be restricted to domain-joined or managed devices to prevent corporate data on unmanaged personal devices.",
+                "checks": {"m365": ["m365_cis_onedrive_sync_domain_joined"]},
+            },
+            {
+                "id": "8.1.1",
+                "title": "Ensure Teams email integration is disabled",
+                "description": "AllowEmailIntoChannel must be False to prevent spam, phishing, and data injection from external email into Teams channels.",
+                "checks": {"m365": ["m365_cis_teams_email_disabled"]},
+            },
+            {
+                "id": "8.2.1",
+                "title": "Ensure external access with trial tenants is blocked",
+                "description": "ExternalAccessWithTrialTenants must be Blocked. Trial tenants are easily created by attackers for social engineering via Teams.",
+                "checks": {"m365": ["m365_cis_teams_trial_blocked"]},
+            },
+            {
+                "id": "8.4.1",
+                "title": "Ensure third-party and custom Teams apps are restricted",
+                "description": "Third-party and custom apps should be Off by default in Teams to prevent unapproved apps from accessing Teams data.",
+                "checks": {"m365": ["m365_cis_teams_apps_restricted"]},
+            },
+            {
+                "id": "8.5.1",
+                "title": "Ensure external participants cannot give or request control",
+                "description": "AllowExternalParticipantGiveRequestControl must be False to prevent external users from taking screen control.",
+                "checks": {"m365": ["m365_cis_teams_external_control"]},
+            },
+            {
+                "id": "8.5.8",
+                "title": "Ensure meeting recording is Off by default",
+                "description": "AllowCloudRecording should be False to prevent automatic recording of sensitive meeting content.",
+                "checks": {"m365": ["m365_cis_teams_recording_off"]},
+            },
+            {
+                "id": "8.6.1",
+                "title": "Ensure users can report security concerns in Teams",
+                "description": "AllowSecurityEndUserReporting must be True to enable the 'Report a concern' option for phishing and suspicious content.",
+                "checks": {"m365": ["m365_cis_teams_security_reporting"]},
+            },
+        ],
+    },
+
+    # ═══════════════════════════════════════════════════════════════════
+    # CIS Google Workspace Benchmark v1.3.0
+    # ═══════════════════════════════════════════════════════════════════
+    "CIS-GW-1.3.0": {
+        "name": "CIS Google Workspace Benchmark v1.3.0",
+        "description": "Center for Internet Security best-practice security configuration for Google Workspace covering Rules/alerts, Directory, Security, and Reporting",
+        "category": "cis",
+        "controls": [
+            {
+                "id": "1.1.1",
+                "title": "Ensure multiple super admin accounts exist (2-4)",
+                "description": "Maintain 2-4 super admin accounts for continuity while limiting attack surface. Super admins have unrestricted access to all settings and data.",
+                "checks": {"google_workspace": ["gws_cis_multiple_super_admins"]},
+            },
+            {
+                "id": "1.2.1.1",
+                "title": "Ensure directory data is restricted externally",
+                "description": "Disable external directory contact sharing to prevent exposure of employee names, emails, phone numbers, and org structure for social engineering.",
+                "checks": {"google_workspace": ["gws_cis_directory_external_restricted"]},
+            },
+            {
+                "id": "4.2.1.1",
+                "title": "Ensure API access is restricted for third-party applications",
+                "description": "Control OAuth consent to prevent malicious apps from gaining broad access to user data, emails, Drive files, and calendar via Google APIs.",
+                "checks": {"google_workspace": ["gws_cis_api_access_restricted"]},
+            },
+            {
+                "id": "5.1.1.1",
+                "title": "Ensure application usage activity report is reviewed",
+                "description": "Regularly review OAuth token activity report to identify risky third-party apps with excessive permissions.",
+                "checks": {"google_workspace": ["gws_cis_app_usage_report_reviewed"]},
+            },
+            {
+                "id": "6.1",
+                "title": "Ensure alert for super admin password change is configured",
+                "description": "Alert when a super admin password is changed to detect account takeover attempts. Early detection enables rapid response before attackers establish persistence.",
+                "checks": {"google_workspace": ["gws_cis_alert_password_change"]},
+            },
+            {
+                "id": "6.2",
+                "title": "Ensure alert for government-backed attack warnings is configured",
+                "description": "Alert when Google warns users targeted by government-backed attackers (APT campaigns) requiring immediate incident response.",
+                "checks": {"google_workspace": ["gws_cis_alert_govt_attack"]},
+            },
+            {
+                "id": "6.3",
+                "title": "Ensure alert for suspicious user activity is configured",
+                "description": "Alert on suspicious activity (unusual login patterns, impossible travel, mass downloads) to detect compromised accounts and insider threats.",
+                "checks": {"google_workspace": ["gws_cis_alert_suspicious_activity"]},
+            },
+            {
+                "id": "6.4",
+                "title": "Ensure alert for admin privilege changes is configured",
+                "description": "Alert on admin role assignments/revocations to detect unauthorized privilege escalation, a key indicator of compromise.",
+                "checks": {"google_workspace": ["gws_cis_alert_admin_privilege"]},
+            },
+            {
+                "id": "6.5",
+                "title": "Ensure alert for suspicious programmatic login is configured",
+                "description": "Alert on suspicious programmatic logins indicating automated credential stuffing, OAuth token abuse, or API key compromise.",
+                "checks": {"google_workspace": ["gws_cis_alert_suspicious_login"]},
+            },
+            {
+                "id": "6.6",
+                "title": "Ensure alert for suspicious login from less secure app is configured",
+                "description": "Alert on suspicious logins from less secure apps that bypass 2SV and use basic auth, often indicating credential compromise.",
+                "checks": {"google_workspace": ["gws_cis_alert_suspicious_login_app"]},
+            },
+            {
+                "id": "6.7",
+                "title": "Ensure alert for leaked password detection is configured",
+                "description": "Alert when user credentials appear in data breaches to enforce immediate password resets before attackers exploit leaked credentials.",
+                "checks": {"google_workspace": ["gws_cis_alert_leaked_password"]},
+            },
+            {
+                "id": "6.8",
+                "title": "Ensure alert for potential employee spoofing is configured",
+                "description": "Alert on display name impersonation used in BEC attacks to trick recipients into wire transfers, credential disclosure, or data sharing.",
+                "checks": {"google_workspace": ["gws_cis_alert_employee_spoofing"]},
+            },
+        ],
+    },
 }
 
 

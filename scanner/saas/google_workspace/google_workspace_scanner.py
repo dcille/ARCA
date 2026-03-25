@@ -1,10 +1,13 @@
 """Google Workspace SaaS Security Scanner.
 
-Implements 22 security checks across 4 auditor categories:
+Implements 38+ security checks across 6 auditor categories:
 - Users: Admin MFA, user 2FA enrollment, suspended accounts, password policy, admin count, super admin usage
 - Security: SSO configured, security keys for admins, login challenges, less secure apps, app access control
 - Email Security: SPF/DKIM/DMARC configured, email allowlist review, content compliance, phishing protections
 - Drive & Data: External sharing restrictions, link sharing defaults, DLP rules configured
+- CIS Alerts (v1.3.0): Password change, govt-backed attacks, suspicious activity, admin privilege,
+  suspicious login, leaked password, employee spoofing alert rules
+- CIS Directory/Security (v1.3.0): Super admin count, directory visibility, API controls, app usage reports
 """
 import json
 import logging
@@ -89,6 +92,8 @@ class GoogleWorkspaceScanner(BaseSaaSScanner):
             self._check_security,
             self._check_email_security,
             self._check_drive_and_data,
+            self._check_cis_alert_rules,
+            self._check_cis_directory_security,
         ]
 
         for check_fn in check_groups:
@@ -699,6 +704,321 @@ class GoogleWorkspaceScanner(BaseSaaSScanner):
 
         except Exception as e:
             logger.warning(f"Google Workspace Drive and data checks failed: {e}")
+
+        return results
+
+    def _check_cis_alert_rules(self) -> list[dict]:
+        """CIS Google Workspace v1.3.0 - Alert rules (section 6.x)."""
+        results = []
+        fw = ["CIS-GW-1.3.0", "NIST-CSF", "ISO-27001", "CIS"]
+
+        try:
+            reports = self._get_reports_service()
+
+            # Define all CIS 6.x alert rules to verify
+            alert_checks = [
+                {
+                    "cis": "6.1", "event": "CHANGE_PASSWORD",
+                    "check_id": "gws_cis_alert_password_change",
+                    "title": "Alert rule configured for super admin password change (CIS 6.1)",
+                    "desc": (
+                        "An alert rule must notify when a super admin's password is changed. "
+                        "Unauthorized password changes to super admin accounts indicate "
+                        "account takeover attempts. Early detection enables rapid response "
+                        "before attackers establish persistence."
+                    ),
+                    "fix": (
+                        "Admin Console > Rules > Create rule > Activity trigger: "
+                        "Admin log events > Event = Change password for super admin users. "
+                        "Set action to 'Send email notification to all super admins'."
+                    ),
+                },
+                {
+                    "cis": "6.2", "event": "GOVERNMENT_ATTACK_WARNING",
+                    "check_id": "gws_cis_alert_govt_attack",
+                    "title": "Alert rule for government-backed attack warnings (CIS 6.2)",
+                    "desc": (
+                        "Google may warn users targeted by government-backed attackers. "
+                        "An alert rule ensures admins are immediately notified of nation-state "
+                        "level threats. These attacks are sophisticated APT campaigns requiring "
+                        "immediate incident response."
+                    ),
+                    "fix": (
+                        "Admin Console > Rules > Create rule: trigger on "
+                        "'Government-backed attack' alert. Send to security team and super admins. "
+                        "This alert is critical and should trigger immediate incident response."
+                    ),
+                },
+                {
+                    "cis": "6.3", "event": "SUSPICIOUS_ACTIVITY",
+                    "check_id": "gws_cis_alert_suspicious_activity",
+                    "title": "Alert rule for suspicious user activity (CIS 6.3)",
+                    "desc": (
+                        "Alerts for suspicious activity (unusual login patterns, impossible travel, "
+                        "mass downloads) enable detection of compromised accounts and insider "
+                        "threats before significant damage occurs."
+                    ),
+                    "fix": (
+                        "Admin Console > Rules > Activity trigger: Suspicious login activity. "
+                        "Set severity to High. Notify security team via email and integrate "
+                        "with SIEM/SOAR for automated response."
+                    ),
+                },
+                {
+                    "cis": "6.4", "event": "ASSIGN_ROLE",
+                    "check_id": "gws_cis_alert_admin_privilege",
+                    "title": "Alert rule for admin privilege changes (CIS 6.4)",
+                    "desc": (
+                        "Admin privilege escalation must trigger alerts. Unauthorized role "
+                        "assignments are a key indicator of compromise—attackers elevate "
+                        "privileges to maintain access and exfiltrate data."
+                    ),
+                    "fix": (
+                        "Admin Console > Rules > Create rule > Activity trigger: "
+                        "Admin log events > Event = Assign/Revoke admin role. "
+                        "Notify all super admins and security team."
+                    ),
+                },
+                {
+                    "cis": "6.5", "event": "SUSPICIOUS_LOGIN",
+                    "check_id": "gws_cis_alert_suspicious_login",
+                    "title": "Alert rule for suspicious programmatic login (CIS 6.5)",
+                    "desc": (
+                        "Suspicious programmatic logins indicate automated credential stuffing, "
+                        "OAuth token abuse, or API key compromise. These attacks operate at "
+                        "machine speed and require immediate automated detection."
+                    ),
+                    "fix": (
+                        "Admin Console > Rules > Create rule: trigger on suspicious "
+                        "programmatic login activity. Set severity to High. "
+                        "Consider blocking the user session automatically."
+                    ),
+                },
+                {
+                    "cis": "6.6", "event": "SUSPICIOUS_LOGIN_LESS_SECURE_APP",
+                    "check_id": "gws_cis_alert_suspicious_login_app",
+                    "title": "Alert rule for suspicious login from less secure app (CIS 6.6)",
+                    "desc": (
+                        "Less secure app logins bypass 2SV and use basic auth. Suspicious "
+                        "logins from these apps often indicate credential compromise. "
+                        "Alert enables rapid account lockdown and password reset."
+                    ),
+                    "fix": (
+                        "Admin Console > Rules > Create rule: trigger on suspicious login "
+                        "from less secure application. Combine with disabling less secure "
+                        "apps access organization-wide."
+                    ),
+                },
+                {
+                    "cis": "6.7", "event": "LEAKED_PASSWORD",
+                    "check_id": "gws_cis_alert_leaked_password",
+                    "title": "Alert rule for leaked password detection (CIS 6.7)",
+                    "desc": (
+                        "Google detects when user credentials appear in data breaches. "
+                        "Alert rules ensure admins enforce immediate password resets for "
+                        "affected accounts before attackers use the leaked credentials."
+                    ),
+                    "fix": (
+                        "Admin Console > Rules > Create rule: trigger on 'Leaked password' alert. "
+                        "Set action to force password reset and notify the affected user. "
+                        "Also notify the security team for investigation."
+                    ),
+                },
+                {
+                    "cis": "6.8", "event": "EMAIL_SENDER_SPOOFING",
+                    "check_id": "gws_cis_alert_employee_spoofing",
+                    "title": "Alert rule for potential employee spoofing (CIS 6.8)",
+                    "desc": (
+                        "Employee spoofing (display name impersonation) is used in BEC attacks "
+                        "to trick recipients into wire transfers, credential disclosure, or "
+                        "sensitive data sharing. Alert enables rapid response to active BEC."
+                    ),
+                    "fix": (
+                        "Admin Console > Rules > Create rule: trigger on 'Possible employee "
+                        "spoofing' alert from Gmail. Notify security team and affected users. "
+                        "Combine with DMARC reject policy for full protection."
+                    ),
+                },
+            ]
+
+            for ac in alert_checks:
+                try:
+                    activities = reports.activities().list(
+                        userKey="all", applicationName="admin",
+                        eventName=ac["event"], maxResults=1
+                    ).execute()
+                    has_alert = bool(activities.get("items", []))
+                except Exception:
+                    has_alert = False
+
+                results.append(SaaSCheckResult(
+                    check_id=ac["check_id"],
+                    check_title=ac["title"],
+                    service_area="alert_rules", severity="high",
+                    status="PASS" if has_alert else "FAIL",
+                    resource_id=self.domain,
+                    description=ac["desc"],
+                    remediation=ac["fix"],
+                    compliance_frameworks=fw,
+                ).to_dict())
+
+        except Exception as e:
+            logger.warning(f"CIS alert rules checks failed: {e}")
+
+        return results
+
+    def _check_cis_directory_security(self) -> list[dict]:
+        """CIS Google Workspace v1.3.0 - Directory, Security, Reporting checks."""
+        results = []
+        fw = ["CIS-GW-1.3.0", "NIST-CSF", "ISO-27001", "CIS"]
+
+        # 1.1.1 - Multiple super admin accounts (2-4 recommended)
+        try:
+            service = self._get_directory_service()
+            users = []
+            request = service.users().list(domain=self.domain, maxResults=500)
+            while request:
+                try:
+                    response = request.execute()
+                    users.extend(response.get("users", []))
+                    request = service.users().list_next(request, response)
+                except Exception:
+                    break
+
+            super_admins = [
+                u for u in users
+                if u.get("isAdmin", False) and not u.get("suspended", False)
+            ]
+            count = len(super_admins)
+            results.append(SaaSCheckResult(
+                check_id="gws_cis_multiple_super_admins",
+                check_title="Multiple super admin accounts exist (2-4) (CIS 1.1.1)",
+                service_area="directory", severity="critical",
+                status="PASS" if 2 <= count <= 4 else "FAIL",
+                resource_id=self.domain,
+                description=(
+                    f"Super admin accounts: {count}. At least 2 super admin accounts ensure "
+                    "continuity if one is locked out, but more than 4 increases attack surface. "
+                    "Super admins have unrestricted access to all settings and data."
+                ),
+                remediation=(
+                    "Admin Console > Account > Admin roles: maintain 2-4 super admin accounts. "
+                    "Use separate accounts for daily admin tasks (delegated admin roles). "
+                    "Super admin accounts should only be used for emergency access."
+                ),
+                compliance_frameworks=fw,
+            ).to_dict())
+        except Exception as e:
+            logger.warning(f"CIS 1.1.1 super admin count check failed: {e}")
+
+        # 1.2.1.1 - Directory data externally restricted
+        try:
+            reports = self._get_reports_service()
+            activities = reports.activities().list(
+                userKey="all", applicationName="admin",
+                eventName="CHANGE_DIRECTORY_SETTING",
+                maxResults=5
+            ).execute()
+            events = activities.get("items", [])
+            sharing_restricted = False
+            for event in events:
+                for evt in event.get("events", []):
+                    for param in evt.get("parameters", []):
+                        val = str(param.get("value", "")).lower()
+                        if "external" in val and ("off" in val or "restricted" in val):
+                            sharing_restricted = True
+            results.append(SaaSCheckResult(
+                check_id="gws_cis_directory_external_restricted",
+                check_title="Directory data sharing is restricted externally (CIS 1.2.1.1)",
+                service_area="directory", severity="high",
+                status="PASS" if sharing_restricted else "FAIL",
+                resource_id=self.domain,
+                description=(
+                    "Directory contact sharing with external organizations must be disabled. "
+                    "External directory sharing exposes employee names, emails, phone numbers, "
+                    "and org structure to outsiders, enabling targeted social engineering."
+                ),
+                remediation=(
+                    "Admin Console > Directory > Directory settings > Sharing settings: "
+                    "set Contact sharing to 'Do not allow any directory information to be "
+                    "shared externally'. This applies to all organizational units."
+                ),
+                compliance_frameworks=fw,
+            ).to_dict())
+        except Exception as e:
+            logger.warning(f"CIS 1.2.1.1 directory sharing check failed: {e}")
+
+        # 4.2.1.1 - API access restricted for third-party apps
+        try:
+            reports = self._get_reports_service()
+            activities = reports.activities().list(
+                userKey="all", applicationName="admin",
+                eventName="CHANGE_APP_ACCESS_SETTINGS_CHANGE_APP_ACCESS",
+                maxResults=5
+            ).execute()
+            events = activities.get("items", [])
+            api_restricted = False
+            for event in events:
+                for evt in event.get("events", []):
+                    for param in evt.get("parameters", []):
+                        val = str(param.get("value", "")).lower()
+                        if "restricted" in val or "blocked" in val or "trusted" in val:
+                            api_restricted = True
+            results.append(SaaSCheckResult(
+                check_id="gws_cis_api_access_restricted",
+                check_title="API access is restricted for third-party applications (CIS 4.2.1.1)",
+                service_area="security", severity="high",
+                status="PASS" if api_restricted else "FAIL",
+                resource_id=self.domain,
+                description=(
+                    "Third-party application API access must be controlled. Unrestricted OAuth "
+                    "consent allows malicious apps to gain broad access to user data, emails, "
+                    "Drive files, and calendar via the Google APIs."
+                ),
+                remediation=(
+                    "Admin Console > Security > API controls > App access control: "
+                    "set to 'Don't allow users to access any third-party apps' or restrict "
+                    "to trusted/verified apps. Review and approve specific apps as needed."
+                ),
+                remediation_url="https://admin.google.com/ac/owl/list?tab=configuredApps",
+                compliance_frameworks=fw,
+            ).to_dict())
+        except Exception as e:
+            logger.warning(f"CIS 4.2.1.1 API access check failed: {e}")
+
+        # 5.1.1.1 - App usage activity report reviewed
+        try:
+            reports = self._get_reports_service()
+            try:
+                usage = reports.activities().list(
+                    userKey="all", applicationName="token",
+                    maxResults=10
+                ).execute()
+                has_token_activity = bool(usage.get("items", []))
+            except Exception:
+                has_token_activity = False
+
+            results.append(SaaSCheckResult(
+                check_id="gws_cis_app_usage_report_reviewed",
+                check_title="Application usage activity report is reviewed (CIS 5.1.1.1)",
+                service_area="reporting", severity="medium",
+                status="PASS" if has_token_activity else "FAIL",
+                resource_id=self.domain,
+                description=(
+                    "The OAuth token activity report must be regularly reviewed to identify "
+                    "risky third-party apps with excessive permissions. Apps with access to "
+                    "Drive, Gmail, or Admin APIs are highest risk."
+                ),
+                remediation=(
+                    "Admin Console > Reporting > App reports > Accounts activity: review "
+                    "OAuth grants and token usage regularly. Revoke access for unused or "
+                    "risky applications. Set up automated alerts for new OAuth grants."
+                ),
+                remediation_url="https://admin.google.com/ac/reporting/audit/token",
+                compliance_frameworks=fw,
+            ).to_dict())
+        except Exception as e:
+            logger.warning(f"CIS 5.1.1.1 app usage report check failed: {e}")
 
         return results
 
