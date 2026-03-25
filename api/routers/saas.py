@@ -29,6 +29,40 @@ router = APIRouter()
 
 VALID_SAAS_PROVIDERS = ("servicenow", "m365", "salesforce", "snowflake", "github", "google_workspace", "cloudflare", "openstack")
 
+# Lazy cache for registry check counts
+_registry_check_counts: dict[str, int] | None = None
+
+
+def _get_registry_check_counts() -> dict[str, int]:
+    """Load check counts per SaaS provider from the check registry."""
+    global _registry_check_counts
+    if _registry_check_counts is not None:
+        return _registry_check_counts
+
+    counts: dict[str, int] = {}
+    try:
+        from scanner.registry.definitions import (
+            servicenow_checks, m365_checks, salesforce_checks, snowflake_checks,
+            github_checks, google_workspace_checks, cloudflare_checks, openstack_checks,
+        )
+        provider_modules = {
+            "servicenow": servicenow_checks,
+            "m365": m365_checks,
+            "salesforce": salesforce_checks,
+            "snowflake": snowflake_checks,
+            "github": github_checks,
+            "google_workspace": google_workspace_checks,
+            "cloudflare": cloudflare_checks,
+            "openstack": openstack_checks,
+        }
+        for provider_id, mod in provider_modules.items():
+            counts[provider_id] = len(mod.get_checks())
+    except Exception:
+        # Fallback if registry not available
+        pass
+    _registry_check_counts = counts
+    return counts
+
 CREDENTIAL_VALIDATORS = {
     "servicenow": ServiceNowCredentials,
     "m365": M365Credentials,
@@ -246,6 +280,7 @@ async def saas_overview(
         low_findings=severity_counts.get("low", 0),
         pass_rate=round((passed / total_findings * 100) if total_findings > 0 else 0, 1),
         by_provider=by_provider,
+        registry_check_counts=_get_registry_check_counts(),
     )
 
 

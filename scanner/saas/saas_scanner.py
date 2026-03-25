@@ -1,29 +1,22 @@
-"""SaaS Scanner Factory - creates appropriate scanner based on provider type."""
-from scanner.saas.base_saas_check import BaseSaaSScanner
+"""SaaS Scanner Factory - creates appropriate scanner based on provider type.
+
+Resolves scanner implementations from the central scanner registry
+(SCANNER_PROVIDERS) instead of maintaining a separate hardcoded mapping.
+"""
+from scanner.registry.models import get_scanner_class, SAAS_PROVIDERS
 
 
 class SaaSScannerFactory:
     """Factory for creating SaaS-specific scanners."""
 
-    @staticmethod
-    def create(provider_type: str, credentials: dict) -> BaseSaaSScanner:
-        scanners = {
-            "servicenow": "scanner.saas.servicenow.servicenow_scanner.ServiceNowScanner",
-            "m365": "scanner.saas.m365.m365_scanner.M365Scanner",
-            "salesforce": "scanner.saas.salesforce.salesforce_scanner.SalesforceScanner",
-            "snowflake": "scanner.saas.snowflake.snowflake_scanner.SnowflakeScanner",
-            "github": "scanner.saas.github.github_scanner.GitHubScanner",
-            "google_workspace": "scanner.saas.google_workspace.google_workspace_scanner.GoogleWorkspaceScanner",
-            "cloudflare": "scanner.saas.cloudflare.cloudflare_scanner.CloudflareScanner",
-            "openstack": "scanner.saas.openstack.openstack_scanner.OpenStackScanner",
-        }
+    _saas_provider_values = {p.value for p in SAAS_PROVIDERS}
 
-        scanner_path = scanners.get(provider_type)
-        if not scanner_path:
-            raise ValueError(f"Unsupported SaaS provider: {provider_type}")
-
-        module_path, class_name = scanner_path.rsplit(".", 1)
-        import importlib
-        module = importlib.import_module(module_path)
-        scanner_class = getattr(module, class_name)
-        return scanner_class(credentials)
+    @classmethod
+    def create(cls, provider_type: str, credentials: dict):
+        if provider_type not in cls._saas_provider_values:
+            raise ValueError(
+                f"Unsupported SaaS provider: '{provider_type}'. "
+                f"Supported: {sorted(cls._saas_provider_values)}"
+            )
+        scanner_cls = get_scanner_class(provider_type)
+        return scanner_cls(credentials)

@@ -19,15 +19,15 @@ import {
   BeakerIcon,
 } from '@heroicons/react/24/outline'
 
-const SAAS_PROVIDERS = [
-  { id: 'servicenow', name: 'ServiceNow', icon: 'SN', color: 'bg-[#81B5A1]', checks: 92 },
-  { id: 'm365', name: 'Microsoft 365', icon: 'M365', color: 'bg-[#0078D4]', checks: 37 },
-  { id: 'salesforce', name: 'Salesforce', icon: 'SF', color: 'bg-[#00A1E0]', checks: 18 },
-  { id: 'snowflake', name: 'Snowflake', icon: 'SN*', color: 'bg-[#29B5E8]', checks: 21 },
-  { id: 'github', name: 'GitHub', icon: 'GH', color: 'bg-[#24292F]', checks: 30 },
-  { id: 'google_workspace', name: 'Google Workspace', icon: 'GW', color: 'bg-[#4285F4]', checks: 25 },
-  { id: 'cloudflare', name: 'Cloudflare', icon: 'CF', color: 'bg-[#F38020]', checks: 22 },
-  { id: 'openstack', name: 'OpenStack', icon: 'OS', color: 'bg-[#ED1944]', checks: 24 },
+const SAAS_PROVIDERS_BASE = [
+  { id: 'servicenow', name: 'ServiceNow', icon: 'SN', color: 'bg-[#81B5A1]' },
+  { id: 'm365', name: 'Microsoft 365', icon: 'M365', color: 'bg-[#0078D4]' },
+  { id: 'salesforce', name: 'Salesforce', icon: 'SF', color: 'bg-[#00A1E0]' },
+  { id: 'snowflake', name: 'Snowflake', icon: 'SN*', color: 'bg-[#29B5E8]' },
+  { id: 'github', name: 'GitHub', icon: 'GH', color: 'bg-[#24292F]' },
+  { id: 'google_workspace', name: 'Google Workspace', icon: 'GW', color: 'bg-[#4285F4]' },
+  { id: 'cloudflare', name: 'Cloudflare', icon: 'CF', color: 'bg-[#F38020]' },
+  { id: 'openstack', name: 'OpenStack', icon: 'OS', color: 'bg-[#ED1944]' },
 ]
 
 type Tab = 'overview' | 'connections' | 'findings'
@@ -44,6 +44,12 @@ export default function SaaSSecurityPage() {
   const [credFields, setCredFields] = useState<Record<string, string>>({})
   const [filterProvider, setFilterProvider] = useState('')
   const [filterSeverity, setFilterSeverity] = useState('')
+
+  // Merge registry check counts with provider base info
+  const SAAS_PROVIDERS = SAAS_PROVIDERS_BASE.map(p => ({
+    ...p,
+    checks: overview?.registry_check_counts?.[p.id] || 0,
+  }))
 
   const loadData = async () => {
     setLoading(true)

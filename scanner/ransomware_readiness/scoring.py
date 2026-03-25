@@ -119,29 +119,43 @@ def calculate_domain_score(
     low = sum(1 for e in evaluations if e.status == "fail" and e.severity == Severity.LOW)
 
     # Base score calculation:
-    # - Warnings represent checks that couldn't be evaluated (no data / not run).
-    # - They should NOT grant a perfect score — inability to verify is a risk.
-    # - Include warnings in the denominator: they count as "not passing".
-    # - Only passed checks contribute positively.
+    # - Warnings = checks without data (not run / no findings).
+    # - Base = pass rate among evaluated checks (passed + failed).
+    # - Coverage factor scales down the score when many checks are unevaluated,
+    #   but not as harshly as treating warnings as failures.
+    # - Severity penalties are then applied proportionally.
     evaluated = passed + failed
     all_checks = passed + failed + warning
 
     if all_checks == 0:
         base = 0.0
     elif evaluated == 0:
-        # All checks are warnings (no actual pass/fail data) — score based on
-        # warning ratio to show this domain has no verified compliance
+        # All checks are warnings — no data to evaluate
         base = 0.0
     else:
-        # Score = passed / all_checks (warnings count against the score)
-        base = (passed / all_checks) * 100
+        # Pass rate among evaluated checks
+        eval_score = (passed / evaluated) * 100
+        # Coverage factor: fraction of checks that were actually evaluated
+        # Use sqrt to soften the penalty (50% coverage → 71% factor instead of 50%)
+        coverage = evaluated / all_checks
+        import math
+        coverage_factor = math.sqrt(coverage)
+        base = eval_score * coverage_factor
 
-    adjustment = (
+    # Severity penalties: scale by the inverse of failed checks so that
+    # having many failures doesn't amplify the penalty beyond the base score.
+    # Cap total penalty at 50% of the base so the score always reflects
+    # the actual pass rate to some degree.
+    raw_penalty = (
         crit * SEVERITY_PENALTY[Severity.CRITICAL]
         + high * SEVERITY_PENALTY[Severity.HIGH]
         + med * SEVERITY_PENALTY[Severity.MEDIUM]
         + low * SEVERITY_PENALTY[Severity.LOW]
     )
+    if failed > 0:
+        raw_penalty = raw_penalty / failed  # average penalty per failure
+        raw_penalty = raw_penalty * min(failed, 5)  # cap effective failures at 5
+    adjustment = max(raw_penalty, -base * 0.5)  # never take more than half the base
 
     final = max(0.0, min(100.0, base + adjustment))
 

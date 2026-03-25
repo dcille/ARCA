@@ -572,7 +572,7 @@ FRAMEWORKS = {
 
     "CIS-Azure-5.0": {
         "name": "CIS Microsoft Azure Foundations Benchmark v5.0",
-        "description": "CIS Benchmark v5.0 for Microsoft Azure — comprehensive security configuration covering Identity, Networking, Compute, Security, Storage, Management, and Analytics services with 140+ controls",
+        "description": "CIS Benchmark v5.0 for Microsoft Azure — comprehensive security configuration covering Identity, Networking, Compute, Security, Storage, Management, Analytics, DevOps, and Governance services",
         "category": "cis",
         "controls": [
             # ── Section 2: Analytics Services ─────────────────────────────
@@ -937,6 +937,187 @@ FRAMEWORKS = {
                 "title": "Ensure that 'Enable key rotation reminders' is enabled for each Storage Account",
                 "description": "Enable key rotation reminders to ensure storage account access keys are rotated regularly, reducing the window of compromise.",
                 "checks": {"azure": ["azure_storage_cmk_encryption", "azure_storage_key_rotation"]},
+            },
+            # ── Section 10: App Service & Web Apps ────────────────────────
+            {
+                "id": "10.1",
+                "title": "Ensure App Service web apps require HTTPS and have proper TLS configuration",
+                "description": "App Service should enforce HTTPS-only traffic, require client certificates, and disable FTP/FTPS access.",
+                "checks": {"azure": ["azure_appservice_https_only", "azure_appservice_client_certs", "azure_appservice_ftp_disabled"]},
+            },
+            {
+                "id": "10.2",
+                "title": "Ensure App Service uses managed identity and has remote debugging disabled",
+                "description": "App Service should use managed identities for authentication and have remote debugging disabled in production.",
+                "checks": {"azure": ["azure_appservice_managed_identity", "azure_appservice_remote_debugging_off"]},
+            },
+            {
+                "id": "10.3",
+                "title": "Ensure App Service has HTTP logging enabled",
+                "description": "Enable HTTP logging for App Service to capture request/response data for security monitoring and incident investigation.",
+                "checks": {"azure": ["azure_appservice_http_logging"]},
+            },
+            # ── Section 11: Compute & Virtual Machines ────────────────────
+            {
+                "id": "11.1",
+                "title": "Ensure VM disks are encrypted and use managed disks",
+                "description": "Virtual machine disks should use disk encryption and managed disks. Unattached disks should be encrypted beyond platform keys.",
+                "checks": {"azure": ["azure_vm_disk_encryption", "azure_vm_managed_disks", "azure_disk_unattached_encrypted"]},
+            },
+            {
+                "id": "11.2",
+                "title": "Ensure VMs have antimalware protection and Trusted Launch enabled",
+                "description": "Virtual machines should have antimalware extensions installed and use Trusted Launch for hardware-based boot integrity.",
+                "checks": {"azure": ["azure_vm_antimalware_extension", "azure_vm_trusted_launch"]},
+            },
+            # ── Section 12: Container Services (AKS) ─────────────────────
+            {
+                "id": "12.1",
+                "title": "Ensure AKS clusters use RBAC, Azure AD integration, and network policies",
+                "description": "AKS clusters should have RBAC enabled, Azure AD integration, network policies configured, and Azure Policy add-on enabled.",
+                "checks": {"azure": ["azure_aks_rbac_enabled", "azure_aks_aad_integration", "azure_aks_network_policy", "azure_aks_azure_policy_addon"]},
+            },
+            {
+                "id": "12.2",
+                "title": "Ensure AKS cluster API server has authorized IP ranges configured",
+                "description": "Restrict AKS API server access to specific IP ranges to prevent unauthorized cluster management access.",
+                "checks": {"azure": ["azure_aks_authorized_ip_ranges"]},
+            },
+            # ── Section 13: Database Services ─────────────────────────────
+            {
+                "id": "13.1",
+                "title": "Ensure SQL Server has auditing, TDE, and Advanced Threat Protection enabled",
+                "description": "SQL Servers should have auditing, Transparent Data Encryption, and Advanced Threat Protection enabled for security monitoring.",
+                "checks": {"azure": ["azure_sql_auditing_enabled", "azure_sql_tde_enabled", "azure_sql_atp_enabled"]},
+            },
+            {
+                "id": "13.2",
+                "title": "Ensure SQL Server has Azure AD admin, restricts public access, and requires TLS 1.2",
+                "description": "SQL Servers should have an Azure AD administrator, disable public network access, and enforce TLS 1.2 minimum.",
+                "checks": {"azure": ["azure_sql_ad_admin_configured", "azure_sql_public_access_disabled", "azure_sql_tls_12"]},
+            },
+            {
+                "id": "13.3",
+                "title": "Ensure SQL Server has Vulnerability Assessment configured",
+                "description": "SQL Server should have Vulnerability Assessment enabled for continuous security scanning and recommendations.",
+                "checks": {"azure": ["azure_sql_vulnerability_assessment"]},
+            },
+            {
+                "id": "13.4",
+                "title": "Ensure PostgreSQL Server restricts public network access",
+                "description": "PostgreSQL flexible servers should disable public network access and use private endpoints.",
+                "checks": {"azure": ["azure_postgresql_public_access"]},
+            },
+            # ── Section 14: Key Vault ─────────────────────────────────────
+            {
+                "id": "14.1",
+                "title": "Ensure Key Vault has soft delete, purge protection, and RBAC authorization",
+                "description": "Key Vaults should enable soft delete, purge protection, and RBAC authorization for secure key management.",
+                "checks": {"azure": ["azure_keyvault_soft_delete", "azure_keyvault_purge_protection", "azure_keyvault_rbac_authorization"]},
+            },
+            {
+                "id": "14.2",
+                "title": "Ensure Key Vault has network ACLs configured",
+                "description": "Key Vaults should have network ACLs to restrict access to trusted networks and services only.",
+                "checks": {"azure": ["azure_keyvault_network_acls"]},
+            },
+            # ── Section 15: Storage Services (Extended) ───────────────────
+            {
+                "id": "15.1",
+                "title": "Ensure Storage Accounts enforce HTTPS, TLS 1.2, and block public access",
+                "description": "Storage accounts should require HTTPS, use TLS 1.2 minimum, and block public blob access.",
+                "checks": {"azure": ["azure_storage_https_only", "azure_storage_tls_12", "azure_storage_no_public_access"]},
+            },
+            {
+                "id": "15.2",
+                "title": "Ensure Storage Accounts have network rules, infrastructure encryption, and shared key disabled",
+                "description": "Storage accounts should have default-deny network rules, infrastructure encryption, and shared key access disabled.",
+                "checks": {"azure": ["azure_storage_network_default_deny", "azure_storage_infrastructure_encryption", "azure_storage_shared_key_disabled"]},
+            },
+            # ── Section 16: Backup & Recovery ─────────────────────────────
+            {
+                "id": "16.1",
+                "title": "Ensure Recovery Services vaults are configured with appropriate redundancy",
+                "description": "Recovery Services vaults should be configured for backup operations with appropriate redundancy (GRS/ZRS).",
+                "checks": {"azure": ["azure_backup_vault_exists", "azure_backup_vault_redundancy"]},
+            },
+            # ── Section 17: Endpoint Protection ───────────────────────────
+            {
+                "id": "17.1",
+                "title": "Ensure endpoint protection and adaptive application controls are enforced",
+                "description": "VMs should have endpoint protection installed with adaptive application controls to prevent unauthorized applications.",
+                "checks": {"azure": ["azure_endpoint_protection_installed", "azure_adaptive_app_controls"]},
+            },
+            {
+                "id": "17.2",
+                "title": "Ensure Just-In-Time VM access, auto-updates, and vulnerability assessment are configured",
+                "description": "VMs should use JIT access for management ports, enable automatic OS updates, and have vulnerability assessment installed.",
+                "checks": {"azure": ["azure_jit_vm_access", "azure_vm_auto_updates", "azure_vm_vulnerability_assessment"]},
+            },
+            # ── Section 18: Identity & Privileged Access ──────────────────
+            {
+                "id": "18.1",
+                "title": "Ensure managed identities are used and service principal privileges are limited",
+                "description": "Use managed identities instead of service principal secrets and limit high-privilege service principal roles.",
+                "checks": {"azure": ["azure_iam_managed_identity_usage", "azure_iam_sp_high_privilege"]},
+            },
+            {
+                "id": "18.2",
+                "title": "Ensure classic administrators are removed and PIM JIT access is used",
+                "description": "Remove classic subscription administrators and enable Privileged Identity Management just-in-time access for privileged roles.",
+                "checks": {"azure": ["azure_classic_admins_removed", "azure_pim_jit_access"]},
+            },
+            # ── Section 19: Incident Response & Alerting ──────────────────
+            {
+                "id": "19.1",
+                "title": "Ensure security contacts and alert notifications are configured",
+                "description": "Configure security contacts with email notifications for high severity alerts and ensure action groups are set up.",
+                "checks": {"azure": ["azure_security_contact_configured", "azure_security_alert_notifications", "azure_alert_notifications_enabled"]},
+            },
+            {
+                "id": "19.2",
+                "title": "Ensure action groups and alert rules are configured for critical operations",
+                "description": "Action groups should be associated with alert rules. Activity log alerts should cover critical security operations.",
+                "checks": {"azure": ["azure_action_groups_configured", "azure_alert_rules_with_actions", "azure_critical_operation_alerts"]},
+            },
+            {
+                "id": "19.3",
+                "title": "Ensure incident response playbooks and Sentinel automation are configured",
+                "description": "Configure incident response playbooks and Microsoft Sentinel automation rules for automated threat response.",
+                "checks": {"azure": ["azure_incident_playbooks", "azure_sentinel_automation_rules"]},
+            },
+            # ── Section 20: Microsoft Defender ────────────────────────────
+            {
+                "id": "20.1",
+                "title": "Ensure Defender auto-provisioning is enabled",
+                "description": "Enable auto-provisioning of the Log Analytics monitoring agent to ensure all VMs and new resources are covered.",
+                "checks": {"azure": ["azure_defender_auto_provisioning"]},
+            },
+            # ── Section 21: Azure Policy & Governance ─────────────────────
+            {
+                "id": "21.1",
+                "title": "Ensure Azure Policy assignments exist with security initiatives",
+                "description": "Azure Policy should have assignments configured with the Azure Security Benchmark initiative for continuous compliance.",
+                "checks": {"azure": ["azure_policy_assignments_exist", "azure_policy_security_initiative"]},
+            },
+            {
+                "id": "21.2",
+                "title": "Ensure Azure Policy compliance rate is monitored",
+                "description": "Monitor Azure Policy compliance rate to ensure security policies are being enforced across all resources.",
+                "checks": {"azure": ["azure_policy_compliance_rate"]},
+            },
+            # ── Section 22: DevOps & Supply Chain Security ────────────────
+            {
+                "id": "22.1",
+                "title": "Ensure DevOps security posture management and secure pipelines are configured",
+                "description": "Enable DevOps security posture management with secret scanning, IaC scanning, and secure deployment pipelines.",
+                "checks": {"azure": ["azure_devops_security_enabled", "azure_devops_secret_scanning", "azure_devops_iac_scanning", "azure_devops_secure_pipelines"]},
+            },
+            {
+                "id": "22.2",
+                "title": "Ensure container registry and software supply chain security are configured",
+                "description": "Container registries should have content trust and vulnerability scanning. Supply chain security should be configured.",
+                "checks": {"azure": ["azure_acr_content_trust", "azure_acr_vulnerability_scan", "azure_devops_supply_chain"]},
             },
         ],
     },
