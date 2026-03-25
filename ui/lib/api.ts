@@ -447,6 +447,18 @@ class ApiClient {
     return this.request<any[]>('GET', '/api/v1/dspm/data-stores', undefined, { params })
   }
 
+  async getDSPMPIIPatterns() {
+    return this.request<any>('GET', '/api/v1/dspm/pii-patterns')
+  }
+
+  async getDSPMClassificationLevels() {
+    return this.request<any>('GET', '/api/v1/dspm/classification-levels')
+  }
+
+  async getDSPMScanCapabilities() {
+    return this.request<any>('GET', '/api/v1/dspm/scan-capabilities')
+  }
+
   // Security Graph
   async getSecurityGraph(params?: Record<string, string>) {
     return this.request<any>('GET', '/api/v1/security-graph/graph', undefined, { params })
