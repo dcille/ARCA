@@ -1,16 +1,24 @@
 """Cloud security scanner engine.
 
-Supports AWS, Azure, GCP, Kubernetes, OCI, Alibaba, and IBM Cloud security assessments.
+Supports AWS, Azure, GCP, Kubernetes, OCI, Alibaba, IBM Cloud,
+and all SaaS providers registered in the scanner registry.
 Each provider implements checks organized by service.
 """
+import inspect
 import logging
 from typing import Optional
+
+from scanner.registry.models import get_scanner_class, SCANNER_PROVIDERS
 
 logger = logging.getLogger(__name__)
 
 
 class CloudScanner:
-    """Main cloud scanner that dispatches to provider-specific scanners."""
+    """Main cloud scanner that dispatches to provider-specific scanners.
+
+    Resolves scanner implementations dynamically from the scanner registry
+    (SCANNER_PROVIDERS) instead of hardcoding provider-to-class mappings.
+    """
 
     def __init__(
         self,
@@ -28,53 +36,25 @@ class CloudScanner:
 
     def run_checks(self) -> list[dict]:
         """Run all applicable security checks for the configured provider."""
-        scanner_map = {
-            "aws": self._run_aws_checks,
-            "azure": self._run_azure_checks,
-            "gcp": self._run_gcp_checks,
-            "kubernetes": self._run_kubernetes_checks,
-            "oci": self._run_oci_checks,
-            "alibaba": self._run_alibaba_checks,
-            "ibm_cloud": self._run_ibm_cloud_checks,
-        }
-
-        scanner_fn = scanner_map.get(self.provider_type)
-        if not scanner_fn:
-            raise ValueError(f"Unsupported provider: {self.provider_type}")
-
-        return scanner_fn()
-
-    def _run_aws_checks(self) -> list[dict]:
-        from scanner.providers.aws.aws_scanner import AWSScanner
-        scanner = AWSScanner(self.credentials, self.regions, self.services)
+        scanner_cls = get_scanner_class(self.provider_type)
+        scanner = self._instantiate_scanner(scanner_cls)
         return scanner.scan()
 
-    def _run_azure_checks(self) -> list[dict]:
-        from scanner.providers.azure.azure_scanner import AzureScanner
-        scanner = AzureScanner(self.credentials, self.services)
-        return scanner.scan()
+    def _instantiate_scanner(self, scanner_cls):
+        """Instantiate a scanner, passing only the parameters it accepts."""
+        sig = inspect.signature(scanner_cls.__init__)
+        params = set(sig.parameters.keys()) - {"self"}
 
-    def _run_gcp_checks(self) -> list[dict]:
-        from scanner.providers.gcp.gcp_scanner import GCPScanner
-        scanner = GCPScanner(self.credentials, self.services)
-        return scanner.scan()
+        kwargs: dict = {"credentials": self.credentials}
 
-    def _run_kubernetes_checks(self) -> list[dict]:
-        from scanner.providers.kubernetes.k8s_scanner import K8sScanner
-        scanner = K8sScanner(self.credentials)
-        return scanner.scan()
+        if "regions" in params and self.regions is not None:
+            kwargs["regions"] = self.regions
+        if "services" in params and self.services is not None:
+            kwargs["services"] = self.services
 
-    def _run_oci_checks(self) -> list[dict]:
-        from scanner.providers.oci.oci_scanner import OCIScanner
-        scanner = OCIScanner(self.credentials, self.regions, self.services)
-        return scanner.scan()
+        return scanner_cls(**kwargs)
 
-    def _run_alibaba_checks(self) -> list[dict]:
-        from scanner.providers.alibaba.alibaba_scanner import AlibabaScanner
-        scanner = AlibabaScanner(self.credentials, self.regions, self.services)
-        return scanner.scan()
-
-    def _run_ibm_cloud_checks(self) -> list[dict]:
-        from scanner.providers.ibm_cloud.ibm_cloud_scanner import IBMCloudScanner
-        scanner = IBMCloudScanner(self.credentials, self.regions, self.services)
-        return scanner.scan()
+    @staticmethod
+    def supported_providers() -> list[str]:
+        """Return all provider types with registered scanners."""
+        return sorted(SCANNER_PROVIDERS.keys())

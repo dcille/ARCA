@@ -10,7 +10,14 @@ Resolution chain:
   RR check_id → CHECK_ID_ALIASES → scanner_check_id → CIS control in registry
 """
 
-from scanner.registry.models import CheckDefinition, ProviderType, Severity, Category
+from scanner.registry.models import (
+    CheckDefinition,
+    ProviderType,
+    Severity,
+    Category,
+    SCANNER_PROVIDERS,
+    get_scanner_class,
+)
 from scanner.registry.registry import CheckRegistry, get_default_registry
 
 __all__ = [
@@ -19,5 +26,7 @@ __all__ = [
     "ProviderType",
     "Severity",
     "Category",
+    "SCANNER_PROVIDERS",
+    "get_scanner_class",
     "get_default_registry",
 ]

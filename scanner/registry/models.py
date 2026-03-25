@@ -79,6 +79,49 @@ SAAS_PROVIDERS = {
     ProviderType.CLOUDFLARE, ProviderType.OPENSTACK,
 }
 
+# ---------------------------------------------------------------------------
+# Scanner implementation registry
+# Maps provider_type → fully qualified scanner class path.
+# CloudScanner and SaaSScannerFactory resolve scanners from here dynamically.
+# ---------------------------------------------------------------------------
+SCANNER_PROVIDERS: dict[str, str] = {
+    # Cloud providers
+    "aws": "scanner.providers.aws.aws_scanner.AWSScanner",
+    "azure": "scanner.providers.azure.azure_scanner.AzureScanner",
+    "gcp": "scanner.providers.gcp.gcp_scanner.GCPScanner",
+    "kubernetes": "scanner.providers.kubernetes.k8s_scanner.K8sScanner",
+    "oci": "scanner.providers.oci.oci_scanner.OCIScanner",
+    "alibaba": "scanner.providers.alibaba.alibaba_scanner.AlibabaScanner",
+    "ibm_cloud": "scanner.providers.ibm_cloud.ibm_cloud_scanner.IBMCloudScanner",
+    # SaaS providers
+    "m365": "scanner.saas.m365.m365_scanner.M365Scanner",
+    "github": "scanner.saas.github.github_scanner.GitHubScanner",
+    "google_workspace": "scanner.saas.google_workspace.google_workspace_scanner.GoogleWorkspaceScanner",
+    "salesforce": "scanner.saas.salesforce.salesforce_scanner.SalesforceScanner",
+    "servicenow": "scanner.saas.servicenow.servicenow_scanner.ServiceNowScanner",
+    "snowflake": "scanner.saas.snowflake.snowflake_scanner.SnowflakeScanner",
+    "cloudflare": "scanner.saas.cloudflare.cloudflare_scanner.CloudflareScanner",
+    "openstack": "scanner.saas.openstack.openstack_scanner.OpenStackScanner",
+}
+
+
+def get_scanner_class(provider_type: str):
+    """Dynamically import and return the scanner class for a provider.
+
+    Raises ValueError if the provider is not registered.
+    """
+    import importlib
+
+    class_path = SCANNER_PROVIDERS.get(provider_type)
+    if not class_path:
+        raise ValueError(
+            f"Unsupported provider: '{provider_type}'. "
+            f"Registered providers: {sorted(SCANNER_PROVIDERS.keys())}"
+        )
+    module_path, class_name = class_path.rsplit(".", 1)
+    module = importlib.import_module(module_path)
+    return getattr(module, class_name)
+
 
 @dataclass
 class CheckDefinition:
