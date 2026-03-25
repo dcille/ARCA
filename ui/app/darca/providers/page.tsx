@@ -15,6 +15,7 @@ const PROVIDER_TYPES = [
   { id: 'gcp', name: 'Google Cloud Platform', color: 'bg-[#4285F4]' },
   { id: 'oci', name: 'Oracle Cloud Infrastructure', color: 'bg-[#C74634]' },
   { id: 'alibaba', name: 'Alibaba Cloud', color: 'bg-[#FF6A00]' },
+  { id: 'ibm_cloud', name: 'IBM Cloud', color: 'bg-[#054ADA]' },
   { id: 'kubernetes', name: 'Kubernetes', color: 'bg-[#326CE5]' },
 ]
 
@@ -78,6 +79,18 @@ const SETUP_INSTRUCTIONS: Record<string, { title: string; steps: string[]; permi
     permissions: 'Required: AliyunReadOnlyAccess or custom read-only policy',
     docsUrl: 'https://www.alibabacloud.com/help/en/ram/user-guide/create-a-ram-user',
   },
+  ibm_cloud: {
+    title: 'IBM Cloud IAM Setup',
+    steps: [
+      'Go to IBM Cloud Console > Manage > Access (IAM) > API keys',
+      'Click Create an IBM Cloud API key and provide a name/description',
+      'Copy the API key (shown only once — save it securely)',
+      'Note your Account ID from Manage > Account > Account settings',
+      'Ensure the API key owner has Viewer and Service Reader roles on target services',
+    ],
+    permissions: 'Required: Viewer and Service Reader roles on target services. For enterprise: Enterprise Reader',
+    docsUrl: 'https://cloud.ibm.com/docs/account?topic=account-userapikey',
+  },
   kubernetes: {
     title: 'Kubernetes Kubeconfig Setup',
     steps: [
@@ -126,6 +139,8 @@ export default function ProvidersPage() {
     region: '',
     alibaba_access_key_id: '',
     alibaba_access_key_secret: '',
+    ibm_api_key: '',
+    ibm_account_id: '',
     account_type: 'single',
   })
 
@@ -194,6 +209,12 @@ export default function ProvidersPage() {
             access_key_secret: form.alibaba_access_key_secret,
           }
           break
+        case 'ibm_cloud':
+          credentials = {
+            api_key: form.ibm_api_key,
+            account_id: form.ibm_account_id || undefined,
+          }
+          break
         case 'kubernetes':
           credentials = { kubeconfig: form.kubeconfig }
           break
@@ -253,6 +274,8 @@ export default function ProvidersPage() {
       kubeconfig: '',
       alibaba_access_key_id: '',
       alibaba_access_key_secret: '',
+      ibm_api_key: '',
+      ibm_account_id: '',
     })
     setShowEditModal(true)
   }
@@ -312,6 +335,15 @@ export default function ProvidersPage() {
             credentials = {
               access_key_id: editForm.alibaba_access_key_id,
               access_key_secret: editForm.alibaba_access_key_secret,
+            }
+            hasCredentials = true
+          }
+          break
+        case 'ibm_cloud':
+          if (editForm.ibm_api_key) {
+            credentials = {
+              api_key: editForm.ibm_api_key,
+              account_id: editForm.ibm_account_id || undefined,
             }
             hasCredentials = true
           }
@@ -730,6 +762,23 @@ export default function ProvidersPage() {
                     </>
                   )}
 
+                  {form.provider_type === 'ibm_cloud' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">API Key</label>
+                        <input type="password" value={form.ibm_api_key} onChange={(e) => setForm({ ...form, ibm_api_key: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Account ID <span className="text-brand-gray-400 font-normal">(optional)</span></label>
+                        <input type="text" value={form.ibm_account_id} onChange={(e) => setForm({ ...form, ibm_account_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Region</label>
+                        <input type="text" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} placeholder="us-south" className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                      </div>
+                    </>
+                  )}
+
                   {form.provider_type === 'kubernetes' && (
                     <div>
                       <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Kubeconfig (YAML)</label>
@@ -858,6 +907,23 @@ export default function ProvidersPage() {
                   <div>
                     <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Region</label>
                     <input type="text" value={editForm.region} onChange={(e) => setEditForm({ ...editForm, region: e.target.value })} placeholder="cn-hangzhou" className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
+                  </div>
+                </>
+              )}
+
+              {editingProvider.provider_type === 'ibm_cloud' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">API Key <span className="text-brand-gray-400 font-normal">(leave empty to keep)</span></label>
+                    <input type="password" value={editForm.ibm_api_key} onChange={(e) => setEditForm({ ...editForm, ibm_api_key: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="••••••••" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Account ID</label>
+                    <input type="text" value={editForm.ibm_account_id} onChange={(e) => setEditForm({ ...editForm, ibm_account_id: e.target.value })} className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" placeholder="Leave empty to keep" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Region</label>
+                    <input type="text" value={editForm.region} onChange={(e) => setEditForm({ ...editForm, region: e.target.value })} placeholder="us-south" className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm" />
                   </div>
                 </>
               )}

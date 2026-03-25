@@ -13,7 +13,7 @@ class Provider(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
-    provider_type: Mapped[str] = mapped_column(String(50), nullable=False)  # aws, azure, gcp, kubernetes
+    provider_type: Mapped[str] = mapped_column(String(50), nullable=False)  # aws, azure, gcp, kubernetes, oci, alibaba, ibm_cloud
     alias: Mapped[str] = mapped_column(String(255), nullable=False)
     credentials_encrypted: Mapped[str] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="connected")

@@ -1,6 +1,6 @@
 """Cloud security scanner engine.
 
-Supports AWS, Azure, GCP, and Kubernetes security assessments.
+Supports AWS, Azure, GCP, Kubernetes, OCI, Alibaba, and IBM Cloud security assessments.
 Each provider implements checks organized by service.
 """
 import logging
@@ -35,6 +35,7 @@ class CloudScanner:
             "kubernetes": self._run_kubernetes_checks,
             "oci": self._run_oci_checks,
             "alibaba": self._run_alibaba_checks,
+            "ibm_cloud": self._run_ibm_cloud_checks,
         }
 
         scanner_fn = scanner_map.get(self.provider_type)
@@ -71,4 +72,9 @@ class CloudScanner:
     def _run_alibaba_checks(self) -> list[dict]:
         from scanner.providers.alibaba.alibaba_scanner import AlibabaScanner
         scanner = AlibabaScanner(self.credentials, self.regions, self.services)
+        return scanner.scan()
+
+    def _run_ibm_cloud_checks(self) -> list[dict]:
+        from scanner.providers.ibm_cloud.ibm_cloud_scanner import IBMCloudScanner
+        scanner = IBMCloudScanner(self.credentials, self.regions, self.services)
         return scanner.scan()
