@@ -61,13 +61,17 @@ const CLASSIFICATION_LEVEL_COLORS: Record<string, { bg: string; text: string; bo
   restricted: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-500' },
 }
 
-type TabId = 'inventory' | 'checks' | 'pii' | 'classification' | 'modules'
+type TabId = 'inventory' | 'findings' | 'checks' | 'pii' | 'classification' | 'modules'
 
 export default function DSPMPage() {
   const [overview, setOverview] = useState<any>(null)
   const [piiPatterns, setPiiPatterns] = useState<any>(null)
   const [classificationLevels, setClassificationLevels] = useState<any>(null)
   const [scanCapabilities, setScanCapabilities] = useState<any>(null)
+  const [findingsData, setFindingsData] = useState<any>(null)
+  const [findingsLoading, setFindingsLoading] = useState(false)
+  const [findingsCategoryFilter, setFindingsCategoryFilter] = useState('')
+  const [findingsStatusFilter, setFindingsStatusFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabId>('inventory')
 
@@ -77,16 +81,37 @@ export default function DSPMPage() {
       api.getDSPMPIIPatterns().catch(() => null),
       api.getDSPMClassificationLevels().catch(() => null),
       api.getDSPMScanCapabilities().catch(() => null),
+      api.getDSPMFindings().catch(() => null),
     ])
-      .then(([overviewData, piiData, classData, capData]) => {
+      .then(([overviewData, piiData, classData, capData, findData]) => {
         setOverview(overviewData)
         setPiiPatterns(piiData)
         setClassificationLevels(classData)
         setScanCapabilities(capData)
+        setFindingsData(findData)
       })
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
+
+  const loadFindings = async () => {
+    setFindingsLoading(true)
+    try {
+      const params: Record<string, string> = {}
+      if (findingsCategoryFilter) params.category = findingsCategoryFilter
+      const data = await api.getDSPMFindings(params)
+      setFindingsData(data)
+    } catch (e) {
+      console.error(e)
+    }
+    setFindingsLoading(false)
+  }
+
+  useEffect(() => {
+    if (activeTab === 'findings' && (findingsCategoryFilter)) {
+      loadFindings()
+    }
+  }, [findingsCategoryFilter])
 
   if (loading) {
     return (
@@ -147,6 +172,7 @@ export default function DSPMPage() {
       <div className="flex gap-1 mb-6 bg-brand-gray-100 rounded-lg p-1 w-fit">
         {([
           { id: 'inventory' as const, label: 'Data Inventory' },
+          { id: 'findings' as const, label: 'Findings' },
           { id: 'checks' as const, label: 'Security Checks' },
           { id: 'pii' as const, label: 'PII Detection' },
           { id: 'classification' as const, label: 'Data Classification' },
@@ -220,6 +246,131 @@ export default function DSPMPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Findings Tab */}
+      {activeTab === 'findings' && (
+        <div className="space-y-4">
+          {/* Category summary cards */}
+          {findingsData?.category_summary && Object.keys(findingsData.category_summary).length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {Object.entries(findingsData.category_summary).map(([cat, stats]: [string, any]) => {
+                const catInfo = CATEGORY_LABELS[cat] || { label: cat, color: 'bg-gray-100 text-gray-600' }
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setFindingsCategoryFilter(findingsCategoryFilter === cat ? '' : cat)}
+                    className={`card text-center cursor-pointer transition-all ${
+                      findingsCategoryFilter === cat ? 'ring-2 ring-brand-green' : ''
+                    }`}
+                  >
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${catInfo.color}`}>{catInfo.label}</span>
+                    <p className="text-lg font-bold text-brand-navy mt-1">{stats.total}</p>
+                    <div className="flex justify-center gap-2 text-[10px] mt-1">
+                      <span className="text-green-600">{stats.pass} pass</span>
+                      <span className="text-red-600">{stats.fail} fail</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Filters */}
+          <div className="flex gap-3 items-center">
+            {findingsCategoryFilter && (
+              <button
+                onClick={() => setFindingsCategoryFilter('')}
+                className="text-xs text-brand-gray-500 hover:text-brand-navy flex items-center gap-1"
+              >
+                Clear filter
+              </button>
+            )}
+            <select
+              value={findingsStatusFilter}
+              onChange={(e) => setFindingsStatusFilter(e.target.value)}
+              className="px-3 py-1.5 border border-brand-gray-200 rounded-lg text-sm"
+            >
+              <option value="">All Statuses</option>
+              <option value="FAIL">Failed</option>
+              <option value="PASS">Passed</option>
+            </select>
+            <span className="text-xs text-brand-gray-400">
+              {findingsData?.total || 0} total findings
+            </span>
+          </div>
+
+          {/* Findings table */}
+          <div className="card overflow-hidden p-0">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-brand-gray-200">
+                <thead>
+                  <tr className="bg-brand-gray-50">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Severity</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Check</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Category</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Data Store</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Resource</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Service</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-brand-gray-100">
+                  {(!findingsData?.findings || findingsData.findings.length === 0) ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center text-brand-gray-400">
+                        No DSPM findings found. Run a cloud scan to discover data security issues.
+                      </td>
+                    </tr>
+                  ) : (
+                    findingsData.findings
+                      .filter((f: any) => !findingsStatusFilter || f.status === findingsStatusFilter)
+                      .map((f: any, idx: number) => {
+                        const catInfo = CATEGORY_LABELS[f.dspm_category] || { label: f.dspm_category, color: 'bg-gray-100 text-gray-600' }
+                        return (
+                          <tr key={f.id || idx} className="hover:bg-brand-gray-50">
+                            <td className="px-4 py-3">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                f.status === 'FAIL'
+                                  ? 'bg-red-100 text-red-700 border border-red-200'
+                                  : 'bg-green-100 text-green-700 border border-green-200'
+                              }`}>
+                                {f.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                SEVERITY_COLORS[f.severity] || 'bg-gray-100 text-gray-600 border-gray-200'
+                              }`}>
+                                {f.severity?.toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-brand-navy font-medium max-w-xs truncate">
+                              {f.check_title}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${catInfo.color}`}>
+                                {catInfo.label}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-brand-gray-600">
+                              {f.dspm_data_store || '-'}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-brand-gray-600 max-w-[200px] truncate">
+                              {f.resource_name || f.resource_id || '-'}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-brand-gray-500">
+                              {f.service}
+                            </td>
+                          </tr>
+                        )
+                      })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

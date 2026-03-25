@@ -115,3 +115,4 @@ class SaaSOverview(BaseModel):
     low_findings: int
     pass_rate: float
     by_provider: dict
+    registry_check_counts: dict = {}

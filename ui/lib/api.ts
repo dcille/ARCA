@@ -479,6 +479,14 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/dspm/scan-capabilities')
   }
 
+  async getDSPMFindings(params?: Record<string, string>) {
+    return this.request<any>('GET', '/api/v1/dspm/findings', undefined, { params })
+  }
+
+  async getDSPMAttackPaths() {
+    return this.request<any>('GET', '/api/v1/dspm/attack-paths')
+  }
+
   // Security Graph
   async getSecurityGraph(params?: Record<string, string>) {
     return this.request<any>('GET', '/api/v1/security-graph/graph', undefined, { params })
