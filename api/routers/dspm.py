@@ -20,6 +20,15 @@ from scanner.dspm.data_store_checks import (
     get_data_checks_for_provider,
     get_data_checks_by_category,
 )
+from scanner.dspm.pii_scanner import DEFAULT_PATTERNS, PIIScanner
+from scanner.dspm.data_classifier import (
+    CLASSIFICATION_LEVELS,
+    CLASSIFICATION_RULES,
+    PII_CATEGORY_MAP,
+    TAG_MAPPING,
+    DataClassifier,
+)
+from scanner.dspm.router import DSPMOrchestrator
 from scanner.attack_paths.graph_engine import AttackPathAnalyzer
 
 router = APIRouter()
@@ -319,6 +328,198 @@ async def dspm_findings(
         "findings": sorted(results, key=lambda x: (x["status"] != "FAIL", x["severity"])),
         "category_summary": cat_summary,
         "total": len(results),
+    }
+
+
+@router.get("/pii-patterns")
+async def dspm_pii_patterns():
+    """Return all available PII detection patterns from the PII scanner module."""
+    patterns_by_category: dict[str, list[dict]] = {}
+
+    for p in DEFAULT_PATTERNS:
+        entry = {
+            "pattern_id": p.pattern_id,
+            "name": p.name,
+            "category": p.category,
+            "gdpr_category": p.gdpr_category,
+            "severity": p.severity,
+            "has_validator": p.validator is not None,
+            "confidence": "high" if p.validator is not None else "medium",
+        }
+        patterns_by_category.setdefault(p.gdpr_category, []).append(entry)
+
+    # Summary counts
+    severity_counts: dict[str, int] = {}
+    for p in DEFAULT_PATTERNS:
+        severity_counts[p.severity] = severity_counts.get(p.severity, 0) + 1
+
+    return {
+        "total_patterns": len(DEFAULT_PATTERNS),
+        "patterns_by_gdpr_category": patterns_by_category,
+        "patterns": [
+            {
+                "pattern_id": p.pattern_id,
+                "name": p.name,
+                "category": p.category,
+                "gdpr_category": p.gdpr_category,
+                "severity": p.severity,
+                "has_validator": p.validator is not None,
+                "confidence": "high" if p.validator is not None else "medium",
+            }
+            for p in DEFAULT_PATTERNS
+        ],
+        "severity_summary": severity_counts,
+    }
+
+
+@router.get("/classification-levels")
+async def dspm_classification_levels():
+    """Return data classification levels, rules, and tag conventions."""
+    level_descriptions = {
+        "public": {
+            "label": "Public",
+            "description": "Data intended for public access. No PII or sensitive content.",
+            "color": "green",
+            "order": 0,
+        },
+        "internal": {
+            "label": "Internal",
+            "description": "Internal data containing medium-sensitivity PII such as emails or phone numbers.",
+            "color": "blue",
+            "order": 1,
+        },
+        "confidential": {
+            "label": "Confidential",
+            "description": "Confidential data with high-severity PII such as government IDs or passports.",
+            "color": "orange",
+            "order": 2,
+        },
+        "restricted": {
+            "label": "Restricted",
+            "description": "Highly restricted data with critical PII: financial records, health data, or national IDs.",
+            "color": "red",
+            "order": 3,
+        },
+    }
+
+    rules = []
+    for r in CLASSIFICATION_RULES:
+        rules.append({
+            "pii_categories": r["pii_categories"],
+            "min_matches": r["min_matches"],
+            "level": r["level"],
+            "confidence": r["confidence"],
+        })
+
+    return {
+        "levels": list(CLASSIFICATION_LEVELS),
+        "level_details": level_descriptions,
+        "rules": rules,
+        "pii_category_map": PII_CATEGORY_MAP,
+        "tag_conventions": TAG_MAPPING,
+    }
+
+
+@router.get("/scan-capabilities")
+async def dspm_scan_capabilities():
+    """Return a summary of all DSPM module capabilities and status."""
+    modules = [
+        {
+            "id": "pii_scanner",
+            "name": "PII Scanner",
+            "description": "Detects Personally Identifiable Information across text, files, and structured data with GDPR-focused pattern matching.",
+            "capabilities": [
+                "Text scanning with regex-based PII detection",
+                "File content scanning (UTF-8 and Latin-1)",
+                "Structured data scanning (CSV/JSON rows)",
+                "Validator-based confidence scoring (Luhn, DNI, NIE, IBAN)",
+                "Automatic match redaction for safe reporting",
+            ],
+            "pattern_count": len(DEFAULT_PATTERNS),
+            "status": "active",
+        },
+        {
+            "id": "permission_analyzer",
+            "name": "Permission Analyzer",
+            "description": "Analyses effective permissions on cloud data stores to identify public access, cross-account access, and excessive privileges.",
+            "capabilities": [
+                "Public access detection",
+                "Cross-account principal analysis",
+                "Admin privilege enumeration",
+                "Risk factor identification",
+            ],
+            "status": "active",
+        },
+        {
+            "id": "shadow_detector",
+            "name": "Shadow Data Detector",
+            "description": "Detects shadow copies of sensitive data in unmanaged or unexpected locations across cloud providers.",
+            "capabilities": [
+                "Unmanaged data store discovery",
+                "Shadow copy detection",
+                "Cross-region data replication alerts",
+            ],
+            "status": "active",
+        },
+        {
+            "id": "data_classifier",
+            "name": "Data Classifier",
+            "description": "Classifies cloud resources based on content analysis (PII scan results) and existing cloud tags, detecting misclassifications.",
+            "capabilities": [
+                "Content-based classification (public/internal/confidential/restricted)",
+                "Tag-based classification from cloud resource tags",
+                "Misclassification detection",
+                "Bulk classification support",
+                "Tag recommendation generation per cloud provider",
+            ],
+            "classification_levels": list(CLASSIFICATION_LEVELS),
+            "status": "active",
+        },
+        {
+            "id": "content_sampler",
+            "name": "Content Sampler",
+            "description": "Samples content from cloud data stores for PII and classification analysis without downloading entire datasets.",
+            "capabilities": [
+                "Configurable sampling strategies",
+                "Support for multiple data store types",
+                "Size-limited content extraction",
+            ],
+            "status": "active",
+        },
+        {
+            "id": "native_integrations",
+            "name": "Native Integrations",
+            "description": "Checks the status of native cloud data-security services (e.g. AWS Macie, Azure Purview) and recommends enabling them.",
+            "capabilities": [
+                "Cloud-native service status checks",
+                "Integration recommendations",
+                "Multi-provider support (AWS, Azure, GCP)",
+            ],
+            "status": "active",
+        },
+        {
+            "id": "data_store_checks",
+            "name": "Data Store Checks",
+            "description": "Security checks for cloud data stores covering encryption, access control, backup, retention, logging, and classification.",
+            "capabilities": [
+                "Encryption-at-rest and in-transit validation",
+                "Access control policy checks",
+                "Backup and retention compliance",
+                "Logging and audit trail verification",
+                "Classification tag presence checks",
+            ],
+            "check_count": len(DSPM_CHECKS),
+            "status": "active",
+        },
+    ]
+
+    return {
+        "total_modules": len(modules),
+        "active_modules": sum(1 for m in modules if m["status"] == "active"),
+        "modules": modules,
+        "total_pii_patterns": len(DEFAULT_PATTERNS),
+        "total_security_checks": len(DSPM_CHECKS),
+        "classification_levels": list(CLASSIFICATION_LEVELS),
     }
 
 

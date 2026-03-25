@@ -330,6 +330,26 @@ class ApiClient {
     window.URL.revokeObjectURL(downloadUrl)
   }
 
+  async downloadRRReport() {
+    const url = new URL('/api/v1/reports/ransomware-readiness', window.location.origin)
+    const token = this.getToken()
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    const response = await fetch(url.toString(), { headers })
+    if (!response.ok) throw new Error(`Report generation failed: ${response.status}`)
+
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'ARCA_Ransomware_Readiness_Report.pdf'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(downloadUrl)
+  }
+
   async exportFindings(format: 'csv' | 'json', params?: Record<string, string>) {
     const url = new URL('/api/v1/reports/export/findings', window.location.origin)
     url.searchParams.set('format', format)
@@ -445,6 +465,18 @@ class ApiClient {
   async getDSPMDataStores(providerType?: string) {
     const params = providerType ? { provider_type: providerType } : undefined
     return this.request<any[]>('GET', '/api/v1/dspm/data-stores', undefined, { params })
+  }
+
+  async getDSPMPIIPatterns() {
+    return this.request<any>('GET', '/api/v1/dspm/pii-patterns')
+  }
+
+  async getDSPMClassificationLevels() {
+    return this.request<any>('GET', '/api/v1/dspm/classification-levels')
+  }
+
+  async getDSPMScanCapabilities() {
+    return this.request<any>('GET', '/api/v1/dspm/scan-capabilities')
   }
 
   // Security Graph

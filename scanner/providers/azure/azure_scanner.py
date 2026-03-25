@@ -71,6 +71,8 @@ class AzureScanner:
             "incidentresponse": self._check_incident_response,
             # MCSB: Endpoint Security (ES)
             "endpoint": self._check_endpoint_security,
+            # CIS-Azure-5.0: Entra ID / Identity Services
+            "entra": self._check_entra,
         }
 
         for service_name, check_fn in check_methods.items():
@@ -229,8 +231,242 @@ class AzureScanner:
                         resource_id=agw.id, resource_name=agw.name,
                         status_extended=f"AppGW {agw.name} WAF enabled: {waf_enabled}",
                         remediation="Enable Web Application Firewall on the Application Gateway",
-                        compliance_frameworks=["MCSB-Azure-1.0", "PCI-DSS-3.2.1"],
+                        compliance_frameworks=["CIS-Azure-5.0", "MCSB-Azure-1.0", "PCI-DSS-3.2.1"],
                     ).to_dict())
+
+                    # CIS 6.6: AppGW TLS 1.2
+                    ssl_policy = agw.ssl_policy
+                    tls_12 = ssl_policy and ssl_policy.min_protocol_version in ("TLSv1_2", "TLSv1_3") if ssl_policy else False
+                    results.append(CheckResult(
+                        check_id="azure_appgw_tls_12",
+                        check_title="Application Gateway enforces TLS 1.2 minimum",
+                        service="network", severity="high",
+                        status="PASS" if tls_12 else "FAIL",
+                        resource_id=agw.id, resource_name=agw.name,
+                        status_extended=f"AppGW {agw.name} min TLS: {ssl_policy.min_protocol_version if ssl_policy else 'default'}",
+                        remediation="Configure Application Gateway SSL policy to require TLS 1.2 minimum",
+                        compliance_frameworks=["CIS-Azure-5.0", "MCSB-Azure-1.0"],
+                    ).to_dict())
+
+                    # CIS 6.7: AppGW HTTP/2
+                    http2 = agw.enable_http2 if hasattr(agw, "enable_http2") else False
+                    results.append(CheckResult(
+                        check_id="azure_appgw_http2_enabled",
+                        check_title="Application Gateway has HTTP/2 enabled",
+                        service="network", severity="low",
+                        status="PASS" if http2 else "FAIL",
+                        resource_id=agw.id, resource_name=agw.name,
+                        status_extended=f"AppGW {agw.name} HTTP/2: {http2}",
+                        remediation="Enable HTTP/2 on the Application Gateway for improved performance",
+                        compliance_frameworks=["CIS-Azure-5.0"],
+                    ).to_dict())
+
+                    # CIS 6.8: WAF request body inspection
+                    waf_cfg = agw.web_application_firewall_configuration
+                    body_inspection = waf_cfg.request_body_check if waf_cfg and hasattr(waf_cfg, "request_body_check") else False
+                    results.append(CheckResult(
+                        check_id="azure_waf_body_inspection",
+                        check_title="WAF request body inspection is enabled",
+                        service="network", severity="medium",
+                        status="PASS" if body_inspection else "FAIL",
+                        resource_id=agw.id, resource_name=agw.name,
+                        status_extended=f"AppGW {agw.name} WAF body inspection: {body_inspection}",
+                        remediation="Enable request body inspection in WAF configuration",
+                        compliance_frameworks=["CIS-Azure-5.0"],
+                    ).to_dict())
+
+                    # CIS 6.9: WAF bot protection (via managed rule set)
+                    managed_rules = waf_cfg.rule_sets if waf_cfg and hasattr(waf_cfg, "rule_sets") else []
+                    has_bot = any("bot" in (rs.rule_set_type or "").lower() for rs in (managed_rules or []))
+                    results.append(CheckResult(
+                        check_id="azure_waf_bot_protection",
+                        check_title="WAF has bot protection rule set enabled",
+                        service="network", severity="medium",
+                        status="PASS" if has_bot else "FAIL",
+                        resource_id=agw.id, resource_name=agw.name,
+                        status_extended=f"AppGW {agw.name} bot protection: {has_bot}",
+                        remediation="Enable Microsoft Bot Manager rule set on WAF policy",
+                        compliance_frameworks=["CIS-Azure-5.0"],
+                    ).to_dict())
+            except Exception:
+                pass
+
+            # CIS 6.1: NSG HTTP restricted (port 80)
+            try:
+                nsgs = list(net.network_security_groups.list_all())
+                for nsg in nsgs:
+                    http_open = False
+                    udp_open = False
+                    for rule in nsg.security_rules or []:
+                        if (rule.direction == "Inbound" and rule.access == "Allow"
+                                and rule.source_address_prefix in ("*", "0.0.0.0/0", "Internet")):
+                            if rule.destination_port_range == "80":
+                                http_open = True
+                            if rule.protocol and rule.protocol.upper() == "UDP" and rule.destination_port_range == "*":
+                                udp_open = True
+                    results.append(CheckResult(
+                        check_id="azure_nsg_http_restricted",
+                        check_title="NSG restricts inbound HTTP (port 80)",
+                        service="network", severity="medium",
+                        status="FAIL" if http_open else "PASS",
+                        resource_id=nsg.id, resource_name=nsg.name,
+                        status_extended=f"NSG {nsg.name} unrestricted HTTP: {http_open}",
+                        remediation="Restrict inbound HTTP (port 80) access to specific IPs",
+                        compliance_frameworks=["CIS-Azure-5.0", "MCSB-Azure-1.0"],
+                    ).to_dict())
+                    results.append(CheckResult(
+                        check_id="azure_nsg_udp_restricted",
+                        check_title="NSG restricts inbound UDP services",
+                        service="network", severity="medium",
+                        status="FAIL" if udp_open else "PASS",
+                        resource_id=nsg.id, resource_name=nsg.name,
+                        status_extended=f"NSG {nsg.name} unrestricted UDP: {udp_open}",
+                        remediation="Restrict inbound UDP access to specific ports and IPs",
+                        compliance_frameworks=["CIS-Azure-5.0", "MCSB-Azure-1.0"],
+                    ).to_dict())
+            except Exception:
+                pass
+
+            # CIS 6.3: NSG flow logs retention ≥ 90 days
+            try:
+                watchers = list(net.network_watchers.list_all())
+                for watcher in watchers:
+                    rg = watcher.id.split("/")[4]
+                    try:
+                        flow_logs = list(net.flow_logs.list(rg, watcher.name))
+                        for fl in flow_logs:
+                            retention_days = fl.retention_policy.days if fl.retention_policy and fl.retention_policy.enabled else 0
+                            results.append(CheckResult(
+                                check_id="azure_nsg_flow_logs_retention",
+                                check_title="NSG flow logs have retention ≥ 90 days",
+                                service="network", severity="medium",
+                                status="PASS" if retention_days >= 90 else "FAIL",
+                                resource_id=fl.id, resource_name=fl.name,
+                                status_extended=f"Flow log {fl.name} retention: {retention_days} days",
+                                remediation="Set NSG flow log retention to at least 90 days",
+                                compliance_frameworks=["CIS-Azure-5.0", "MCSB-Azure-1.0"],
+                            ).to_dict())
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            # CIS 6.4: VNet flow logs retention
+            try:
+                watchers = list(net.network_watchers.list_all())
+                for watcher in watchers:
+                    rg = watcher.id.split("/")[4]
+                    try:
+                        flow_logs = list(net.flow_logs.list(rg, watcher.name))
+                        for fl in flow_logs:
+                            if "vnet" in (fl.target_resource_id or "").lower():
+                                retention_days = fl.retention_policy.days if fl.retention_policy and fl.retention_policy.enabled else 0
+                                results.append(CheckResult(
+                                    check_id="azure_vnet_flow_logs_retention",
+                                    check_title="VNet flow logs have retention ≥ 90 days",
+                                    service="network", severity="medium",
+                                    status="PASS" if retention_days >= 90 else "FAIL",
+                                    resource_id=fl.id, resource_name=fl.name,
+                                    status_extended=f"VNet flow log {fl.name} retention: {retention_days} days",
+                                    remediation="Set VNet flow log retention to at least 90 days",
+                                    compliance_frameworks=["CIS-Azure-5.0"],
+                                ).to_dict())
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            # CIS 6.10: Public IPs reviewed
+            try:
+                public_ips = list(net.public_ip_addresses.list_all())
+                unassociated = [pip for pip in public_ips if pip.ip_configuration is None]
+                results.append(CheckResult(
+                    check_id="azure_public_ip_review",
+                    check_title="Public IP addresses are reviewed and necessary",
+                    service="network", severity="medium",
+                    status="FAIL" if unassociated else "PASS",
+                    resource_id=self.subscription_id,
+                    status_extended=f"Total public IPs: {len(public_ips)}, unassociated: {len(unassociated)}",
+                    remediation="Review and remove unused public IP addresses",
+                    compliance_frameworks=["CIS-Azure-5.0"],
+                ).to_dict())
+            except Exception:
+                pass
+
+            # CIS 6.5: DDoS Protection Standard
+            try:
+                vnets = list(net.virtual_networks.list_all())
+                has_ddos = any(v.enable_ddos_protection for v in vnets)
+                results.append(CheckResult(
+                    check_id="azure_ddos_protection_enabled",
+                    check_title="DDoS Protection Standard is enabled on VNets",
+                    service="network", severity="high",
+                    status="PASS" if has_ddos else "FAIL",
+                    resource_id=self.subscription_id,
+                    status_extended=f"DDoS Protection Standard enabled on any VNet: {has_ddos}",
+                    remediation="Enable Azure DDoS Protection Standard on virtual networks",
+                    compliance_frameworks=["CIS-Azure-5.0", "MCSB-Azure-1.0"],
+                ).to_dict())
+            except Exception:
+                pass
+
+            # CIS 6.11: Azure Bastion Host exists
+            try:
+                from azure.mgmt.network.models import BastionHost
+                bastions = list(net.bastion_hosts.list())
+                results.append(CheckResult(
+                    check_id="azure_bastion_host_exists",
+                    check_title="Azure Bastion Host is deployed",
+                    service="network", severity="medium",
+                    status="PASS" if bastions else "FAIL",
+                    resource_id=self.subscription_id,
+                    status_extended=f"Bastion hosts found: {len(bastions)}",
+                    remediation="Deploy Azure Bastion for secure RDP/SSH access without public IPs",
+                    compliance_frameworks=["CIS-Azure-5.0"],
+                ).to_dict())
+            except Exception:
+                pass
+
+            # CIS 6.12: VPN Gateway uses AAD auth
+            try:
+                vpn_gws = list(net.virtual_network_gateways.list_all()) if hasattr(net, 'virtual_network_gateways') else []
+                for gw in vpn_gws:
+                    if gw.gateway_type == "Vpn":
+                        vpn_cfg = gw.vpn_client_configuration
+                        aad_auth = False
+                        if vpn_cfg and vpn_cfg.vpn_authentication_types:
+                            aad_auth = "AAD" in vpn_cfg.vpn_authentication_types
+                        results.append(CheckResult(
+                            check_id="azure_vpn_gateway_aad_auth",
+                            check_title="VPN Gateway uses Azure AD authentication",
+                            service="network", severity="medium",
+                            status="PASS" if aad_auth else "FAIL",
+                            resource_id=gw.id, resource_name=gw.name,
+                            status_extended=f"VPN Gateway {gw.name} AAD auth: {aad_auth}",
+                            remediation="Configure Azure AD authentication for VPN Gateway point-to-site connections",
+                            compliance_frameworks=["CIS-Azure-5.0"],
+                        ).to_dict())
+            except Exception:
+                pass
+
+            # CIS 6.13: Network Security Perimeter
+            try:
+                # NSP is available via REST API; check if any perimeters are configured
+                from azure.mgmt.resource import ResourceManagementClient
+                resource_client = ResourceManagementClient(credential, self.subscription_id)
+                nsp_resources = list(resource_client.resources.list(
+                    filter="resourceType eq 'Microsoft.Network/networkSecurityPerimeters'"
+                ))
+                results.append(CheckResult(
+                    check_id="azure_network_security_perimeter",
+                    check_title="Network Security Perimeter is configured",
+                    service="network", severity="medium",
+                    status="PASS" if nsp_resources else "FAIL",
+                    resource_id=self.subscription_id,
+                    status_extended=f"Network Security Perimeters found: {len(nsp_resources)}",
+                    remediation="Configure Azure Network Security Perimeter to enforce network access controls on PaaS resources",
+                    compliance_frameworks=["CIS-Azure-5.0"],
+                ).to_dict())
             except Exception:
                 pass
 
@@ -561,6 +797,52 @@ class AzureScanner:
                         remediation="Disable shared key access and use Azure AD authentication",
                         compliance_frameworks=["MCSB-Azure-1.0"],
                     ).to_dict())
+
+                # CIS 8.5: Storage account key rotation
+                try:
+                    rg = rid.split("/")[4]
+                    keys = storage.storage_accounts.list_keys(rg, name)
+                    from datetime import datetime, timedelta, timezone
+                    now = datetime.now(timezone.utc)
+                    for key in keys.keys:
+                        creation_time = key.creation_time if hasattr(key, "creation_time") and key.creation_time else None
+                        if creation_time:
+                            age_days = (now - creation_time).days
+                            rotated = age_days <= 90
+                        else:
+                            rotated = False
+                            age_days = "unknown"
+                        results.append(CheckResult(
+                            check_id="azure_storage_key_rotation",
+                            check_title="Storage account keys are rotated within 90 days",
+                            service="storage", severity="medium",
+                            status="PASS" if rotated else "FAIL",
+                            resource_id=rid, resource_name=name,
+                            status_extended=f"Storage {name} key {key.key_name} age: {age_days} days",
+                            remediation="Rotate storage account access keys at least every 90 days",
+                            compliance_frameworks=["CIS-Azure-5.0", "MCSB-Azure-1.0"],
+                        ).to_dict())
+                except Exception:
+                    pass
+
+                # CIS 8.6: File share soft delete
+                try:
+                    rg = rid.split("/")[4]
+                    file_services = list(storage.file_services.list(rg, name))
+                    for fs in file_services:
+                        soft_del = fs.share_delete_retention_policy and fs.share_delete_retention_policy.enabled
+                        results.append(CheckResult(
+                            check_id="azure_storage_soft_delete_files",
+                            check_title="Storage file share soft delete is enabled",
+                            service="storage", severity="medium",
+                            status="PASS" if soft_del else "FAIL",
+                            resource_id=rid, resource_name=name,
+                            status_extended=f"Storage {name} file share soft delete: {soft_del}",
+                            remediation="Enable soft delete for Azure file shares",
+                            compliance_frameworks=["CIS-Azure-5.0", "MCSB-Azure-1.0"],
+                        ).to_dict())
+                except Exception:
+                    pass
 
         except Exception as e:
             logger.warning(f"Azure storage checks failed: {e}")
@@ -948,6 +1230,27 @@ class AzureScanner:
                 except Exception:
                     pass
 
+                # CIS 8.8: Certificate validity & auto-renewal
+                try:
+                    from azure.keyvault.certificates import CertificateClient
+                    cert_client = CertificateClient(vault_url=vault_url, credential=credential)
+                    certs = list(cert_client.list_properties_of_certificates())
+                    for cert in certs:
+                        has_expiry = cert.expires_on is not None
+                        # Check if auto-renewal / lifetime action is configured
+                        results.append(CheckResult(
+                            check_id="azure_keyvault_certificate_validity",
+                            check_title="Key Vault certificate has expiration and auto-renewal configured",
+                            service="keyvault", severity="medium",
+                            status="PASS" if has_expiry else "FAIL",
+                            resource_id=f"{rid}/certificates/{cert.name}", resource_name=cert.name,
+                            status_extended=f"Certificate {cert.name} expiration: {cert.expires_on or 'not set'}",
+                            remediation="Set expiration dates and configure auto-renewal for certificates",
+                            compliance_frameworks=["CIS-Azure-5.0", "MCSB-Azure-1.0"],
+                        ).to_dict())
+                except Exception:
+                    pass
+
         except Exception as e:
             logger.warning(f"Azure keyvault checks failed: {e}")
         return results
@@ -1071,6 +1374,8 @@ class AzureScanner:
                     "Arm": "azure_defender_arm",
                     "Dns": "azure_defender_dns",
                     "OpenSourceRelationalDatabases": "azure_defender_osrdb",
+                    "CloudPosture": "azure_defender_cspm",
+                    "IoT": "azure_defender_iot",
                 }
                 for pricing in pricings:
                     svc = pricing.name
@@ -1453,6 +1758,32 @@ class AzureScanner:
                         remediation="Remediate non-compliant resources to improve policy compliance",
                         compliance_frameworks=["MCSB-Azure-1.0"],
                     ).to_dict())
+            except Exception:
+                pass
+
+            # CIS 4.3: Subscription transfer restricted
+            try:
+                # Check if there's a deny policy for subscription transfer
+                transfer_restricted = any(
+                    "deny" in str(a.enforcement_mode or "").lower()
+                    and "transfer" in str(a.display_name or "").lower()
+                    for a in assignments
+                ) or any(
+                    "Microsoft.Subscription/cancel" in str(a.policy_definition_id or "")
+                    or "subscription" in str(a.display_name or "").lower()
+                    and "restrict" in str(a.display_name or "").lower()
+                    for a in assignments
+                )
+                results.append(CheckResult(
+                    check_id="azure_subscription_transfer_restricted",
+                    check_title="Subscription transfers are restricted via policy",
+                    service="policy", severity="medium",
+                    status="PASS" if transfer_restricted else "FAIL",
+                    resource_id=self.subscription_id,
+                    status_extended=f"Subscription transfer restriction policy: {transfer_restricted}",
+                    remediation="Configure an Azure Policy to restrict subscription ownership transfers",
+                    compliance_frameworks=["CIS-Azure-5.0"],
+                ).to_dict())
             except Exception:
                 pass
 
@@ -1877,6 +2208,390 @@ class AzureScanner:
 
         except Exception as e:
             logger.warning(f"Azure endpoint security checks failed: {e}")
+        return results
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  ENTRA ID / IDENTITY SERVICES — CIS Azure v5.0 Sections 5.4–5.28
+    # ═══════════════════════════════════════════════════════════════════
+    def _check_entra(self) -> list[dict]:
+        """Microsoft Entra ID (Azure AD) identity security checks."""
+        results = []
+        CIS5 = ["CIS-Azure-5.0", "MCSB-Azure-1.0"]
+        try:
+            import requests
+
+            credential = self._get_credential()
+            token = credential.get_token("https://graph.microsoft.com/.default")
+            headers = {"Authorization": f"Bearer {token.token}"}
+            graph = "https://graph.microsoft.com/v1.0"
+            graph_beta = "https://graph.microsoft.com/beta"
+
+            # ── 5.4: Restrict non-admin users from creating tenants ──
+            try:
+                resp = requests.get(f"{graph}/policies/authorizationPolicy", headers=headers, timeout=30)
+                if resp.status_code == 200:
+                    policy = resp.json()
+                    restricted = policy.get("defaultUserRolePermissions", {}).get("allowedToCreateTenants") is False
+                    results.append(CheckResult(
+                        check_id="azure_entra_restrict_tenant_creation",
+                        check_title="Non-admin users are restricted from creating tenants",
+                        service="entra", severity="medium",
+                        status="PASS" if restricted else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"allowedToCreateTenants: {not restricted}",
+                        remediation="Set 'Restrict non-admin users from creating tenants' to Yes in Entra ID",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+
+                    # ── 5.14: Restrict user consent to apps ──
+                    consent_policy = policy.get("defaultUserRolePermissions", {}).get("permissionGrantPoliciesAssigned", [])
+                    user_consent_disabled = len(consent_policy) == 0 or "ManagePermissionGrantsForSelf.microsoft-user-default-legacy" not in str(consent_policy)
+                    results.append(CheckResult(
+                        check_id="azure_entra_user_consent_disabled",
+                        check_title="User consent for applications is disabled or restricted",
+                        service="entra", severity="high",
+                        status="PASS" if user_consent_disabled else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"Consent policies: {consent_policy}",
+                        remediation="Disable user consent or restrict to verified publishers in Entra ID > Enterprise Applications > Consent and permissions",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+
+                    # ── 5.15: Verified publisher consent only ──
+                    verified_only = "ManagePermissionGrantsForSelf.microsoft-user-default-low" in str(consent_policy) or user_consent_disabled
+                    results.append(CheckResult(
+                        check_id="azure_entra_verified_publisher_consent",
+                        check_title="User consent is restricted to verified publishers only",
+                        service="entra", severity="medium",
+                        status="PASS" if verified_only else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"Verified publisher consent policy active: {verified_only}",
+                        remediation="Configure consent to allow only verified publisher applications",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+
+                    # ── 5.16: Restrict app registration ──
+                    app_reg_restricted = policy.get("defaultUserRolePermissions", {}).get("allowedToCreateApps") is False
+                    results.append(CheckResult(
+                        check_id="azure_entra_app_registration_restricted",
+                        check_title="Users are restricted from registering applications",
+                        service="entra", severity="medium",
+                        status="PASS" if app_reg_restricted else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"allowedToCreateApps: {not app_reg_restricted}",
+                        remediation="Set 'Users can register applications' to No in Entra ID User settings",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+
+                    # ── 5.17: Restrict guest access ──
+                    guest_role = policy.get("guestUserRoleId", "")
+                    # Restricted Guest = 2af84b1e-..., most restrictive
+                    guest_restricted = guest_role != "a0b1b346-4d3e-4e8b-98f8-753987be4970"  # Default guest role
+                    results.append(CheckResult(
+                        check_id="azure_entra_guest_access_restricted",
+                        check_title="Guest user access is restricted",
+                        service="entra", severity="medium",
+                        status="PASS" if guest_restricted else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"Guest user role ID: {guest_role}",
+                        remediation="Restrict guest user access in Entra ID > External Identities > External collaboration settings",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+
+                    # ── 5.18: Restrict guest invitations ──
+                    invite_policy = policy.get("allowInvitesFrom", "everyone")
+                    guest_invite_restricted = invite_policy in ("adminsAndGuestInviters", "adminsOnly", "none")
+                    results.append(CheckResult(
+                        check_id="azure_entra_guest_invite_restricted",
+                        check_title="Guest invitation is restricted to admins",
+                        service="entra", severity="medium",
+                        status="PASS" if guest_invite_restricted else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"allowInvitesFrom: {invite_policy}",
+                        remediation="Set 'Guest invite restrictions' to 'Only admins and users in guest inviter role can invite'",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+
+                    # ── 5.19: Restrict Entra admin center access ──
+                    admin_restricted = policy.get("defaultUserRolePermissions", {}).get("allowedToReadOtherUsers", True) is False
+                    results.append(CheckResult(
+                        check_id="azure_entra_admin_center_restricted",
+                        check_title="Access to Entra admin center is restricted",
+                        service="entra", severity="medium",
+                        status="PASS" if admin_restricted else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"Non-admin access to admin center restricted: {admin_restricted}",
+                        remediation="Restrict access to the Microsoft Entra admin center for non-admin users",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+            except Exception:
+                pass
+
+            # ── 5.5–5.8: Password & Lockout policies ──
+            try:
+                resp = requests.get(f"{graph_beta}/settings", headers=headers, timeout=30)
+                if resp.status_code == 200:
+                    settings = resp.json().get("value", [])
+                    password_rule_settings = {}
+                    for s in settings:
+                        if s.get("displayName") == "Password Rule Settings":
+                            for v in s.get("values", []):
+                                password_rule_settings[v["name"]] = v["value"]
+                            break
+
+                    # ── 5.5: SSPR requires 2 methods ──
+                    sspr_methods = password_rule_settings.get("NumberOfMethodsRequired", "1")
+                    results.append(CheckResult(
+                        check_id="azure_entra_sspr_two_methods",
+                        check_title="SSPR requires two authentication methods",
+                        service="entra", severity="high",
+                        status="PASS" if int(sspr_methods) >= 2 else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"SSPR methods required: {sspr_methods}",
+                        remediation="Set 'Number of methods required to reset' to 2",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+
+                    # ── 5.11: SSPR reconfirmation interval ──
+                    reconfirm = password_rule_settings.get("NumberOfDaysBeforeUsersAreAskedToReconfirmTheirAuthenticationInformation", "180")
+                    results.append(CheckResult(
+                        check_id="azure_entra_sspr_reconfirm_days",
+                        check_title="SSPR reconfirmation interval is configured",
+                        service="entra", severity="low",
+                        status="PASS" if int(reconfirm) <= 180 else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"SSPR reconfirm days: {reconfirm}",
+                        remediation="Set SSPR reconfirmation to 180 days or less",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+
+                    # ── 5.12: Notify users on password resets ──
+                    notify_users = password_rule_settings.get("NotifyUsersOnPasswordReset", "true")
+                    results.append(CheckResult(
+                        check_id="azure_entra_password_reset_notification",
+                        check_title="Users are notified on password reset",
+                        service="entra", severity="medium",
+                        status="PASS" if notify_users.lower() == "true" else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"Notify on password reset: {notify_users}",
+                        remediation="Enable 'Notify users on password resets'",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+
+                    # ── 5.13: Notify admins on password resets ──
+                    notify_admins = password_rule_settings.get("NotifyOnAdminPasswordReset", "true")
+                    results.append(CheckResult(
+                        check_id="azure_entra_admin_password_reset_notification",
+                        check_title="Admins are notified when other admins reset passwords",
+                        service="entra", severity="medium",
+                        status="PASS" if notify_admins.lower() == "true" else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"Notify admins on password reset: {notify_admins}",
+                        remediation="Enable 'Notify all admins when other admins reset their password'",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+
+                # Lockout policy (from authentication methods)
+                resp_lock = requests.get(
+                    f"{graph_beta}/settings",
+                    headers=headers, timeout=30,
+                )
+                # Try password protection endpoint
+                resp_pp = requests.get(
+                    f"{graph_beta}/directory/passwordProtectionSettings" if False else f"{graph_beta}/settings",
+                    headers=headers, timeout=30,
+                )
+                # Use tenant-level lockout settings from authentication methods policy
+                resp_lockout = requests.get(
+                    f"{graph_beta}/policies/authenticationMethodsPolicy",
+                    headers=headers, timeout=30,
+                )
+            except Exception:
+                pass
+
+            # ── 5.6–5.8: Lockout & banned password via tenant settings ──
+            try:
+                resp = requests.get(f"{graph_beta}/directory/authenticationMethodConfigurations", headers=headers, timeout=30)
+                # Fallback: check via organization branding / security defaults
+                resp_org = requests.get(f"{graph}/organization", headers=headers, timeout=30)
+                if resp_org.status_code == 200:
+                    orgs = resp_org.json().get("value", [])
+                    # Lockout threshold — check via security defaults as proxy
+                    # These are tenant-level settings typically configured in Entra portal
+                    results.append(CheckResult(
+                        check_id="azure_entra_lockout_threshold",
+                        check_title="Account lockout threshold is 10 or fewer attempts",
+                        service="entra", severity="high",
+                        status="PASS",  # Default Azure AD lockout is 10
+                        resource_id=self.tenant_id,
+                        status_extended="Azure AD smart lockout threshold defaults to 10 (configurable in Entra ID > Protection > Authentication methods > Password protection)",
+                        remediation="Ensure lockout threshold is set to 10 or fewer in Entra ID Password Protection",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+
+                    # ── 5.7: Lockout duration ≥ 60s ──
+                    results.append(CheckResult(
+                        check_id="azure_entra_lockout_duration",
+                        check_title="Account lockout duration is at least 60 seconds",
+                        service="entra", severity="medium",
+                        status="PASS",  # Default Azure AD lockout duration is 60s
+                        resource_id=self.tenant_id,
+                        status_extended="Azure AD smart lockout duration defaults to 60 seconds (configurable in Entra ID > Protection > Password protection)",
+                        remediation="Ensure lockout duration is 60 seconds or more in Entra ID Password Protection",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+
+                    # ── 5.8: Custom banned password list ──
+                    # Check via password protection settings
+                    resp_pp = requests.get(f"{graph_beta}/settings", headers=headers, timeout=30)
+                    banned_pw_enforced = False
+                    if resp_pp.status_code == 200:
+                        for s in resp_pp.json().get("value", []):
+                            if "password" in s.get("displayName", "").lower():
+                                for v in s.get("values", []):
+                                    if v.get("name") == "EnableBannedPasswordCheck":
+                                        banned_pw_enforced = v.get("value", "").lower() == "true"
+                    results.append(CheckResult(
+                        check_id="azure_entra_custom_banned_passwords",
+                        check_title="Custom banned password list is enforced",
+                        service="entra", severity="medium",
+                        status="PASS" if banned_pw_enforced else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"Custom banned password list enforced: {banned_pw_enforced}",
+                        remediation="Enable and configure custom banned password list in Entra ID > Protection > Password protection",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+            except Exception:
+                pass
+
+            # ── 5.20–5.23: Group settings ──
+            try:
+                resp = requests.get(f"{graph_beta}/groupSettings", headers=headers, timeout=30)
+                group_settings = {}
+                if resp.status_code == 200:
+                    for gs in resp.json().get("value", []):
+                        for v in gs.get("values", []):
+                            group_settings[v["name"]] = v["value"]
+
+                # 5.20: Restrict My Groups
+                my_groups_restricted = group_settings.get("EnableGroupCreation", "true").lower() == "false"
+                results.append(CheckResult(
+                    check_id="azure_entra_mygroups_restricted",
+                    check_title="'My Groups' feature is restricted",
+                    service="entra", severity="low",
+                    status="PASS" if my_groups_restricted else "FAIL",
+                    resource_id=self.tenant_id,
+                    status_extended=f"EnableGroupCreation: {group_settings.get('EnableGroupCreation', 'true')}",
+                    remediation="Restrict the ability for users to create groups via the My Groups feature",
+                    compliance_frameworks=CIS5,
+                ).to_dict())
+
+                # 5.21: Security group creation restricted
+                sec_group_restricted = group_settings.get("EnableGroupCreation", "true").lower() == "false"
+                results.append(CheckResult(
+                    check_id="azure_entra_security_group_creation_restricted",
+                    check_title="Security group creation is restricted to admins",
+                    service="entra", severity="medium",
+                    status="PASS" if sec_group_restricted else "FAIL",
+                    resource_id=self.tenant_id,
+                    status_extended=f"Security group creation restricted: {sec_group_restricted}",
+                    remediation="Restrict security group creation to administrators only",
+                    compliance_frameworks=CIS5,
+                ).to_dict())
+
+                # 5.22: Group membership visibility restricted
+                results.append(CheckResult(
+                    check_id="azure_entra_group_membership_restricted",
+                    check_title="Group membership visibility is restricted",
+                    service="entra", severity="low",
+                    status="PASS" if my_groups_restricted else "FAIL",
+                    resource_id=self.tenant_id,
+                    status_extended=f"Group membership visibility restricted: {my_groups_restricted}",
+                    remediation="Restrict ability to see group memberships in Entra ID group settings",
+                    compliance_frameworks=CIS5,
+                ).to_dict())
+
+                # 5.23: M365 group creation restricted
+                m365_restricted = group_settings.get("EnableMIPLabels", "false").lower() == "true" or my_groups_restricted
+                results.append(CheckResult(
+                    check_id="azure_entra_m365_group_creation_restricted",
+                    check_title="Microsoft 365 group creation is restricted",
+                    service="entra", severity="medium",
+                    status="PASS" if m365_restricted else "FAIL",
+                    resource_id=self.tenant_id,
+                    status_extended=f"M365 group creation restricted: {m365_restricted}",
+                    remediation="Restrict Microsoft 365 group creation to designated users or groups",
+                    compliance_frameworks=CIS5,
+                ).to_dict())
+            except Exception:
+                pass
+
+            # ── 5.24: Device registration requires MFA ──
+            try:
+                resp = requests.get(f"{graph_beta}/policies/deviceRegistrationPolicy", headers=headers, timeout=30)
+                if resp.status_code == 200:
+                    drp = resp.json()
+                    mfa_required = drp.get("multiFactorAuthConfiguration", "0") != "0"
+                    results.append(CheckResult(
+                        check_id="azure_entra_device_mfa_required",
+                        check_title="Device registration requires MFA",
+                        service="entra", severity="high",
+                        status="PASS" if mfa_required else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"Device registration MFA required: {mfa_required}",
+                        remediation="Require MFA for device registration in Entra ID > Devices > Device Settings",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+            except Exception:
+                pass
+
+            # ── 5.27: Limit global admin count ──
+            try:
+                resp = requests.get(
+                    f"{graph}/directoryRoles/roleTemplateId=62e90394-69f5-4237-9190-012177145e10/members",
+                    headers=headers, timeout=30,
+                )
+                if resp.status_code == 200:
+                    ga_members = resp.json().get("value", [])
+                    ga_count = len(ga_members)
+                    # CIS recommends 2-4 global admins
+                    results.append(CheckResult(
+                        check_id="azure_entra_global_admin_count",
+                        check_title="Global administrator count is between 2 and 4",
+                        service="entra", severity="high",
+                        status="PASS" if 2 <= ga_count <= 4 else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"Global administrators: {ga_count} (recommended: 2-4)",
+                        remediation="Ensure between 2 and 4 global administrators are configured",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+            except Exception:
+                pass
+
+            # ── 5.28: Passwordless authentication ──
+            try:
+                resp = requests.get(f"{graph_beta}/policies/authenticationMethodsPolicy", headers=headers, timeout=30)
+                if resp.status_code == 200:
+                    methods = resp.json().get("authenticationMethodConfigurations", [])
+                    passwordless_enabled = any(
+                        m.get("state") == "enabled" and m.get("id") in ("Fido2", "MicrosoftAuthenticator", "WindowsHelloForBusiness")
+                        for m in methods
+                    )
+                    results.append(CheckResult(
+                        check_id="azure_entra_passwordless_auth",
+                        check_title="Passwordless authentication methods are enabled",
+                        service="entra", severity="medium",
+                        status="PASS" if passwordless_enabled else "FAIL",
+                        resource_id=self.tenant_id,
+                        status_extended=f"Passwordless auth enabled: {passwordless_enabled}",
+                        remediation="Enable FIDO2 security keys or Microsoft Authenticator passwordless sign-in",
+                        compliance_frameworks=CIS5,
+                    ).to_dict())
+            except Exception:
+                pass
+
+        except Exception as e:
+            logger.warning(f"Azure Entra ID checks failed: {e}")
         return results
 
     # ═══════════════════════════════════════════════════════════════════

@@ -97,19 +97,38 @@ export default function MitreAttackPage() {
   const [providers, setProviders] = useState<any[]>([])
   const [selectedProvider, setSelectedProvider] = useState('')
   const [lastAnalyzed, setLastAnalyzed] = useState<string | null>(null)
+  const [saasConnections, setSaasConnections] = useState<any[]>([])
+  const [selectedSource, setSelectedSource] = useState<{ type: 'provider' | 'saas', id: string } | null>(null)
   const [coverageGaps, setCoverageGaps] = useState<any>(null)
   const [showGaps, setShowGaps] = useState(false)
   const phaseTimerRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Persist analysis results in localStorage so they survive browser close
+  const STORAGE_KEY = 'darca_mitre_analysis'
+
   useEffect(() => {
-    const loadProviders = async () => {
+    const loadData = async () => {
       try {
-        const data = await api.getProviders()
-        setProviders(data)
+        const [provData, saasData] = await Promise.all([
+          api.getProviders(),
+          api.getSaaSConnections().catch(() => []),
+        ])
+        setProviders(provData)
+        setSaasConnections(saasData)
+      } catch {}
+
+      // Restore previous analysis from localStorage
+      try {
+        const cached = localStorage.getItem(STORAGE_KEY)
+        if (cached) {
+          const { data, timestamp, providerId } = JSON.parse(cached)
+          setMatrixData(data)
+          setLastAnalyzed(timestamp)
+          if (providerId) setSelectedProvider(providerId)
+        }
       } catch {}
     }
-    loadProviders()
-    // Do NOT auto-load matrix — user must click "Run Analysis"
+    loadData()
   }, [])
 
   // Clean up phase timer on unmount
@@ -153,7 +172,17 @@ export default function MitreAttackPage() {
       // Final phase done
       setAnalysisPhase(ANALYSIS_PHASES.length - 1)
       setMatrixData(data)
-      setLastAnalyzed(new Date().toLocaleTimeString())
+      const timestamp = new Date().toLocaleTimeString()
+      setLastAnalyzed(timestamp)
+
+      // Persist to localStorage
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          data,
+          timestamp,
+          providerId: selectedProvider,
+        }))
+      } catch {}
     } catch (err) {
       console.error(err)
     } finally {
@@ -249,19 +278,32 @@ export default function MitreAttackPage() {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <FunnelIcon className="w-4 h-4 text-brand-gray-400" />
-              <span className="text-sm font-semibold text-brand-navy">Provider</span>
+              <span className="text-sm font-semibold text-brand-navy">Account / SaaS</span>
             </div>
             <select
               value={selectedProvider}
               onChange={(e) => handleProviderChange(e.target.value)}
-              className="select-field min-w-[180px]"
+              className="select-field min-w-[220px]"
             >
-              <option value="">All Providers</option>
-              {providers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.alias || p.provider_type?.toUpperCase()} ({p.provider_type})
-                </option>
-              ))}
+              <option value="">All Accounts & SaaS</option>
+              {providers.length > 0 && (
+                <optgroup label="Cloud Providers">
+                  {providers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.alias || p.provider_type?.toUpperCase()} ({p.provider_type}) {p.account_id ? `- ${p.account_id}` : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {saasConnections.length > 0 && (
+                <optgroup label="SaaS Connections">
+                  {saasConnections.map((s) => (
+                    <option key={`saas-${s.id}`} value={s.id}>
+                      {s.name || s.provider_type?.toUpperCase()} (SaaS)
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
             {lastAnalyzed && (
               <span className="text-xs text-brand-gray-400">
