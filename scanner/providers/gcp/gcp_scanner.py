@@ -2509,7 +2509,12 @@ class GCPScanner:
         # Emit MANUAL results for uncovered CIS controls
         manual_results: list[dict] = []
         for ctrl in GCP_CIS_CONTROLS:
-            cis_id, title, level, assess_type, severity, service_area = ctrl
+            cis_id = ctrl["cis_id"]
+            title = ctrl["title"]
+            level = ctrl["cis_level"]
+            assess_type = ctrl["assessment_type"]
+            severity = ctrl["severity"]
+            service_area = ctrl["service_area"]
             if cis_id not in covered_cis_ids:
                 manual_results.append(CheckResult(
                     check_id=f"gcp_cis_{cis_id.replace('.', '_')}",
@@ -2523,7 +2528,7 @@ class GCPScanner:
                         f"This control requires "
                         f"{'manual verification' if assess_type == 'manual' else 'automated check implementation'}."
                     ),
-                    remediation=f"Refer to CIS Google Cloud Platform Foundation Benchmark v3.0.0, control {cis_id}.",
+                    remediation=ctrl.get("remediation", f"Refer to CIS Google Cloud Platform Foundation Benchmark v4.0.0, control {cis_id}."),
                     compliance_frameworks=_DEFAULT_FRAMEWORKS,
                     assessment_type=assess_type,
                     cis_control_id=cis_id,

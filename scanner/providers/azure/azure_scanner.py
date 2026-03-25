@@ -2704,7 +2704,12 @@ class AzureScanner:
         fw = ["CIS-Azure-3.0.0", "MCSB-Azure-1.0", "SOC2", "ISO-27001"]
 
         for ctrl in AZURE_CIS_CONTROLS:
-            cis_id, title, level, assessment_type, severity, service_area = ctrl
+            cis_id = ctrl["cis_id"]
+            title = ctrl["title"]
+            level = ctrl["cis_level"]
+            assessment_type = ctrl["assessment_type"]
+            severity = ctrl["severity"]
+            service_area = ctrl["service_area"]
             if cis_id not in covered_cis_ids:
                 manual_results.append(CheckResult(
                     check_id=f"azure_cis_{cis_id.replace('.', '_')}",
@@ -2717,7 +2722,7 @@ class AzureScanner:
                         f"CIS {cis_id} [{level}] - {assessment_type.upper()} assessment. "
                         f"This control requires {'manual verification' if assessment_type == 'manual' else 'automated check implementation'}."
                     ),
-                    remediation=f"Refer to CIS Microsoft Azure Foundations Benchmark v3.0.0, control {cis_id}.",
+                    remediation=ctrl.get("remediation", f"Refer to CIS Microsoft Azure Foundations Benchmark v5.0.0, control {cis_id}."),
                     compliance_frameworks=fw,
                     assessment_type=assessment_type,
                     cis_control_id=cis_id,

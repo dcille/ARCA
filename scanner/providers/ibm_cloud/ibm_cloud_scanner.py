@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from scanner.providers.base_check import CheckResult
+from scanner.cis_controls.ibm_cloud_cis_controls import IBM_CLOUD_CIS_CONTROLS
 
 logger = logging.getLogger(__name__)
 
@@ -402,4 +403,58 @@ class IBMCloudScanner:
         except Exception as e:
             logger.warning(f"IBM Cloud Kubernetes checks failed: {e}")
 
+        return results
+
+    # ------------------------------------------------------------------
+    # CIS benchmark coverage
+    # ------------------------------------------------------------------
+
+    def _emit_cis_coverage(self, existing_results: list[dict]) -> list[dict]:
+        """Emit MANUAL results for CIS controls not covered by automated checks."""
+        covered_cis_ids: set[str] = set()
+        check_to_cis = {}
+        for ctrl in IBM_CLOUD_CIS_CONTROLS:
+            cis_id = ctrl["cis_id"]
+            check_to_cis[f"ibm_cis_{cis_id.replace('.', '_')}"] = cis_id
+
+        for result in existing_results:
+            check_id = result.get("check_id", "")
+            if check_id in check_to_cis:
+                covered_cis_ids.add(check_to_cis[check_id])
+
+        manual_results = []
+        fw = ["CIS-IBM-Cloud-2.0.0", "NIST-800-53", "CCM-4.1"]
+
+        for ctrl in IBM_CLOUD_CIS_CONTROLS:
+            cis_id = ctrl["cis_id"]
+            title = ctrl["title"]
+            level = ctrl["cis_level"]
+            assessment_type = ctrl["assessment_type"]
+            severity = ctrl["severity"]
+            service_area = ctrl["service_area"]
+            if cis_id not in covered_cis_ids:
+                manual_results.append(CheckResult(
+                    check_id=f"ibm_cis_{cis_id.replace('.', '_')}",
+                    check_title=f"{title} (CIS {cis_id})",
+                    service=service_area,
+                    severity=severity,
+                    status="MANUAL",
+                    resource_id="ibm-cloud-account",
+                    status_extended=(
+                        f"CIS {cis_id} [{level}] - {assessment_type.upper()} assessment. "
+                        f"This control requires {'manual verification' if assessment_type == 'manual' else 'automated check implementation'}."
+                    ),
+                    remediation=ctrl.get("remediation", f"Refer to CIS IBM Cloud Foundations Benchmark v2.0.0, control {cis_id}."),
+                    compliance_frameworks=fw,
+                    assessment_type=assessment_type,
+                    cis_control_id=cis_id,
+                    cis_level=level,
+                ).to_dict())
+
+        return manual_results
+
+    def run_all_checks(self) -> list[dict]:
+        """Run all IBM Cloud security checks including complete CIS benchmark coverage."""
+        results = self.scan()
+        results.extend(self._emit_cis_coverage(results))
         return results

@@ -8,6 +8,7 @@ Implements 32+ security checks across 3 auditor categories:
 import logging
 
 from scanner.saas.base_saas_check import BaseSaaSScanner, SaaSCheckResult
+from scanner.cis_controls.snowflake_cis_controls import SNOWFLAKE_CIS_CONTROLS
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,9 @@ class SnowflakeScanner(BaseSaaSScanner):
             except Exception as e:
                 logger.error(f"Snowflake check group failed: {e}")
 
+        # Add CIS coverage for uncovered controls
+        results.extend(self._emit_cis_coverage(results))
+
         if self._connection:
             try:
                 self._connection.close()
@@ -75,6 +79,50 @@ class SnowflakeScanner(BaseSaaSScanner):
                 pass
 
         return results
+
+    def _emit_cis_coverage(self, existing_results: list[dict]) -> list[dict]:
+        """Emit MANUAL results for CIS controls not covered by automated checks."""
+        covered_cis_ids: set[str] = set()
+        check_to_cis = {}
+        for ctrl in SNOWFLAKE_CIS_CONTROLS:
+            cis_id = ctrl["cis_id"]
+            check_to_cis[f"sf_cis_{cis_id.replace('.', '_')}"] = cis_id
+
+        for result in existing_results:
+            check_id = result.get("check_id", "")
+            if check_id in check_to_cis:
+                covered_cis_ids.add(check_to_cis[check_id])
+
+        manual_results = []
+        fw = ["CIS-Snowflake-1.1.0", "SOC2", "ISO-27001"]
+
+        for ctrl in SNOWFLAKE_CIS_CONTROLS:
+            cis_id = ctrl["cis_id"]
+            title = ctrl["title"]
+            level = ctrl["cis_level"]
+            assess_type = ctrl["assessment_type"]
+            severity = ctrl["severity"]
+            area = ctrl["service_area"]
+            if cis_id not in covered_cis_ids:
+                manual_results.append(SaaSCheckResult(
+                    check_id=f"sf_cis_{cis_id.replace('.', '_')}",
+                    check_title=f"{title} (CIS {cis_id})",
+                    service_area=area,
+                    severity=severity,
+                    status="MANUAL",
+                    resource_id=self.account if hasattr(self, 'account') else "snowflake-account",
+                    description=(
+                        f"CIS {cis_id} [{level}] - {assess_type.upper()} assessment. "
+                        f"This control requires {'manual verification' if assess_type == 'manual' else 'automated check implementation'}."
+                    ),
+                    remediation=ctrl.get("remediation", f"Refer to CIS Snowflake Foundations Benchmark v1.1.0, control {cis_id}."),
+                    compliance_frameworks=fw,
+                    assessment_type=assess_type,
+                    cis_control_id=cis_id,
+                    cis_level=level,
+                ).to_dict())
+
+        return manual_results
 
     def _check_users(self) -> list[dict]:
         """User security checks."""
