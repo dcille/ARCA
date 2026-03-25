@@ -573,6 +573,29 @@ class ApiClient {
   async triggerRREvaluation() {
     return this.request<any>('POST', '/api/v1/ransomware-readiness/evaluate')
   }
+
+  // Audit Log
+  async getAuditLogs(params?: Record<string, string>) {
+    return this.request<any[]>('GET', '/api/v1/audit-log', undefined, { params })
+  }
+
+  async getAuditLogStats(days?: number) {
+    const params = days ? { days: String(days) } : undefined
+    return this.request<any>('GET', '/api/v1/audit-log/stats', undefined, { params })
+  }
+
+  // API Keys
+  async getApiKeys() {
+    return this.request<any[]>('GET', '/api/v1/auth/api-keys')
+  }
+
+  async createApiKey(name: string) {
+    return this.request<any>('POST', '/api/v1/auth/api-keys', { name })
+  }
+
+  async deleteApiKey(id: string) {
+    return this.request<void>('DELETE', `/api/v1/auth/api-keys/${id}`)
+  }
 }
 
 export const api = new ApiClient()

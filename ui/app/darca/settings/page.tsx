@@ -12,9 +12,11 @@ import {
   BuildingOffice2Icon,
   UserPlusIcon,
   TrashIcon,
+  PlusIcon,
+  ClipboardDocumentIcon,
 } from '@heroicons/react/24/outline'
 
-type Tab = 'profile' | 'organization'
+type Tab = 'profile' | 'organization' | 'api-keys'
 
 export default function SettingsPage() {
   const { user } = useAuthStore()
@@ -26,6 +28,13 @@ export default function SettingsPage() {
     scans: 0,
     findings: 0,
   })
+
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState<any[]>([])
+  const [apiKeysLoading, setApiKeysLoading] = useState(false)
+  const [showCreateKey, setShowCreateKey] = useState(false)
+  const [newKeyName, setNewKeyName] = useState('')
+  const [createdKey, setCreatedKey] = useState<string | null>(null)
 
   // Organization state
   const [org, setOrg] = useState<any>(null)
@@ -77,8 +86,48 @@ export default function SettingsPage() {
     }
   }
 
+  const loadApiKeys = async () => {
+    setApiKeysLoading(true)
+    try {
+      const keys = await api.getApiKeys()
+      setApiKeys(keys)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setApiKeysLoading(false)
+    }
+  }
+
+  const handleCreateApiKey = async () => {
+    try {
+      const result = await api.createApiKey(newKeyName)
+      setCreatedKey(result.key)
+      setNewKeyName('')
+      loadApiKeys()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create API key')
+    }
+  }
+
+  const handleDeleteApiKey = async (id: string) => {
+    if (!confirm('Revoke this API key? This cannot be undone.')) return
+    try {
+      await api.deleteApiKey(id)
+      toast.success('API key revoked')
+      loadApiKeys()
+    } catch (err: any) {
+      toast.error(err.message)
+    }
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    toast.success('Copied to clipboard')
+  }
+
   useEffect(() => {
     if (tab === 'organization') loadOrg()
+    if (tab === 'api-keys') loadApiKeys()
   }, [tab])
 
   const handleCreateOrg = async () => {
@@ -146,6 +195,7 @@ export default function SettingsPage() {
         {([
           { id: 'profile' as Tab, label: 'Profile' },
           { id: 'organization' as Tab, label: 'Organization' },
+          { id: 'api-keys' as Tab, label: 'API Keys' },
         ]).map((t) => (
           <button
             key={t.id}
@@ -425,6 +475,115 @@ export default function SettingsPage() {
                     className="flex-1 btn-primary disabled:opacity-50"
                   >
                     Send Invite
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* API Keys Tab */}
+      {tab === 'api-keys' && (
+        <div className="space-y-6">
+          <div className="card">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h4 className="text-sm font-semibold text-brand-navy">API Keys</h4>
+                <p className="text-xs text-brand-gray-400 mt-1">
+                  Manage programmatic access keys for the ARCA API. Keys are shown only once at creation.
+                </p>
+              </div>
+              <button
+                onClick={() => { setShowCreateKey(true); setCreatedKey(null) }}
+                className="btn-primary flex items-center gap-2 text-sm"
+              >
+                <PlusIcon className="w-4 h-4" />
+                Create Key
+              </button>
+            </div>
+
+            {/* Created key banner */}
+            {createdKey && (
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm font-medium text-green-800 mb-2">
+                  API key created successfully. Copy it now - it won&apos;t be shown again.
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 px-3 py-2 bg-white border border-green-300 rounded text-sm font-mono text-green-900 select-all">
+                    {createdKey}
+                  </code>
+                  <button
+                    onClick={() => copyToClipboard(createdKey)}
+                    className="p-2 rounded-lg hover:bg-green-100 text-green-700 transition-colors"
+                    title="Copy"
+                  >
+                    <ClipboardDocumentIcon className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {apiKeysLoading ? (
+              <div className="animate-pulse"><div className="h-24 bg-brand-gray-100 rounded" /></div>
+            ) : apiKeys.length === 0 ? (
+              <div className="text-center py-8">
+                <KeyIcon className="w-10 h-10 text-brand-gray-300 mx-auto mb-3" />
+                <p className="text-sm text-brand-gray-400">No API keys yet. Create one to get started.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {apiKeys.map((k) => (
+                  <div key={k.id} className="flex items-center justify-between py-3 border-b border-brand-gray-100 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <KeyIcon className="w-5 h-5 text-brand-gray-400" />
+                      <div>
+                        <p className="text-sm font-medium text-brand-navy">{k.name}</p>
+                        <div className="flex items-center gap-3 text-xs text-brand-gray-400 mt-0.5">
+                          <span className="font-mono">{k.key_prefix}...</span>
+                          <span>Created {new Date(k.created_at).toLocaleDateString()}</span>
+                          {k.last_used_at && (
+                            <span>Last used {new Date(k.last_used_at).toLocaleDateString()}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteApiKey(k.id)}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-brand-gray-400 hover:text-red-500 transition-colors"
+                      title="Revoke"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Create API Key Modal */}
+          {showCreateKey && (
+            <div className="modal-backdrop">
+              <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+                <h3 className="text-lg font-semibold text-brand-navy mb-4">Create API Key</h3>
+                <div>
+                  <label className="block text-sm font-medium text-brand-gray-700 mb-1.5">Key Name</label>
+                  <input
+                    type="text"
+                    value={newKeyName}
+                    onChange={(e) => setNewKeyName(e.target.value)}
+                    className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm"
+                    placeholder="e.g., CI/CD Pipeline, Terraform, CLI"
+                  />
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <button onClick={() => setShowCreateKey(false)} className="flex-1 btn-outline">Cancel</button>
+                  <button
+                    onClick={() => { handleCreateApiKey(); setShowCreateKey(false) }}
+                    disabled={!newKeyName}
+                    className="flex-1 btn-primary disabled:opacity-50"
+                  >
+                    Generate Key
                   </button>
                 </div>
               </div>

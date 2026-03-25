@@ -1,15 +1,20 @@
-"""Azure Security Scanner — comprehensive MCSB-aligned checks.
+"""Azure Security Scanner — comprehensive MCSB-aligned checks with complete CIS coverage.
 
 Implements 80+ security checks across all 12 Microsoft Cloud Security Benchmark
 (MCSB) v2 domains: Network Security, Identity Management, Privileged Access,
 Data Protection, Asset Management, Logging & Threat Detection, Incident Response,
 Posture & Vulnerability Management, Endpoint Security, Backup & Recovery,
 DevOps Security, and Governance & Strategy.
+
+Provides complete CIS Microsoft Azure Foundations Benchmark v3.0.0 coverage by
+emitting MANUAL status results for any CIS controls not covered by automated checks,
+ensuring every benchmark control is represented in scan output.
 """
 import json
 import logging
 from typing import Optional
 
+from scanner.cis_controls.azure_cis_controls import AZURE_CIS_CONTROLS
 from scanner.providers.base_check import CheckResult
 
 logger = logging.getLogger(__name__)
@@ -1872,4 +1877,145 @@ class AzureScanner:
 
         except Exception as e:
             logger.warning(f"Azure endpoint security checks failed: {e}")
+        return results
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  CIS BENCHMARK COVERAGE — emit MANUAL status for uncovered controls
+    # ═══════════════════════════════════════════════════════════════════
+    def _emit_cis_coverage(self, automated_results: list[dict]) -> list[dict]:
+        """Emit results for ALL CIS controls, filling in MANUAL status for non-automated ones.
+
+        This ensures the framework reports on every single CIS control from the
+        CIS Microsoft Azure Foundations Benchmark v3.0.0, marking automated controls
+        with their actual PASS/FAIL status and manual controls with MANUAL status
+        indicating human review is required.
+        """
+        # Build a set of CIS control IDs already covered by automated checks
+        covered_cis_ids = set()
+        for result in automated_results:
+            cis_id = result.get("cis_control_id")
+            if cis_id:
+                covered_cis_ids.add(cis_id)
+
+        # Map check_ids to approximate CIS control IDs based on naming patterns
+        check_to_cis = {
+            # Section 1: Identity and Access Management
+            "azure_iam_mfa_enabled_all_users": "1.2.3",
+            "azure_iam_owner_count": "1.27",
+            "azure_iam_no_custom_owner_roles": "1.23",
+            "azure_iam_sp_high_privilege": "1.3",
+            "azure_iam_guest_users_reviewed": "1.4",
+            "azure_iam_managed_identity_usage": "9.14",
+            "azure_iam_contributor_count": "1.27",
+            "azure_resource_locks_configured": "10.1",
+            "azure_classic_admins_removed": "1.11",
+            "azure_pim_jit_access": "1.26",
+            # Section 2: Microsoft Defender
+            "azure_security_contact_configured": "2.1.15",
+            "azure_security_alert_notifications": "2.1.16",
+            "azure_defender_auto_provisioning": "2.1.12",
+            # Section 3: Storage Accounts
+            "azure_storage_https_only": "3.1",
+            "azure_storage_tls_12": "3.15",
+            "azure_storage_no_public_access": "3.6",
+            "azure_storage_infrastructure_encryption": "3.2",
+            "azure_storage_cmk_encryption": "3.11",
+            "azure_storage_network_default_deny": "3.7",
+            "azure_storage_soft_delete_blobs": "3.10",
+            "azure_storage_shared_key_disabled": "3.4",
+            # Section 4: Database Services
+            "azure_sql_auditing_enabled": "4.1.1",
+            "azure_sql_tls_12": "4.1.5",
+            "azure_sql_public_access_disabled": "4.1.2",
+            "azure_sql_atp_enabled": "4.1.3",
+            "azure_sql_vulnerability_assessment": "4.1.6",
+            "azure_sql_tde_enabled": "4.1.5",
+            "azure_sql_ad_admin_configured": "4.1.4",
+            "azure_postgresql_public_access": "4.2.7",
+            # Section 5: Logging and Monitoring
+            "azure_monitor_log_profile": "5.1.1",
+            "azure_monitor_log_retention_365": "5.1.2",
+            "azure_monitor_diagnostic_settings": "5.4.1",
+            # Section 6: Networking
+            "azure_nsg_unrestricted_port_22": "6.2",
+            "azure_nsg_unrestricted_port_3389": "6.1",
+            "azure_nsg_unrestricted_port_*": "6.3",
+            "azure_nsg_default_deny_inbound": "6.4",
+            "azure_network_watcher_enabled": "6.6",
+            "azure_nsg_flow_logs_enabled": "6.5",
+            "azure_public_ip_ddos_protection": "6.7",
+            "azure_subnet_has_nsg": "6.12",
+            "azure_private_endpoints_used": "6.11",
+            "azure_appgw_waf_enabled": "6.8",
+            "azure_vm_no_public_ip": "6.10",
+            # Section 7: Virtual Machines
+            "azure_vm_disk_encryption": "7.3",
+            "azure_vm_antimalware_extension": "7.6",
+            "azure_vm_trusted_launch": "7.10",
+            "azure_vm_managed_disks": "7.2",
+            "azure_disk_unattached_encrypted": "7.4",
+            "azure_vm_auto_updates": "7.11",
+            "azure_endpoint_protection_installed": "7.6",
+            "azure_vm_vulnerability_assessment": "7.5",
+            "azure_jit_vm_access": "7.8",
+            # Section 8: Key Vault
+            "azure_keyvault_soft_delete": "8.5",
+            "azure_keyvault_purge_protection": "8.5",
+            "azure_keyvault_rbac_authorization": "8.6",
+            "azure_keyvault_network_acls": "8.10",
+            "azure_keyvault_key_expiration": "8.1",
+            "azure_keyvault_secret_expiration": "8.3",
+            # Section 9: App Service
+            "azure_appservice_https_only": "9.2",
+            "azure_appservice_tls_12": "9.3",
+            "azure_appservice_managed_identity": "9.14",
+            "azure_appservice_ftp_disabled": "9.10",
+            "azure_appservice_remote_debugging_off": "9.15",
+            "azure_appservice_client_certs": "9.4",
+            "azure_appservice_http_logging": "5.1.6",
+            # Section 10: Miscellaneous
+            "azure_policy_assignments_exist": "10.1",
+            "azure_policy_security_initiative": "2.1.13",
+            "azure_policy_compliance_rate": "10.8",
+        }
+
+        for result in automated_results:
+            check_id = result.get("check_id", "")
+            if check_id in check_to_cis:
+                covered_cis_ids.add(check_to_cis[check_id])
+
+        # Emit MANUAL results for uncovered CIS controls
+        manual_results = []
+        fw = ["CIS-Azure-3.0.0", "MCSB-Azure-1.0", "SOC2", "ISO-27001"]
+
+        for ctrl in AZURE_CIS_CONTROLS:
+            cis_id, title, level, assessment_type, severity, service_area = ctrl
+            if cis_id not in covered_cis_ids:
+                manual_results.append(CheckResult(
+                    check_id=f"azure_cis_{cis_id.replace('.', '_')}",
+                    check_title=f"{title} (CIS {cis_id})",
+                    service=service_area,
+                    severity=severity,
+                    status="MANUAL",
+                    resource_id=self.subscription_id,
+                    status_extended=(
+                        f"CIS {cis_id} [{level}] - {assessment_type.upper()} assessment. "
+                        f"This control requires {'manual verification' if assessment_type == 'manual' else 'automated check implementation'}."
+                    ),
+                    remediation=f"Refer to CIS Microsoft Azure Foundations Benchmark v3.0.0, control {cis_id}.",
+                    compliance_frameworks=fw,
+                    assessment_type=assessment_type,
+                    cis_control_id=cis_id,
+                    cis_level=level,
+                ).to_dict())
+
+        return manual_results
+
+    def run_all_checks(self) -> list[dict]:
+        """Run all Azure security checks including complete CIS benchmark coverage."""
+        results = self.scan()
+
+        # Add MANUAL results for any CIS controls not covered by automated checks
+        results.extend(self._emit_cis_coverage(results))
+
         return results

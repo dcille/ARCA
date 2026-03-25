@@ -2,12 +2,17 @@
 
 Implements 80+ security checks across GCP services following CIS GCP Foundations
 Benchmark v3.0, NIST 800-53, SOC 2, and CSA CCM v4.1 frameworks.
+
+Provides complete CIS GCP Foundation Benchmark v3.0.0 coverage: automated checks
+emit PASS/FAIL results while controls not yet automated are emitted as MANUAL
+results so that every benchmark control appears in scan output.
 """
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from scanner.providers.base_check import CheckResult
+from scanner.cis_controls.gcp_cis_controls import GCP_CIS_CONTROLS
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +21,7 @@ _DEFAULT_FRAMEWORKS = ["CIS-GCP-3.0", "NIST-800-53", "SOC2", "CCM-4.1"]
 
 
 class GCPScanner:
-    """GCP cloud security scanner."""
+    """GCP cloud security scanner with complete CIS GCP Foundation Benchmark v3.0.0 coverage."""
 
     compliance_frameworks = ["CIS-GCP-3.0", "NIST-800-53", "SOC2", "CCM-4.1"]
 
@@ -2402,4 +2407,146 @@ class GCPScanner:
 
         except Exception as e:
             logger.warning(f"GCP Secret Manager checks failed: {e}")
+        return results
+
+    # ------------------------------------------------------------------
+    # CIS coverage gap-fill
+    # ------------------------------------------------------------------
+
+    def _emit_cis_coverage(self, automated_results: list[dict]) -> list[dict]:
+        """Emit MANUAL results for CIS controls not covered by automated checks.
+
+        Ensures every control from the CIS GCP Foundation Benchmark v3.0.0
+        appears in the scan output.  Automated checks that already produced
+        PASS/FAIL results are skipped; uncovered controls are emitted with
+        status ``MANUAL`` so that reviewers know a human assessment is needed.
+        """
+        # Build set of CIS IDs already covered by automated results
+        covered_cis_ids: set[str] = set()
+        for result in automated_results:
+            cis_id = result.get("cis_control_id")
+            if cis_id:
+                covered_cis_ids.add(cis_id)
+
+        # Map check_ids to CIS control IDs based on naming patterns
+        check_to_cis: dict[str, str] = {
+            # Section 1 — IAM
+            "gcp_iam_corp_login_required": "1.1",
+            "gcp_iam_no_user_managed_sa_keys": "1.4",
+            "gcp_iam_no_sa_admin_key": "1.5",
+            "gcp_iam_sa_user_role": "1.6",
+            "gcp_iam_sa_token_creator_role": "1.6",
+            "gcp_iam_sa_key_rotation": "1.7",
+            "gcp_iam_kms_separation_of_duties": "1.8",
+            "gcp_kms_no_public_access": "1.9",
+            "gcp_kms_key_rotation": "1.10",
+            "gcp_iam_api_keys_restricted": "1.11",
+            "gcp_iam_api_keys_rotated": "1.13",
+            "gcp_iam_api_keys_exist": "1.14",
+            "gcp_iam_essential_contacts": "1.15",
+            # Section 2 — Logging & Monitoring
+            "gcp_logging_audit_logs_enabled": "2.1",
+            "gcp_logging_ownership_changes": "2.2",
+            "gcp_logging_audit_config_changes": "2.3",
+            "gcp_logging_custom_role_changes": "2.4",
+            "gcp_logging_firewall_changes": "2.5",
+            "gcp_logging_route_changes": "2.6",
+            "gcp_logging_vpc_changes": "2.7",
+            "gcp_logging_storage_iam_changes": "2.8",
+            "gcp_logging_sql_config_changes": "2.9",
+            "gcp_logging_dns_logging": "2.10",
+            "gcp_logging_cloud_asset_inventory": "2.11",
+            "gcp_logging_bucket_retention": "2.16",
+            "gcp_logging_vpc_flow_logs": "3.5",
+            # Section 3 — Networking
+            "gcp_network_no_default_network": "3.1",
+            "gcp_network_no_legacy_network": "3.2",
+            "gcp_network_dns_sec": "3.3",
+            "gcp_dns_dnssec_enabled": "3.3",
+            "gcp_dns_rsasha1_disabled": "3.4",
+            "gcp_network_flow_logs_enabled": "3.5",
+            "gcp_firewall_open_22": "3.6",
+            "gcp_firewall_open_3389": "3.7",
+            "gcp_network_ssl_policy": "3.8",
+            "gcp_firewall_no_default_allow": "3.10",
+            # Section 4 — Virtual Machines
+            "gcp_compute_no_default_sa": "4.1",
+            "gcp_compute_no_full_api_access": "4.2",
+            "gcp_compute_block_project_ssh": "4.3",
+            "gcp_compute_os_login": "4.4",
+            "gcp_compute_serial_port_disabled": "4.5",
+            "gcp_compute_ip_forwarding_disabled": "4.6",
+            "gcp_compute_disk_encryption_cmek": "4.7",
+            "gcp_compute_shielded_vm": "4.8",
+            "gcp_compute_no_external_ip": "4.9",
+            "gcp_compute_confidential_computing": "4.12",
+            # Section 5 — Storage
+            "gcp_storage_no_public_access": "5.1",
+            "gcp_storage_uniform_access": "5.2",
+            "gcp_storage_versioning": "5.3",
+            "gcp_storage_cmek_encryption": "5.4",
+            "gcp_storage_logging_enabled": "5.5",
+            "gcp_storage_retention_policy": "5.6",
+            # Section 6 — Cloud SQL
+            "gcp_sql_no_public_networks": "6.1",
+            "gcp_sql_no_public_ip": "6.2",
+            "gcp_sql_ssl_required": "6.3",
+            "gcp_sql_backup_enabled": "6.5",
+            "gcp_sql_pitr_enabled": "6.6",
+            "gcp_sql_cmek_encryption": "6.4",
+            # Section 7 — BigQuery
+            "gcp_bigquery_dataset_no_public": "7.1",
+            "gcp_bigquery_cmek_encryption": "7.2",
+            "gcp_bigquery_classification": "7.3",
+            "gcp_bigquery_table_encrypted": "7.4",
+        }
+
+        for result in automated_results:
+            check_id = result.get("check_id", "")
+            if check_id in check_to_cis:
+                covered_cis_ids.add(check_to_cis[check_id])
+
+        # Emit MANUAL results for uncovered CIS controls
+        manual_results: list[dict] = []
+        for ctrl in GCP_CIS_CONTROLS:
+            cis_id, title, level, assess_type, severity, service_area = ctrl
+            if cis_id not in covered_cis_ids:
+                manual_results.append(CheckResult(
+                    check_id=f"gcp_cis_{cis_id.replace('.', '_')}",
+                    check_title=f"{title} (CIS {cis_id})",
+                    service=service_area,
+                    severity=severity,
+                    status="MANUAL",
+                    resource_id=self.project_id,
+                    status_extended=(
+                        f"CIS {cis_id} [{level}] - {assess_type.upper()} assessment. "
+                        f"This control requires "
+                        f"{'manual verification' if assess_type == 'manual' else 'automated check implementation'}."
+                    ),
+                    remediation=f"Refer to CIS Google Cloud Platform Foundation Benchmark v3.0.0, control {cis_id}.",
+                    compliance_frameworks=_DEFAULT_FRAMEWORKS,
+                    assessment_type=assess_type,
+                    cis_control_id=cis_id,
+                    cis_level=level,
+                ).to_dict())
+
+        return manual_results
+
+    # ------------------------------------------------------------------
+    # Public entry point with full CIS coverage
+    # ------------------------------------------------------------------
+
+    def run_all_checks(self) -> list[dict]:
+        """Run all GCP security checks including complete CIS benchmark coverage.
+
+        Executes every automated check via :meth:`scan`, then calls
+        :meth:`_emit_cis_coverage` to fill in ``MANUAL`` results for any CIS
+        controls not already covered, ensuring 100 % benchmark representation
+        in the output.
+        """
+        results = self.scan()
+
+        # Add MANUAL results for any CIS controls not covered by automated checks
+        results.extend(self._emit_cis_coverage(results))
+
         return results
