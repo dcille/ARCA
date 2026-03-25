@@ -103,7 +103,7 @@ export default function MitreAttackPage() {
   const [showGaps, setShowGaps] = useState(false)
   const phaseTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Persist analysis results in sessionStorage so they survive navigation
+  // Persist analysis results in localStorage so they survive browser close
   const STORAGE_KEY = 'darca_mitre_analysis'
 
   useEffect(() => {
@@ -117,9 +117,9 @@ export default function MitreAttackPage() {
         setSaasConnections(saasData)
       } catch {}
 
-      // Restore previous analysis from sessionStorage
+      // Restore previous analysis from localStorage
       try {
-        const cached = sessionStorage.getItem(STORAGE_KEY)
+        const cached = localStorage.getItem(STORAGE_KEY)
         if (cached) {
           const { data, timestamp, providerId } = JSON.parse(cached)
           setMatrixData(data)
@@ -175,9 +175,9 @@ export default function MitreAttackPage() {
       const timestamp = new Date().toLocaleTimeString()
       setLastAnalyzed(timestamp)
 
-      // Persist to sessionStorage
+      // Persist to localStorage
       try {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
           data,
           timestamp,
           providerId: selectedProvider,
