@@ -2,7 +2,7 @@
 
 **Cloud & SaaS Security Posture Management Platform**
 
-D-ARCA is a comprehensive CSPM platform that combines cloud infrastructure security scanning (AWS, Azure, GCP, OCI, Alibaba Cloud, Kubernetes) with SaaS application security assessment (ServiceNow, Microsoft 365, Salesforce, Snowflake). It provides a unified dashboard for monitoring, analyzing, and improving the security posture of your entire technology stack — including compliance mapping, MITRE ATT&CK analysis, ransomware readiness assessment, and executive reporting.
+D-ARCA is a comprehensive CSPM platform that combines cloud infrastructure security scanning (AWS, Azure, GCP, OCI, Alibaba Cloud, Kubernetes) with SaaS application security assessment (ServiceNow, Microsoft 365, Salesforce, Snowflake, GitHub, Google Workspace, Cloudflare, OpenStack). It provides a unified dashboard for monitoring, analyzing, and improving the security posture of your entire technology stack — including compliance mapping, MITRE ATT&CK analysis, attack path analysis, data security posture management (DSPM), ransomware readiness assessment, interactive security graph, automated scheduling, audit logging, and executive reporting with embedded charts.
 
 ---
 
@@ -20,6 +20,20 @@ D-ARCA is a comprehensive CSPM platform that combines cloud infrastructure secur
   - [OCI](#oci--oracle-cloud-infrastructure-18-services-60-checks)
   - [Alibaba Cloud](#alibaba-cloud-12-services-70-checks)
 - [SaaS Security Scanning](#saas-security-scanning)
+- [Advanced Security Modules](#advanced-security-modules)
+  - [Attack Path Analysis](#attack-path-analysis)
+  - [Security Graph](#security-graph)
+  - [Data Security Posture Management (DSPM)](#data-security-posture-management-dspm)
+  - [Ransomware Readiness](#ransomware-readiness)
+  - [MITRE ATT&CK Analysis](#mitre-attck-analysis)
+  - [Drift Detection](#drift-detection)
+- [Operations & Management](#operations--management)
+  - [Scan Scheduling](#scan-scheduling)
+  - [Notifications](#notifications)
+  - [Audit Log](#audit-log)
+  - [API Key Management](#api-key-management)
+  - [Integrations](#integrations)
+  - [Reports & Data Export](#reports--data-export)
 - [API Reference](#api-reference)
 - [Frontend Pages](#frontend-pages)
 - [Compliance Frameworks](#compliance-frameworks)
@@ -139,6 +153,7 @@ The API reloads on file changes automatically. The frontend runs on http://local
   - **Overview**: Aggregate stats, per-provider breakdown, severity distribution
   - **Connections**: Add/test/scan/delete SaaS connections
   - **Findings**: Filterable table of all SaaS findings
+- 8 SaaS platforms: ServiceNow, Microsoft 365, Salesforce, Snowflake, GitHub, Google Workspace, Cloudflare, OpenStack
 - Credential validation on connection creation
 - Connection testing before scanning
 - One-click scan initiation
@@ -173,16 +188,88 @@ The API reloads on file changes automatically. The frontend runs on http://local
 - Protection, Detection, Recovery, and Governance categories
 - Executive-level readiness dashboard
 
-### Reports
-- Executive and technical PDF report generation
+### Reports & Data Export
+- Executive and technical PDF report generation with **embedded charts** (severity donut, top services bar)
+- Chart service: matplotlib-based generation (donut, horizontal bar, radar, line, stacked bar charts)
 - MITRE ATT&CK and compliance sections in reports
+- Attack path analysis and ransomware readiness reporting
 - Severity breakdown, top findings, and remediation guidance
-- Downloadable PDF reports per scan or organization
+- Downloadable PDF reports with filters (provider, account, severity, service)
+- **Data export**: CSV and JSON export of findings for SIEM integration
 
 ### Inventory
 - Cloud resource inventory with friendly service labels
 - Per-provider resource aggregation
 - Account summary with resource type breakdown
+- Resource-level findings drill-down
+
+### Attack Path Analysis
+- Automated discovery of multi-step attack chains across resources
+- Graph-based path finding with risk scoring and prioritization
+- Choke point identification for optimal remediation
+- Run comparison to track security posture changes over time
+- Severity classification (critical, high, medium, low)
+- Entry point and target identification with technique mapping
+
+### Security Graph
+- Interactive resource relationship visualization
+- Relationship inference across cloud services
+- Blast radius analysis from any compromised resource
+- Path finding between any two resources
+- Node search and filtering by type/service
+- Findings panel per resource node
+- Edge visualization with relationship types
+
+### Data Security Posture Management (DSPM)
+- **Data Store Discovery**: Inventory of all data stores across cloud providers
+- **PII Scanner**: Detection of personally identifiable information in data stores
+- **Permission Analyzer**: IAM/RBAC permission analysis for data access
+- **Shadow Data Detection**: Discovery of unmanaged/unknown data stores
+- **Content Sampling**: Data content analysis for classification
+- **Data Classifier**: Automated sensitivity classification
+- **Native Integrations**: Cloud-native data platform connectors
+
+### Scan Scheduling
+- Automated recurring scans with configurable frequency (daily, weekly, monthly)
+- Per-provider and per-service scope control
+- Pause/resume schedule management
+- Next run and last run tracking
+- Full CRUD UI for schedule management
+
+### Notifications
+- Real-time notification center for scan completions, critical findings, and system events
+- Read/unread filtering with badge indicators in sidebar
+- Mark individual or all notifications as read
+- Severity-tagged notifications with contextual links
+- Notification count polling in sidebar
+
+### Audit Log
+- Complete activity tracking for all platform actions
+- Filterable by action type (create, update, delete, login, scan, export)
+- Filterable by resource type (provider, scan, schedule, integration, report)
+- Configurable time period (7-90 days)
+- Aggregate statistics by action and resource type
+- IP address tracking per event
+
+### API Key Management
+- Programmatic API access via secure API keys
+- Key generation with `darca_` prefix and SHA-256 hashing
+- One-time key display at creation (never stored in plain text)
+- Key listing with prefix visibility and usage tracking
+- Key revocation with immediate effect
+- Settings tab integration with clipboard copy
+
+### Integrations
+- Third-party webhook and notification integrations
+- Slack, Microsoft Teams, Jira, and custom webhook support
+- Connection testing and validation
+- Event-driven notifications on scan completion and critical findings
+
+### Organizations & Multi-Tenancy
+- Organization creation and management
+- Team member invitation by email
+- Role-based access: Owner, Admin, Member, Viewer
+- Member role management and removal
 
 ---
 
@@ -389,6 +476,244 @@ SaaS security checks are inspired by [ElectricEye](https://github.com/jonrau1/El
 
 **Prerequisites:** Custom role (e.g., `DARCA_AUDITOR`) with `IMPORTED PRIVILEGES` on `SNOWFLAKE` database.
 
+### GitHub (~30 checks)
+
+| Area          | Examples                                                            |
+|---------------|---------------------------------------------------------------------|
+| **Repos**     | Branch protection, signed commits, vulnerability alerts, secret scanning |
+| **Org**       | 2FA enforcement, member privileges, base permissions               |
+| **Actions**   | Workflow permissions, allowed actions, fork PR approvals            |
+
+**Required credentials:** `personal_access_token` with `admin:org` + `repo` scopes.
+
+### Google Workspace (~30 checks)
+
+| Area                | Examples                                                     |
+|---------------------|--------------------------------------------------------------|
+| **Admin**           | 2-Step Verification enforcement, session controls, admin roles |
+| **Gmail**           | SPF, DKIM, DMARC, attachment security, phishing protection   |
+| **Drive**           | External sharing, link sharing defaults, DLP rules           |
+
+**Required credentials:** `service_account_key` (JSON) with domain-wide delegation + `admin_email`.
+
+### Cloudflare (~25 checks)
+
+| Area                | Examples                                                     |
+|---------------------|--------------------------------------------------------------|
+| **DNS**             | DNSSEC, exposed records, CAA records                         |
+| **SSL/TLS**         | TLS version, HSTS, Always Use HTTPS, certificate validity   |
+| **Firewall**        | WAF rules, rate limiting, bot management, IP access rules    |
+
+**Required credentials:** `api_token` with Zone Read + Firewall Read permissions.
+
+### OpenStack (~30 checks)
+
+| Area                | Examples                                                     |
+|---------------------|--------------------------------------------------------------|
+| **Identity (Keystone)** | Password policy, token expiry, MFA, service accounts     |
+| **Compute (Nova)**  | Security groups, metadata service, encrypted volumes         |
+| **Network (Neutron)** | Security group rules, floating IPs, port security          |
+| **Storage (Swift)** | Container ACLs, encryption, versioning                       |
+
+**Required credentials:** `auth_url`, `username`, `password`, `project_name`, `user_domain_name`.
+
+---
+
+## Advanced Security Modules
+
+### Attack Path Analysis
+
+D-ARCA discovers multi-step attack paths that chain together individual misconfigurations into exploitable routes through your infrastructure.
+
+| Component           | Description                                                    |
+|---------------------|----------------------------------------------------------------|
+| **Graph Engine**    | Builds a resource dependency graph and discovers attack chains (2,523 lines) |
+| **Path Scoring**    | Risk scoring based on severity, blast radius, and exploitability (174 lines) |
+| **Choke Points**    | Identifies optimal remediation points to break multiple paths  |
+| **Run Comparison**  | Compare analysis runs to track posture improvement over time   |
+
+### Security Graph
+
+Interactive visualization of cloud resource relationships and security posture.
+
+| Feature              | Description                                                   |
+|----------------------|---------------------------------------------------------------|
+| **Resource Nodes**   | Visual representation of all cloud resources with health status |
+| **Relationship Edges** | Inferred connections (IAM roles, network, storage, compute) |
+| **Blast Radius**     | Impact analysis from any compromised resource                 |
+| **Path Finding**     | Discover all paths between any two resources                  |
+| **Search**           | Full-text search across resource nodes                        |
+| **Findings Panel**   | Per-resource security findings overlay                        |
+
+### Data Security Posture Management (DSPM)
+
+Complete data security lifecycle management across cloud providers (~7,800 lines).
+
+| Module                  | Lines | Description                                           |
+|-------------------------|-------|-------------------------------------------------------|
+| **Router/Orchestrator** | 976   | Orchestration and routing of DSPM workflows           |
+| **Permission Analyzer** | 1,065 | IAM/RBAC permission analysis for data access          |
+| **Data Store Checks**   | 452   | Security validation of data stores                    |
+| **PII Scanner**         | 710   | Personally identifiable information detection         |
+| **Shadow Detector**     | 987   | Discovery of unmanaged/unknown data stores            |
+| **Content Sampler**     | 680   | Data content sampling for classification              |
+| **Data Classifier**     | 465   | Automated sensitivity and compliance classification   |
+| **Native Integrations** | 703   | Cloud-native data platform connectors                 |
+
+### Ransomware Readiness
+
+Comprehensive ransomware preparedness assessment with 105 rules across 7 domains.
+
+| Domain             | Weight | Focus Areas                                                |
+|--------------------|--------|------------------------------------------------------------|
+| **Protection**     | High   | Encryption, access controls, network segmentation          |
+| **Detection**      | High   | Monitoring, alerting, anomaly detection                    |
+| **Recovery**       | High   | Backup strategy, RTO/RPO, disaster recovery                |
+| **Governance**     | Medium | Policies, procedures, training, executive ownership        |
+| **Identity**       | High   | MFA, privileged access, credential hygiene                 |
+| **Data**           | Medium | Classification, encryption, DLP                           |
+| **Infrastructure** | Medium | Patching, hardening, segmentation                          |
+
+Features: Knowledge base side panel, domain drill-down, account-level assessment, score history, governance controls, executive PDF reports.
+
+### MITRE ATT&CK Analysis
+
+Maps all security findings to the MITRE ATT&CK framework for threat-centric visibility.
+
+| Feature                 | Description                                              |
+|-------------------------|----------------------------------------------------------|
+| **Matrix Visualization** | Interactive tactic/technique heatmap                    |
+| **Coverage Gaps**       | Identifies unassessed and at-risk techniques             |
+| **Technique Detail**    | Per-technique evidence with mapped checks                |
+| **Navigator Layer**     | Export to MITRE ATT&CK Navigator format                  |
+| **Attack Path Coverage** | Cross-reference with discovered attack paths            |
+
+### Drift Detection
+
+Point-in-time configuration drift detection and change tracking (697 lines).
+
+| Feature               | Description                                               |
+|-----------------------|-----------------------------------------------------------|
+| **State Snapshots**   | Capture resource configuration at scan time               |
+| **Change Detection**  | Identify configuration changes between snapshots          |
+| **Drift Scoring**     | Classify drift severity based on security impact          |
+| **Remediation**       | Recommendations to restore compliant state                |
+
+### Check Library
+
+Centralized registry of all security checks across all providers (701 lines).
+
+| Feature               | Description                                               |
+|-----------------------|-----------------------------------------------------------|
+| **Check Registry**    | Central catalog of all security checks                    |
+| **Search & Filter**   | Find checks by provider, service, severity, framework     |
+| **Compliance Mapping** | Per-check compliance framework associations              |
+| **Remediation Guidance** | Step-by-step remediation for each check                |
+
+---
+
+## Operations & Management
+
+### Scan Scheduling
+
+Automated recurring scans via the Schedules management page.
+
+| Feature             | Description                                                 |
+|---------------------|-------------------------------------------------------------|
+| **Frequency**       | Daily, weekly, or monthly schedules                         |
+| **Scope Control**   | Filter by provider, services, and regions                   |
+| **Pause/Resume**    | Toggle schedules without deleting them                      |
+| **Next/Last Run**   | Track execution history and upcoming runs                   |
+
+**API Endpoints:**
+
+| Method | Endpoint                    | Description          |
+|--------|---------------------------  |----------------------|
+| GET    | `/api/v1/schedules`         | List all schedules   |
+| POST   | `/api/v1/schedules`         | Create schedule      |
+| PUT    | `/api/v1/schedules/{id}`    | Update schedule      |
+| DELETE | `/api/v1/schedules/{id}`    | Delete schedule      |
+
+### Notifications
+
+Real-time notification center for platform events.
+
+| Feature               | Description                                             |
+|-----------------------|---------------------------------------------------------|
+| **Event Types**       | Scan complete, critical finding, schedule, system       |
+| **Severity Tags**     | Critical, high, medium, low, info                       |
+| **Read/Unread**       | Filter and manage notification state                    |
+| **Sidebar Badge**     | Live unread count with polling (30s interval)           |
+
+**API Endpoints:**
+
+| Method | Endpoint                          | Description              |
+|--------|-----------------------------------|--------------------------|
+| GET    | `/api/v1/notifications`           | List notifications       |
+| GET    | `/api/v1/notifications/count`     | Get unread count         |
+| PUT    | `/api/v1/notifications/{id}/read` | Mark as read             |
+| PUT    | `/api/v1/notifications/read-all`  | Mark all as read         |
+
+### Audit Log
+
+Complete platform activity tracking for compliance and forensics.
+
+| Feature                | Description                                            |
+|------------------------|--------------------------------------------------------|
+| **Action Tracking**    | Create, update, delete, login, scan, export, download  |
+| **Resource Types**     | Provider, scan, schedule, integration, finding, report |
+| **Time Filtering**     | Configurable lookback period (7-90 days)               |
+| **Statistics**         | Aggregate counts by action and resource type            |
+| **IP Tracking**        | Source IP address recorded per event                    |
+
+**API Endpoints:**
+
+| Method | Endpoint                  | Description              |
+|--------|---------------------------|--------------------------|
+| GET    | `/api/v1/audit-log`       | List audit log entries   |
+| GET    | `/api/v1/audit-log/stats` | Aggregate statistics     |
+
+### API Key Management
+
+Programmatic API access via secure, revocable API keys.
+
+| Feature              | Description                                              |
+|----------------------|----------------------------------------------------------|
+| **Key Format**       | `darca_` prefix + 48 hex characters                      |
+| **Security**         | SHA-256 hashed storage; plain text shown only at creation |
+| **Management**       | Create, list (prefix only), revoke via Settings page     |
+| **Usage Tracking**   | Last used timestamp per key                              |
+
+**API Endpoints:**
+
+| Method | Endpoint                     | Description          |
+|--------|------------------------------|----------------------|
+| GET    | `/api/v1/auth/api-keys`      | List API keys        |
+| POST   | `/api/v1/auth/api-keys`      | Create new key       |
+| DELETE | `/api/v1/auth/api-keys/{id}` | Revoke key           |
+
+### Integrations
+
+Third-party service integrations for notifications and workflow automation.
+
+| Integration    | Description                                              |
+|----------------|----------------------------------------------------------|
+| **Slack**      | Channel notifications on scan completion and findings    |
+| **Teams**      | Microsoft Teams webhook integration                      |
+| **Jira**       | Automatic ticket creation for critical findings          |
+| **Webhooks**   | Custom HTTP webhook for any event type                   |
+
+### Reports & Data Export
+
+| Feature               | Description                                             |
+|-----------------------|---------------------------------------------------------|
+| **Executive PDF**     | High-level summary with charts, metrics, recommendations |
+| **Technical PDF**     | Detailed findings with remediation, compliance, MITRE   |
+| **Chart Embedding**   | Severity donut chart + top services bar chart in PDFs   |
+| **CSV Export**        | Tabular findings export for spreadsheets                |
+| **JSON Export**       | Structured findings export for SIEM/API integration     |
+| **Ransomware Report** | Dedicated ransomware readiness executive report         |
+
 ---
 
 ## API Reference
@@ -397,54 +722,69 @@ Base URL: `http://localhost:8080`
 
 Interactive API documentation: http://localhost:8080/docs (Swagger UI)
 
-### Authentication
+### Authentication & API Keys
 
-| Method | Endpoint               | Description          |
-|--------|------------------------|----------------------|
-| POST   | `/api/v1/auth/register`| Create new account   |
-| POST   | `/api/v1/auth/login`   | Login, get JWT token |
-| GET    | `/api/v1/auth/me`      | Get current user     |
+| Method | Endpoint                      | Description              |
+|--------|-------------------------------|--------------------------|
+| POST   | `/api/v1/auth/register`       | Create new account       |
+| POST   | `/api/v1/auth/login`          | Login, get JWT token     |
+| GET    | `/api/v1/auth/me`             | Get current user         |
+| GET    | `/api/v1/auth/api-keys`       | List API keys            |
+| POST   | `/api/v1/auth/api-keys`       | Create new API key       |
+| DELETE | `/api/v1/auth/api-keys/{id}`  | Revoke API key           |
 
 All other endpoints require `Authorization: Bearer <token>` header.
 
 ### Dashboard
 
-| Method | Endpoint                  | Description                 |
-|--------|---------------------------|-----------------------------|
-| GET    | `/api/v1/dashboard/overview` | Aggregate stats & recent scans |
+| Method | Endpoint                             | Description                        |
+|--------|--------------------------------------|------------------------------------|
+| GET    | `/api/v1/dashboard/overview`         | Aggregate stats & recent scans     |
+| GET    | `/api/v1/dashboard/trends`           | Historical trend data              |
+| GET    | `/api/v1/dashboard/account/{id}`     | Per-provider dashboard metrics     |
 
 ### Cloud Providers
 
-| Method | Endpoint                        | Description            |
-|--------|---------------------------------|------------------------|
-| GET    | `/api/v1/providers/`            | List providers         |
-| POST   | `/api/v1/providers/`            | Add provider           |
-| GET    | `/api/v1/providers/{id}`        | Get provider details   |
-| DELETE | `/api/v1/providers/{id}`        | Remove provider        |
+| Method | Endpoint                                    | Description             |
+|--------|---------------------------------------------|-------------------------|
+| GET    | `/api/v1/providers`                         | List providers          |
+| POST   | `/api/v1/providers`                         | Add provider            |
+| PUT    | `/api/v1/providers/{id}`                    | Update provider         |
+| DELETE | `/api/v1/providers/{id}`                    | Remove provider         |
+| POST   | `/api/v1/providers/{id}/discover-accounts`  | Discover sub-accounts   |
+| GET    | `/api/v1/providers/{id}/accounts`           | List child accounts     |
 
 ### Scans
 
 | Method | Endpoint                | Description         |
 |--------|-------------------------|---------------------|
-| GET    | `/api/v1/scans/`        | List scans          |
-| POST   | `/api/v1/scans/`        | Start new scan      |
+| GET    | `/api/v1/scans`         | List scans          |
+| POST   | `/api/v1/scans`         | Start new scan      |
 | GET    | `/api/v1/scans/{id}`    | Get scan status     |
 
 ### Cloud Findings
 
-| Method | Endpoint                  | Description                     |
-|--------|---------------------------|---------------------------------|
-| GET    | `/api/v1/findings/`       | List findings (filterable)      |
-| GET    | `/api/v1/findings/stats`  | Aggregated finding statistics   |
+| Method | Endpoint                              | Description                    |
+|--------|---------------------------------------|--------------------------------|
+| GET    | `/api/v1/findings`                    | List findings (filterable)     |
+| GET    | `/api/v1/findings/stats`              | Aggregated finding statistics  |
+| POST   | `/api/v1/findings/{id}/exception`     | Create finding exception       |
+| POST   | `/api/v1/findings/{id}/remediate`     | Mark finding as remediated     |
+| GET    | `/api/v1/findings/{id}/actions`       | Get finding action history     |
 
 Query parameters: `severity`, `status`, `service`, `region`, `scan_id`, `limit`, `offset`
 
 ### Compliance
 
-| Method | Endpoint                       | Description                |
-|--------|--------------------------------|----------------------------|
-| GET    | `/api/v1/compliance/frameworks`| List all frameworks        |
-| GET    | `/api/v1/compliance/summary`   | Pass/fail summary          |
+| Method | Endpoint                                         | Description                    |
+|--------|--------------------------------------------------|--------------------------------|
+| GET    | `/api/v1/compliance/frameworks`                  | List all frameworks            |
+| GET    | `/api/v1/compliance/summary`                     | Pass/fail summary              |
+| GET    | `/api/v1/compliance/accounts`                    | List compliant accounts        |
+| GET    | `/api/v1/compliance/frameworks/{id}/checks`      | Framework checks detail        |
+| GET    | `/api/v1/compliance/frameworks/{id}/stats`       | Framework statistics           |
+| GET    | `/api/v1/compliance/frameworks/{id}/library`     | Framework control library      |
+| GET    | `/api/v1/compliance/frameworks/{id}/controls`    | Control-level drill-down       |
 
 ### SaaS Security
 
@@ -452,60 +792,160 @@ Query parameters: `severity`, `status`, `service`, `region`, `scan_id`, `limit`,
 |--------|-----------------------------------------------|--------------------------|
 | GET    | `/api/v1/saas/connections`                    | List SaaS connections    |
 | POST   | `/api/v1/saas/connections`                    | Add SaaS connection      |
-| GET    | `/api/v1/saas/connections/{id}`               | Get connection details   |
 | DELETE | `/api/v1/saas/connections/{id}`               | Remove connection        |
 | POST   | `/api/v1/saas/connections/{id}/test`          | Test connectivity        |
 | GET    | `/api/v1/saas/findings`                       | List SaaS findings       |
 | GET    | `/api/v1/saas/overview`                       | SaaS aggregate stats     |
 | GET    | `/api/v1/saas/findings/stats`                 | SaaS finding statistics  |
 
-### MITRE ATT&CK
-
-| Method | Endpoint                        | Description                       |
-|--------|---------------------------------|-----------------------------------|
-| GET    | `/api/v1/mitre/matrix`          | Get MITRE ATT&CK matrix with coverage |
-| GET    | `/api/v1/mitre/techniques`      | List techniques with findings     |
-
-### Reports
+### Attack Paths
 
 | Method | Endpoint                               | Description                    |
 |--------|----------------------------------------|--------------------------------|
-| GET    | `/api/v1/reports/`                     | List generated reports         |
-| POST   | `/api/v1/reports/generate`             | Generate PDF report            |
-| GET    | `/api/v1/reports/{id}/download`        | Download report PDF            |
+| POST   | `/api/v1/attack-paths/analyze`         | Run attack path analysis       |
+| GET    | `/api/v1/attack-paths`                 | List discovered attack paths   |
+| GET    | `/api/v1/attack-paths/summary`         | Aggregate path statistics      |
+| GET    | `/api/v1/attack-paths/{id}`            | Get path details               |
+| GET    | `/api/v1/attack-paths/runs`            | List analysis runs             |
+| GET    | `/api/v1/attack-paths/choke-points`    | Get remediation choke points   |
+| GET    | `/api/v1/attack-paths/compare`         | Compare two analysis runs      |
+
+### Security Graph
+
+| Method | Endpoint                                        | Description                  |
+|--------|-------------------------------------------------|------------------------------|
+| GET    | `/api/v1/security-graph/graph`                  | Get resource graph           |
+| GET    | `/api/v1/security-graph/stats`                  | Graph statistics             |
+| GET    | `/api/v1/security-graph/nodes/{id}`             | Node detail + findings       |
+| GET    | `/api/v1/security-graph/blast-radius/{id}`      | Blast radius analysis        |
+| GET    | `/api/v1/security-graph/paths`                  | Path finding (source/target) |
+| GET    | `/api/v1/security-graph/search`                 | Search nodes by query        |
+
+### MITRE ATT&CK
+
+| Method | Endpoint                                 | Description                       |
+|--------|------------------------------------------|-----------------------------------|
+| GET    | `/api/v1/mitre/matrix`                   | MITRE ATT&CK matrix with coverage |
+| GET    | `/api/v1/mitre/technique/{id}`           | Technique detail with evidence    |
+| GET    | `/api/v1/mitre/technique/{id}/checks`    | Checks mapped to technique        |
+| GET    | `/api/v1/mitre/coverage-gaps`            | Identify coverage gaps            |
+| GET    | `/api/v1/mitre/navigator-layer`          | Export Navigator layer JSON       |
+| GET    | `/api/v1/mitre/attack-paths`             | Attack path technique coverage    |
+
+### DSPM
+
+| Method | Endpoint                     | Description                    |
+|--------|------------------------------|--------------------------------|
+| GET    | `/api/v1/dspm/overview`      | DSPM posture overview          |
+| GET    | `/api/v1/dspm/checks`        | Data security checks           |
+| GET    | `/api/v1/dspm/data-stores`   | Discovered data stores         |
+
+### Reports & Export
+
+| Method | Endpoint                               | Description                         |
+|--------|----------------------------------------|-------------------------------------|
+| GET    | `/api/v1/reports/executive`            | Download executive PDF report       |
+| GET    | `/api/v1/reports/technical`            | Download technical PDF report       |
+| GET    | `/api/v1/reports/export/findings`      | Export findings as CSV or JSON      |
+| GET    | `/api/v1/reports/ransomware-readiness` | Ransomware readiness PDF report     |
 
 ### Inventory
 
-| Method | Endpoint                        | Description                       |
-|--------|---------------------------------|-----------------------------------|
-| GET    | `/api/v1/inventory/`            | List cloud resources              |
-| GET    | `/api/v1/inventory/summary`     | Resource summary by service/account |
+| Method | Endpoint                                | Description                          |
+|--------|-----------------------------------------|--------------------------------------|
+| GET    | `/api/v1/inventory/resources`           | List cloud resources                 |
+| GET    | `/api/v1/inventory/summary`             | Resource summary by service          |
+| GET    | `/api/v1/inventory/summary/by-account`  | Summary grouped by account           |
+| GET    | `/api/v1/inventory/resources/findings`  | Findings for a specific resource     |
 
 ### Ransomware Readiness
 
-| Method | Endpoint                               | Description                    |
-|--------|----------------------------------------|--------------------------------|
-| GET    | `/api/v1/ransomware/assessment`        | Run ransomware readiness check |
-| GET    | `/api/v1/ransomware/score`             | Get readiness score and domains |
+| Method | Endpoint                                         | Description                    |
+|--------|--------------------------------------------------|--------------------------------|
+| GET    | `/api/v1/ransomware-readiness/score`             | Get readiness score            |
+| GET    | `/api/v1/ransomware-readiness/score/history`     | Score history over time        |
+| GET    | `/api/v1/ransomware-readiness/domains`           | Domain breakdown               |
+| GET    | `/api/v1/ransomware-readiness/domains/{id}/rules`| Rules per domain               |
+| GET    | `/api/v1/ransomware-readiness/findings`          | Ransomware findings            |
+| GET    | `/api/v1/ransomware-readiness/accounts`          | Per-account assessment         |
+| GET    | `/api/v1/ransomware-readiness/rules`             | All ransomware rules           |
+| GET    | `/api/v1/ransomware-readiness/governance`        | Governance controls            |
+| PUT    | `/api/v1/ransomware-readiness/governance`        | Update governance settings     |
+| POST   | `/api/v1/ransomware-readiness/evaluate`          | Trigger new evaluation         |
+
+### Schedules
+
+| Method | Endpoint                    | Description          |
+|--------|-----------------------------|----------------------|
+| GET    | `/api/v1/schedules`         | List all schedules   |
+| POST   | `/api/v1/schedules`         | Create schedule      |
+| PUT    | `/api/v1/schedules/{id}`    | Update schedule      |
+| DELETE | `/api/v1/schedules/{id}`    | Delete schedule      |
+
+### Notifications
+
+| Method | Endpoint                          | Description          |
+|--------|-----------------------------------|----------------------|
+| GET    | `/api/v1/notifications`           | List notifications   |
+| GET    | `/api/v1/notifications/count`     | Unread count         |
+| PUT    | `/api/v1/notifications/{id}/read` | Mark as read         |
+| PUT    | `/api/v1/notifications/read-all`  | Mark all as read     |
+
+### Integrations
+
+| Method | Endpoint                            | Description            |
+|--------|-------------------------------------|------------------------|
+| GET    | `/api/v1/integrations`              | List integrations      |
+| POST   | `/api/v1/integrations`              | Create integration     |
+| PUT    | `/api/v1/integrations/{id}`         | Update integration     |
+| DELETE | `/api/v1/integrations/{id}`         | Delete integration     |
+| POST   | `/api/v1/integrations/{id}/test`    | Test integration       |
+
+### Organizations
+
+| Method | Endpoint                                         | Description          |
+|--------|--------------------------------------------------|----------------------|
+| POST   | `/api/v1/organizations`                          | Create organization  |
+| GET    | `/api/v1/organizations/current`                  | Get current org      |
+| PUT    | `/api/v1/organizations/current`                  | Update org           |
+| GET    | `/api/v1/organizations/current/members`          | List members         |
+| POST   | `/api/v1/organizations/current/members/invite`   | Invite member        |
+| PUT    | `/api/v1/organizations/current/members/{id}/role`| Update member role   |
+| DELETE | `/api/v1/organizations/current/members/{id}`     | Remove member        |
+
+### Audit Log
+
+| Method | Endpoint                  | Description              |
+|--------|---------------------------|--------------------------|
+| GET    | `/api/v1/audit-log`       | List audit log entries   |
+| GET    | `/api/v1/audit-log/stats` | Audit log statistics     |
 
 ---
 
 ## Frontend Pages
 
-| Page                | Path                       | Description                                    |
-|---------------------|----------------------------|------------------------------------------------|
-| **Sign In**         | `/auth/sign-in`            | JWT authentication login                       |
-| **Sign Up**         | `/auth/sign-up`            | Account registration                           |
-| **Overview**        | `/darca/overview`          | Main dashboard with aggregate metrics          |
-| **Findings**        | `/darca/findings`          | Cloud findings browser with filters            |
-| **Compliance**      | `/darca/compliance`        | Compliance frameworks with control-level library |
-| **Scans**           | `/darca/scans`             | Scan management (create, monitor, history)     |
-| **Cloud Providers** | `/darca/providers`         | Cloud provider management (AWS/Azure/GCP/OCI/Alibaba/K8s) |
-| **SaaS Security**   | `/darca/saas-security`     | SaaS hub: overview, connections, findings      |
-| **MITRE ATT&CK**   | `/darca/mitre-attack`      | MITRE ATT&CK matrix and technique analysis     |
-| **Ransomware**      | `/darca/ransomware`        | Ransomware readiness assessment dashboard      |
-| **Reports**         | `/darca/reports`           | PDF report generation (executive/technical)    |
-| **Inventory**       | `/darca/inventory`         | Cloud resource inventory and account summary   |
+| Page                    | Path                               | Description                                              |
+|-------------------------|-------------------------------------|----------------------------------------------------------|
+| **Sign In**             | `/auth/sign-in`                     | JWT authentication login                                 |
+| **Sign Up**             | `/auth/sign-up`                     | Account registration                                     |
+| **Overview**            | `/darca/overview`                   | Main dashboard with aggregate metrics                    |
+| **Attack Paths**        | `/darca/attack-paths`               | Attack path visualization and analysis                   |
+| **Findings**            | `/darca/findings`                   | Cloud findings browser with filters and actions          |
+| **Compliance**          | `/darca/compliance`                 | Compliance frameworks with control-level library         |
+| **MITRE ATT&CK**       | `/darca/mitre-attack`               | MITRE ATT&CK matrix and technique analysis               |
+| **Ransomware Readiness**| `/darca/ransomware-readiness`       | Readiness dashboard with domains, findings, governance   |
+| **Security Graph**      | `/darca/security-graph`             | Interactive resource relationship graph                  |
+| **Inventory**           | `/darca/inventory`                  | Cloud resource inventory and account summary             |
+| **Cloud Providers**     | `/darca/providers`                  | Provider management (AWS/Azure/GCP/OCI/Alibaba/K8s)     |
+| **Data Security**       | `/darca/dspm`                       | Data Security Posture Management module                  |
+| **SaaS Security**       | `/darca/saas-security`              | SaaS hub: overview, connections, findings                |
+| **Scans**               | `/darca/scans`                      | Scan management (create, monitor, history)               |
+| **Schedules**           | `/darca/schedules`                  | Automated scan scheduling (daily/weekly/monthly)         |
+| **Notifications**       | `/darca/notifications`              | Notification center with read/unread management          |
+| **Reports**             | `/darca/reports`                    | PDF reports (executive/technical) + CSV/JSON export      |
+| **Integrations**        | `/darca/integrations`               | Third-party integrations (Slack, Teams, Jira, webhooks)  |
+| **Audit Log**           | `/darca/audit-log`                  | Platform activity tracking with filters and statistics   |
+| **Settings**            | `/darca/settings`                   | Profile, organization management, API keys               |
 
 ### Color Palette
 
@@ -548,6 +988,7 @@ D-ARCA maps security checks to compliance frameworks at the **control level** �
 | Framework        | Full Name                                              | Controls | Scope           |
 |------------------|--------------------------------------------------------|----------|-----------------|
 | PCI-DSS-3.2.1    | Payment Card Industry Data Security Standard v3.2.1    | 9        | Multi-cloud     |
+| PCI-DSS-v4       | Payment Card Industry Data Security Standard v4.0      | 12       | Multi-cloud     |
 | HIPAA            | HIPAA Security Rule                                    | 4        | Multi-cloud     |
 | SOC2             | SOC 2 Type II (Trust Service Criteria)                 | 5        | Multi-cloud     |
 | GDPR             | General Data Protection Regulation                     | 4        | Multi-cloud     |
@@ -556,6 +997,7 @@ D-ARCA maps security checks to compliance frameworks at the **control level** �
 | ISO-27001        | ISO/IEC 27001:2022 Annex A                             | 6        | Multi-cloud     |
 | MCSB-Azure-1.0   | Microsoft Cloud Security Benchmark (MCSB) v2 - Azure  | 84       | Azure           |
 | CCM-4.1          | CSA Cloud Controls Matrix v4.1                         | 207      | Multi-cloud     |
+| ENS              | Esquema Nacional de Seguridad (Spain)                  | 10       | Multi-cloud     |
 
 ---
 
@@ -577,8 +1019,10 @@ D-ARCA maps security checks to compliance frameworks at the **control level** �
 
 - **Credentials encryption**: Provider and SaaS credentials are base64-encoded before storage. For production, integrate with a proper KMS (e.g., AWS KMS, Azure Key Vault, HashiCorp Vault).
 - **JWT tokens**: Expire after 24 hours by default (`ACCESS_TOKEN_EXPIRE_MINUTES=1440`).
+- **API keys**: Prefixed with `darca_`, stored as SHA-256 hashes. Full key displayed only at creation time.
 - **CORS**: Restricted to configured origins. Update `CORS_ORIGINS` for your deployment domain.
 - **Password hashing**: bcrypt via passlib.
+- **Audit logging**: All significant user actions are recorded with timestamps, IP addresses, and resource details.
 
 ---
 
@@ -587,18 +1031,29 @@ D-ARCA maps security checks to compliance frameworks at the **control level** �
 ```
 ARCA/
 ├── api/                              # Backend (Python / FastAPI)
-│   ├── main.py                       # FastAPI application entry point
+│   ├── main.py                       # FastAPI application entry point (20 routers)
 │   ├── config.py                     # Settings (env vars)
 │   ├── database.py                   # SQLAlchemy async engine setup
 │   ├── celery_app.py                 # Celery configuration
 │   ├── requirements.txt              # Python dependencies
-│   ├── models/                       # SQLAlchemy ORM models
+│   ├── models/                       # SQLAlchemy ORM models (17 tables)
 │   │   ├── user.py                   # User model (auth)
 │   │   ├── provider.py               # Cloud provider model
 │   │   ├── scan.py                   # Scan model (cloud + SaaS)
 │   │   ├── finding.py                # Cloud finding model
+│   │   ├── finding_action.py         # Finding exception/remediation actions
 │   │   ├── saas_connection.py        # SaaS connection model
-│   │   └── saas_finding.py           # SaaS finding model
+│   │   ├── saas_finding.py           # SaaS finding model
+│   │   ├── attack_path.py            # Attack path model
+│   │   ├── scan_schedule.py          # Scan schedule model
+│   │   ├── notification.py           # Notification model
+│   │   ├── integration.py            # Third-party integration model
+│   │   ├── organization.py           # Organization & membership model
+│   │   ├── audit_log.py              # Audit log model (activity tracking)
+│   │   ├── api_key.py                # API key model (programmatic access)
+│   │   ├── rr_score.py               # Ransomware readiness scores
+│   │   ├── rr_finding.py             # Ransomware readiness findings
+│   │   └── rr_governance.py          # Ransomware readiness governance
 │   ├── schemas/                      # Pydantic request/response schemas
 │   │   ├── auth.py                   # Auth DTOs
 │   │   ├── provider.py               # Provider DTOs
@@ -606,21 +1061,33 @@ ARCA/
 │   │   ├── finding.py                # Finding DTOs
 │   │   ├── saas.py                   # SaaS DTOs + credential validators
 │   │   └── dashboard.py              # Dashboard DTOs
-│   ├── routers/                      # API route handlers
-│   │   ├── auth.py                   # POST /register, /login, GET /me
+│   ├── routers/                      # API route handlers (20 modules)
+│   │   ├── auth.py                   # Auth + API key management
 │   │   ├── providers.py              # CRUD cloud providers
 │   │   ├── scans.py                  # Create/list/get scans
-│   │   ├── findings.py               # List/filter/stats findings
-│   │   ├── compliance.py             # Frameworks, summary, control-level library
+│   │   ├── findings.py               # List/filter/stats/actions findings
+│   │   ├── compliance.py             # Frameworks, summary, control library
 │   │   ├── saas.py                   # SaaS connections, findings, overview
-│   │   ├── dashboard.py              # Aggregate overview
-│   │   ├── reports.py                # PDF report generation (executive/technical)
-│   │   ├── mitre.py                  # MITRE ATT&CK matrix and technique mapping
+│   │   ├── dashboard.py              # Aggregate overview + trends
+│   │   ├── attack_paths.py           # Attack path analysis + choke points
+│   │   ├── security_graph.py         # Security graph + blast radius (938 lines)
+│   │   ├── reports.py                # PDF reports + CSV/JSON export
+│   │   ├── mitre.py                  # MITRE ATT&CK matrix + navigator
+│   │   ├── dspm.py                   # Data Security Posture Management
 │   │   ├── inventory.py              # Cloud resource inventory
-│   │   └── ransomware.py             # Ransomware readiness assessment
+│   │   ├── ransomware_readiness.py   # Ransomware readiness assessment
+│   │   ├── schedules.py              # Scan scheduling (CRUD)
+│   │   ├── notifications.py          # Notification management
+│   │   ├── integrations.py           # Third-party integrations
+│   │   ├── organizations.py          # Multi-tenancy + membership
+│   │   └── audit_log.py              # Audit log + statistics
 │   ├── services/                     # Business logic
 │   │   ├── auth_service.py           # JWT, password hashing, encryption
-│   │   └── report_service.py         # PDF report builder (ReportLab)
+│   │   ├── report_service.py         # PDF report builder with chart embedding
+│   │   ├── chart_service.py          # Matplotlib chart generation (donut, bar, radar, line, stacked)
+│   │   ├── rr_report_service.py      # Ransomware readiness report builder
+│   │   ├── notification_service.py   # Notification dispatch
+│   │   └── audit_service.py          # Audit log recording
 │   └── tasks/                        # Celery background tasks
 │       ├── scan_tasks.py             # Cloud scan execution
 │       └── saas_tasks.py             # SaaS scan execution
@@ -641,25 +1108,49 @@ ARCA/
 │   │   │   └── alibaba_scanner.py    # Alibaba checks (12 services, 70+ checks)
 │   │   └── kubernetes/
 │   │       └── k8s_scanner.py        # K8s checks (4 categories)
-│   ├── saas/                         # SaaS application scanners
+│   ├── saas/                         # SaaS application scanners (8 platforms)
 │   │   ├── saas_scanner.py           # SaaS scanner factory
 │   │   ├── base_saas_check.py        # SaaSCheckResult dataclass
 │   │   ├── connection_tester.py      # Connection test functions
-│   │   ├── servicenow/
-│   │   │   └── servicenow_scanner.py # ServiceNow checks (50+)
-│   │   ├── m365/
-│   │   │   └── m365_scanner.py       # Microsoft 365 checks (37)
-│   │   ├── salesforce/
-│   │   │   └── salesforce_scanner.py # Salesforce checks (18)
-│   │   └── snowflake/
-│   │       └── snowflake_scanner.py  # Snowflake checks (21)
+│   │   ├── servicenow/               # ServiceNow checks (50+)
+│   │   ├── m365/                     # Microsoft 365 checks (37)
+│   │   ├── salesforce/               # Salesforce checks (18)
+│   │   ├── snowflake/                # Snowflake checks (21)
+│   │   ├── github/                   # GitHub checks (~30)
+│   │   ├── google_workspace/         # Google Workspace checks (~30)
+│   │   ├── cloudflare/               # Cloudflare checks (~25)
+│   │   └── openstack/                # OpenStack checks (~30)
 │   ├── compliance/
-│   │   └── frameworks.py             # Framework definitions & control mappings (15+ frameworks)
+│   │   └── frameworks.py             # Framework definitions & control mappings (28+ frameworks)
+│   ├── frameworks/                   # Regulatory framework definitions
+│   │   ├── ens.py                    # Esquema Nacional de Seguridad (Spain)
+│   │   ├── gdpr.py                   # GDPR compliance controls
+│   │   ├── hipaa.py                  # HIPAA Security Rule controls
+│   │   ├── pci_dss_v4.py            # PCI-DSS v4.0 controls
+│   │   └── soc2.py                   # SOC 2 Type II controls
+│   ├── mitre/
+│   │   └── attack_mapping.py         # MITRE ATT&CK technique-to-check mapping
+│   ├── attack_paths/                 # Attack path analysis engine (~3,025 lines)
+│   │   ├── graph_engine.py           # Path finding and graph construction
+│   │   ├── graph.py                  # Graph data structure
+│   │   ├── scoring.py                # Path risk scoring
+│   │   └── models.py                 # Attack path data models
+│   ├── dspm/                         # Data Security Posture Management (~7,800 lines)
+│   │   ├── router.py                 # DSPM orchestrator/router
+│   │   ├── permission_analyzer.py    # IAM/RBAC permission analysis
+│   │   ├── data_store_checks.py      # Data store security validation
+│   │   ├── pii_scanner.py            # PII detection
+│   │   ├── shadow_detector.py        # Unmanaged data store discovery
+│   │   ├── content_sampler.py        # Data content sampling
+│   │   ├── data_classifier.py        # Sensitivity classification
+│   │   └── native_integrations.py    # Cloud-native data connectors
+│   ├── check_library.py              # Centralized check registry (701 lines)
+│   ├── drift_detection.py            # Configuration drift detection (697 lines)
 │   └── ransomware/                   # Ransomware readiness module
 │       ├── rules.py                  # 105 ransomware readiness rules
 │       └── scoring.py                # Scoring engine with domain weights
 │
-├── ui/                               # Frontend (Next.js / React / Tailwind)
+├── ui/                               # Frontend (Next.js 14 / React 18 / Tailwind)
 │   ├── app/
 │   │   ├── layout.tsx                # Root layout
 │   │   ├── page.tsx                  # Root redirect
@@ -667,38 +1158,43 @@ ARCA/
 │   │   ├── auth/
 │   │   │   ├── sign-in/page.tsx      # Login page
 │   │   │   └── sign-up/page.tsx      # Registration page
-│   │   └── darca/
+│   │   └── darca/                    # Authenticated pages (21 pages)
 │   │       ├── layout.tsx            # Authenticated layout + sidebar
 │   │       ├── overview/page.tsx     # Main dashboard
+│   │       ├── attack-paths/page.tsx # Attack path visualization
 │   │       ├── findings/page.tsx     # Cloud findings browser
 │   │       ├── compliance/page.tsx   # Compliance frameworks + Check Library
-│   │       ├── scans/page.tsx        # Scan management
-│   │       ├── providers/page.tsx    # Cloud provider management
-│   │       ├── saas-security/page.tsx# SaaS security hub
 │   │       ├── mitre-attack/page.tsx # MITRE ATT&CK matrix analysis
-│   │       ├── ransomware/page.tsx   # Ransomware readiness dashboard
-│   │       ├── reports/page.tsx      # PDF report generation
-│   │       └── inventory/page.tsx    # Cloud resource inventory
+│   │       ├── ransomware-readiness/ # Ransomware readiness (4 sub-pages)
+│   │       ├── security-graph/page.tsx# Interactive security graph
+│   │       ├── inventory/page.tsx    # Cloud resource inventory
+│   │       ├── providers/            # Provider management + dashboard
+│   │       ├── dspm/page.tsx         # Data Security Posture Management
+│   │       ├── saas-security/page.tsx# SaaS security hub
+│   │       ├── scans/page.tsx        # Scan management
+│   │       ├── schedules/page.tsx    # Scan scheduling UI
+│   │       ├── notifications/page.tsx# Notification center
+│   │       ├── reports/page.tsx      # PDF reports + data export
+│   │       ├── integrations/page.tsx # Third-party integrations
+│   │       ├── audit-log/page.tsx    # Activity audit log
+│   │       └── settings/page.tsx     # Profile, organization, API keys
 │   ├── components/
 │   │   ├── layout/
-│   │   │   ├── Sidebar.tsx           # Navigation sidebar
+│   │   │   ├── Sidebar.tsx           # Navigation sidebar (collapsible, mobile-responsive)
 │   │   │   └── Header.tsx            # Page header
 │   │   └── ui/
 │   │       ├── StatCard.tsx          # Metric stat card
 │   │       ├── Badge.tsx             # Severity/status badge
 │   │       └── DataTable.tsx         # Reusable data table
 │   ├── lib/
-│   │   ├── api.ts                    # API client (fetch wrapper)
+│   │   ├── api.ts                    # API client (75+ methods)
 │   │   └── utils.ts                  # Utility functions
 │   ├── store/
 │   │   └── auth.ts                   # Zustand auth store (persisted)
-│   ├── public/
-│   │   └── logo.svg                  # D-ARCA logo
 │   ├── package.json                  # Node.js dependencies
 │   ├── next.config.js                # Next.js configuration
 │   ├── tailwind.config.ts            # Tailwind CSS (corporate colors)
-│   ├── tsconfig.json                 # TypeScript config
-│   └── postcss.config.js             # PostCSS config
+│   └── tsconfig.json                 # TypeScript config
 │
 ├── docker-compose.yml                # Production deployment (6 services)
 ├── docker-compose.dev.yml            # Development (hot-reload)
