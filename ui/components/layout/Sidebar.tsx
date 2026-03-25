@@ -25,6 +25,8 @@ import {
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
   ShieldExclamationIcon,
+  ClockIcon,
+  ClipboardDocumentListIcon,
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/auth'
 import { api } from '@/lib/api'
@@ -60,8 +62,11 @@ const sections: NavSection[] = [
     label: 'Operations',
     items: [
       { name: 'Scans', href: '/darca/scans', icon: ShieldCheckIcon },
+      { name: 'Schedules', href: '/darca/schedules', icon: ClockIcon },
+      { name: 'Notifications', href: '/darca/notifications', icon: BellIcon },
       { name: 'Reports', href: '/darca/reports', icon: DocumentArrowDownIcon },
       { name: 'Integrations', href: '/darca/integrations', icon: BoltIcon },
+      { name: 'Audit Log', href: '/darca/audit-log', icon: ClipboardDocumentListIcon },
       { name: 'Settings', href: '/darca/settings', icon: Cog6ToothIcon },
     ],
   },
@@ -189,7 +194,7 @@ export default function Sidebar() {
           )}
           <div className={cn('flex', collapsed ? 'flex-col gap-1' : 'gap-1')}>
             <Link
-              href="/darca/settings"
+              href="/darca/notifications"
               className="p-1.5 rounded-lg hover:bg-brand-gray-100 text-brand-gray-400 hover:text-brand-gray-600 relative transition-colors"
               title="Notifications"
             >

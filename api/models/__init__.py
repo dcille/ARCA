@@ -10,10 +10,17 @@ from api.models.notification import Notification
 from api.models.integration import Integration
 from api.models.organization import Organization
 from api.models.finding_action import FindingAction
+from api.models.audit_log import AuditLog
+from api.models.api_key import ApiKey
+from api.models.rr_score import RRScore
+from api.models.rr_finding import RRFinding
+from api.models.rr_governance import RRGovernance
 
 __all__ = [
     "User", "Provider", "Scan", "Finding",
     "SaaSConnection", "SaaSFinding",
     "AttackPath", "ScanSchedule", "Notification",
     "Integration", "Organization", "FindingAction",
+    "AuditLog", "ApiKey",
+    "RRScore", "RRFinding", "RRGovernance",
 ]

@@ -1,10 +1,20 @@
 """PDF report generation service for executive and technical reports."""
 import io
 import json
+import tempfile
+import os
 from datetime import datetime
 from typing import Optional
 
 from fpdf import FPDF
+
+from api.services.chart_service import (
+    donut_chart,
+    horizontal_bar_chart,
+    radar_chart,
+    line_chart,
+    stacked_bar_chart,
+)
 
 # ── Color palette (matching ARCA brand) ────────────────────────────
 BRAND_NAVY = (15, 23, 42)
@@ -98,6 +108,19 @@ class ARCAReport(FPDF):
         self.set_font("Helvetica", "", 7)
         self.set_text_color(*BRAND_GRAY)
         self.cell(w, 5, label, align="C")
+
+    def embed_chart(self, chart_bytes: bytes, x: float = None, y: float = None,
+                    w: float = 90, h: float = 0):
+        """Embed a PNG chart image into the PDF."""
+        if not chart_bytes:
+            return
+        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        try:
+            tmp.write(chart_bytes)
+            tmp.close()
+            self.image(tmp.name, x=x or self.get_x(), y=y or self.get_y(), w=w, h=h)
+        finally:
+            os.unlink(tmp.name)
 
     def severity_bar(self, x: float, y: float, width: float,
                      counts: dict, total: int):
@@ -202,6 +225,29 @@ def generate_executive_report(
         pdf.cell(30, 4, label)
         x += 38
     pdf.ln(10)
+
+    # ── Charts Row ─────────────────────────────────────────────────
+    try:
+        if sev_counts:
+            chart_data = {k.title(): v for k, v in sev_counts.items() if v > 0}
+            chart_colors = {k.title(): v for k, v in SEV_COLORS.items()}
+            donut_bytes = donut_chart(chart_data, colors=chart_colors,
+                                      title="Severity Distribution",
+                                      center_text=str(total_findings))
+            y = pdf.get_y()
+            pdf.embed_chart(donut_bytes, x=10, y=y, w=90)
+
+            if findings_by_service:
+                top_svc = dict(sorted(findings_by_service.items(),
+                                       key=lambda x: x[1], reverse=True)[:8])
+                bar_bytes = horizontal_bar_chart(top_svc,
+                                                  title="Top Affected Services",
+                                                  color=BRAND_GREEN)
+                pdf.embed_chart(bar_bytes, x=105, y=y, w=95)
+
+            pdf.set_y(y + 65)
+    except Exception:
+        pass  # Charts are optional; continue without them
 
     # ── Top Affected Services ──────────────────────────────────────
     if findings_by_service:
