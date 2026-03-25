@@ -1,4 +1,12 @@
-"""Data models for the check registry."""
+"""Data models for the check registry.
+
+The registry is based on CIS Benchmark controls as the primary source of truth
+(904 controls across 9 benchmarks). Scanner check_ids map INTO CIS controls,
+and MITRE/RR references are resolved through the scanner_check_ids field.
+
+Resolution chain:
+  CIS Control (canonical) ←→ scanner_check_ids ←→ MITRE / RR references
+"""
 
 from dataclasses import dataclass, field, asdict
 from enum import Enum
@@ -56,6 +64,7 @@ class Category(str, Enum):
     API_SECURITY = "API Security"
     CDN = "CDN"
     DNS = "DNS"
+    ANALYTICS = "Analytics"
 
 
 CLOUD_PROVIDERS = {
@@ -75,28 +84,48 @@ SAAS_PROVIDERS = {
 class CheckDefinition:
     """Defines a single security check in the registry.
 
-    This is the canonical definition — every check_id used by scanners,
-    MITRE mappings, or Ransomware Readiness rules should exist here.
+    Primary source: CIS Benchmark controls.
+    Scanner check_ids are linked via the scanner_check_ids field, allowing
+    MITRE ATT&CK and Ransomware Readiness modules to resolve their references.
     """
 
-    check_id: str
+    # -- Identity --
+    check_id: str  # Canonical ID: "{provider}_{cis_id}" for CIS, scanner ID for supplementary
     title: str
     description: str
     severity: str
     provider: str
     service: str
     category: str
+
+    # -- CIS Benchmark linkage --
+    cis_id: Optional[str] = None  # Original CIS control ID (e.g., "2.1.1")
+    cis_level: Optional[str] = None  # L1, L2
+    cis_profile: Optional[str] = None  # E3, E5, etc. (SaaS)
+    assessment_type: str = "automated"  # automated | manual
+
+    # -- Scanner mapping --
+    # Scanner check_ids that implement this CIS control.
+    # This is the bridge for MITRE/RR resolution.
+    scanner_check_ids: list[str] = field(default_factory=list)
+
+    # -- Ransomware Readiness linkage (from CIS control metadata) --
+    rr_relevant: bool = False
+    rr_domains: list[str] = field(default_factory=list)  # D1..D7
+
+    # -- DSPM linkage --
+    dspm_relevant: bool = False
+    dspm_categories: list[str] = field(default_factory=list)
+
+    # -- Remediation & references --
     remediation: str = ""
     references: list[str] = field(default_factory=list)
+    compliance_mappings: list[str] = field(default_factory=list)
+
+    # -- Metadata --
     enabled: bool = True
     tags: list[str] = field(default_factory=list)
-    compliance_mappings: list[str] = field(default_factory=list)
-    # CIS benchmark linkage
-    cis_control_id: Optional[str] = None
-    cis_level: Optional[str] = None
-    cis_profile: Optional[str] = None
-    # Assessment type
-    assessment_type: str = "automated"  # automated | manual
+    source: str = "cis"  # cis | scanner | custom
 
     def __post_init__(self) -> None:
         valid_severities = {s.value for s in Severity}
@@ -119,9 +148,11 @@ class CheckDefinition:
         return json.dumps(self.to_dict(), indent=2)
 
     def summary(self) -> str:
+        cis = f" CIS:{self.cis_id}" if self.cis_id else ""
+        scanners = f" scanners:{len(self.scanner_check_ids)}" if self.scanner_check_ids else ""
         return (
-            f"[{self.severity.upper():>13s}] {self.check_id:<40s} "
-            f"({self.provider}/{self.service}) - {self.title}"
+            f"[{self.severity.upper():>13s}] {self.check_id:<45s} "
+            f"({self.provider}/{self.service}){cis}{scanners} - {self.title}"
         )
 
     @property
@@ -131,3 +162,18 @@ class CheckDefinition:
     @property
     def is_saas(self) -> bool:
         return self.provider in {p.value for p in SAAS_PROVIDERS}
+
+    @property
+    def is_cis_based(self) -> bool:
+        return self.source == "cis"
+
+    @property
+    def is_supplementary(self) -> bool:
+        return self.source == "scanner"
+
+    @property
+    def all_check_ids(self) -> set[str]:
+        """Return all check_ids associated with this entry (canonical + scanner)."""
+        ids = {self.check_id}
+        ids.update(self.scanner_check_ids)
+        return ids

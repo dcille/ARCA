@@ -1,9 +1,16 @@
-"""Central check registry with cross-reference validation.
+"""Central check registry based on CIS Benchmark controls.
 
 The registry is the single source of truth for check definitions.
+Primary source: CIS controls (904 across 9 benchmarks).
+Supplementary: scanner check_ids not covered by CIS.
+
 MITRE ATT&CK and Ransomware Readiness remain separate modules with their
-own mapping logic, but this registry can validate that every check_id
-they reference actually exists.
+own mapping logic. This registry validates and resolves their references
+through the scanner_check_ids bridge.
+
+Resolution chain:
+  MITRE check_id → scanner_check_id in registry → CIS control
+  RR check_id → CHECK_ID_ALIASES → scanner_check_id in registry → CIS control
 """
 
 import logging
@@ -22,28 +29,18 @@ logger = logging.getLogger(__name__)
 
 
 class CheckRegistry:
-    """Central registry that catalogs all available security checks.
+    """Central registry cataloging all security checks.
 
-    Usage::
-
-        registry = get_default_registry()
-
-        # Query checks
-        aws_checks = registry.filter_by_provider("aws")
-        critical   = registry.filter_by_severity("critical")
-
-        # Validate MITRE/RR references
-        orphans = registry.validate_mitre_references()
-        rr_orphans = registry.validate_rr_references()
-
-        # Cross-reference queries
-        mitre_for_check = registry.get_mitre_techniques("aws_iam_001")
-        rr_for_check    = registry.get_rr_rules("aws_iam_001")
+    Based on CIS Benchmark controls as primary entries, with scanner
+    check_ids mapped to each control. Provides cross-reference validation
+    and resolution for MITRE ATT&CK and Ransomware Readiness modules.
     """
 
     def __init__(self) -> None:
         self._checks: dict[str, CheckDefinition] = {}
         self._custom_checks: set[str] = set()
+        # Reverse index: scanner_check_id → registry check_id
+        self._scanner_index: dict[str, str] = {}
 
     # ------------------------------------------------------------------
     # Registration
@@ -58,6 +55,10 @@ class CheckRegistry:
         self._checks[check.check_id] = check
         if custom:
             self._custom_checks.add(check.check_id)
+        # Build scanner reverse index
+        for sid in check.scanner_check_ids:
+            if sid not in self._scanner_index:
+                self._scanner_index[sid] = check.check_id
         logger.debug("Registered check %s (custom=%s)", check.check_id, custom)
 
     def register_many(self, checks: list[CheckDefinition], custom: bool = False) -> int:
@@ -75,6 +76,9 @@ class CheckRegistry:
             raise KeyError(f"Check '{check_id}' not found in registry.")
         check = self._checks.pop(check_id)
         self._custom_checks.discard(check_id)
+        # Clean up scanner index
+        for sid in check.scanner_check_ids:
+            self._scanner_index.pop(sid, None)
         return check
 
     # ------------------------------------------------------------------
@@ -82,11 +86,30 @@ class CheckRegistry:
     # ------------------------------------------------------------------
 
     def get_check(self, check_id: str) -> Optional[CheckDefinition]:
-        """Retrieve a check by ID, or None if not found."""
+        """Retrieve a check by its registry ID, or None if not found."""
         return self._checks.get(check_id)
+
+    def find_by_scanner_id(self, scanner_check_id: str) -> Optional[CheckDefinition]:
+        """Find the registry entry that contains this scanner_check_id.
+
+        This is the key resolution method for MITRE/RR references:
+        given a scanner check_id, find which CIS control it maps to.
+        """
+        # Direct match (supplementary checks use themselves as check_id)
+        if scanner_check_id in self._checks:
+            return self._checks[scanner_check_id]
+        # Reverse index lookup
+        registry_id = self._scanner_index.get(scanner_check_id)
+        if registry_id:
+            return self._checks.get(registry_id)
+        return None
 
     def has_check(self, check_id: str) -> bool:
         return check_id in self._checks
+
+    def has_scanner_id(self, scanner_check_id: str) -> bool:
+        """Check if a scanner check_id is known (either as registry ID or in scanner_check_ids)."""
+        return scanner_check_id in self._checks or scanner_check_id in self._scanner_index
 
     def list_checks(self, include_disabled: bool = False) -> list[CheckDefinition]:
         if include_disabled:
@@ -94,7 +117,17 @@ class CheckRegistry:
         return [c for c in self._checks.values() if c.enabled]
 
     def list_check_ids(self) -> set[str]:
+        """Return all registry check_ids."""
         return set(self._checks.keys())
+
+    def list_all_scanner_ids(self) -> set[str]:
+        """Return all known scanner check_ids (from scanner_check_ids fields + supplementary)."""
+        ids = set(self._scanner_index.keys())
+        # Supplementary checks use their scanner ID as the registry ID
+        for chk in self._checks.values():
+            if chk.source == "scanner":
+                ids.add(chk.check_id)
+        return ids
 
     def list_custom_checks(self) -> list[CheckDefinition]:
         return [self._checks[cid] for cid in self._custom_checks if cid in self._checks]
@@ -106,6 +139,14 @@ class CheckRegistry:
     @property
     def enabled_count(self) -> int:
         return sum(1 for c in self._checks.values() if c.enabled)
+
+    @property
+    def cis_count(self) -> int:
+        return sum(1 for c in self._checks.values() if c.source == "cis")
+
+    @property
+    def supplementary_count(self) -> int:
+        return sum(1 for c in self._checks.values() if c.source == "scanner")
 
     # ------------------------------------------------------------------
     # Filtering
@@ -146,6 +187,12 @@ class CheckRegistry:
             if any(fw_lower in m.lower() for m in c.compliance_mappings)
         ]
 
+    def filter_cis_controls(self) -> list[CheckDefinition]:
+        return [c for c in self._checks.values() if c.source == "cis" and c.enabled]
+
+    def filter_supplementary(self) -> list[CheckDefinition]:
+        return [c for c in self._checks.values() if c.source == "scanner" and c.enabled]
+
     def filter_cloud_providers(self) -> list[CheckDefinition]:
         cloud_vals = {p.value for p in CLOUD_PROVIDERS}
         return [c for c in self._checks.values() if c.provider in cloud_vals and c.enabled]
@@ -153,6 +200,12 @@ class CheckRegistry:
     def filter_saas_providers(self) -> list[CheckDefinition]:
         saas_vals = {p.value for p in SAAS_PROVIDERS}
         return [c for c in self._checks.values() if c.provider in saas_vals and c.enabled]
+
+    def filter_rr_relevant(self) -> list[CheckDefinition]:
+        return [c for c in self._checks.values() if c.rr_relevant and c.enabled]
+
+    def filter_by_rr_domain(self, domain: str) -> list[CheckDefinition]:
+        return [c for c in self._checks.values() if domain in c.rr_domains and c.enabled]
 
     # ------------------------------------------------------------------
     # Search
@@ -165,6 +218,7 @@ class CheckRegistry:
             searchable = " ".join([
                 chk.check_id, chk.title, chk.description,
                 chk.service, chk.category, " ".join(chk.tags),
+                chk.cis_id or "", " ".join(chk.scanner_check_ids),
             ]).lower()
             if q in searchable:
                 results.append(chk)
@@ -175,89 +229,139 @@ class CheckRegistry:
     # ------------------------------------------------------------------
 
     def validate_mitre_references(self) -> dict:
-        """Validate that all check_ids in MITRE CHECK_TO_MITRE exist in registry.
+        """Validate MITRE CHECK_TO_MITRE references against the registry.
 
-        Returns a dict with 'valid', 'orphaned' (in MITRE but not registry),
-        and 'unmapped' (in registry but not MITRE) check_ids.
+        Uses the scanner_check_ids reverse index — a MITRE reference is
+        considered 'resolved' if its check_id exists as either:
+        - A registry check_id (supplementary scanner check), OR
+        - A scanner_check_id within any CIS control entry
         """
         try:
             from scanner.mitre.attack_mapping import CHECK_TO_MITRE
         except ImportError:
-            logger.warning("Could not import MITRE mappings for validation")
             return {"error": "MITRE module not available"}
 
         mitre_check_ids = set(CHECK_TO_MITRE.keys())
-        registry_ids = self.list_check_ids()
+        all_known_ids = self.list_all_scanner_ids() | self.list_check_ids()
 
-        valid = mitre_check_ids & registry_ids
-        orphaned = mitre_check_ids - registry_ids
-        unmapped = registry_ids - mitre_check_ids
+        resolved = mitre_check_ids & all_known_ids
+        orphaned = mitre_check_ids - all_known_ids
 
         return {
-            "valid": len(valid),
+            "total_references": len(mitre_check_ids),
+            "resolved": len(resolved),
+            "orphaned": len(orphaned),
             "orphaned_check_ids": sorted(orphaned),
-            "unmapped_check_ids": sorted(unmapped),
-            "coverage_pct": round(len(valid) / max(len(mitre_check_ids), 1) * 100, 1),
+            "coverage_pct": round(len(resolved) / max(len(mitre_check_ids), 1) * 100, 1),
         }
 
     def validate_rr_references(self) -> dict:
-        """Validate that all check_ids in Ransomware Readiness rules exist in registry.
+        """Validate Ransomware Readiness references against the registry.
 
-        Returns a dict with validation results per domain.
+        Uses the full resolution chain:
+        RR check_id → CHECK_ID_ALIASES → scanner_check_id → registry
+
+        A reference is 'resolved' if it or its alias target exists in
+        the registry's scanner_check_ids.
         """
         try:
             from scanner.ransomware_readiness.framework import get_all_rules
         except ImportError:
-            logger.warning("Could not import RR framework for validation")
             return {"error": "RR module not available"}
 
-        registry_ids = self.list_check_ids()
-        all_rr_check_ids: set[str] = set()
+        # Load aliases for resolution
+        try:
+            from scanner.ransomware_readiness.evaluator import CHECK_ID_ALIASES
+        except ImportError:
+            CHECK_ID_ALIASES = {}
+
+        all_known_ids = self.list_all_scanner_ids() | self.list_check_ids()
+        all_rr_ids: set[str] = set()
+        resolved: set[str] = set()
         orphaned: set[str] = set()
         by_domain: dict[str, dict] = {}
 
         for rule in get_all_rules():
             domain = rule.domain.value if hasattr(rule.domain, "value") else str(rule.domain)
             if domain not in by_domain:
-                by_domain[domain] = {"total_refs": 0, "valid": 0, "orphaned": []}
+                by_domain[domain] = {"rules": 0, "check_refs": 0, "resolved": 0, "orphaned": []}
+            by_domain[domain]["rules"] += 1
 
             for provider, check_ids in rule.check_ids.items():
                 for cid in check_ids:
-                    all_rr_check_ids.add(cid)
-                    by_domain[domain]["total_refs"] += 1
-                    if cid in registry_ids:
-                        by_domain[domain]["valid"] += 1
-                    else:
-                        by_domain[domain]["orphaned"].append(cid)
-                        orphaned.add(cid)
+                    all_rr_ids.add(cid)
+                    by_domain[domain]["check_refs"] += 1
 
-        valid = all_rr_check_ids & registry_ids
+                    # Direct match
+                    if cid in all_known_ids:
+                        resolved.add(cid)
+                        by_domain[domain]["resolved"] += 1
+                        continue
+
+                    # Alias resolution
+                    alias_targets = CHECK_ID_ALIASES.get(cid, [])
+                    if any(t in all_known_ids for t in alias_targets):
+                        resolved.add(cid)
+                        by_domain[domain]["resolved"] += 1
+                        continue
+
+                    # Special markers (not actual checks)
+                    if cid.startswith("__") and cid.endswith("__"):
+                        resolved.add(cid)
+                        by_domain[domain]["resolved"] += 1
+                        continue
+
+                    orphaned.add(cid)
+                    by_domain[domain]["orphaned"].append(cid)
 
         return {
-            "valid": len(valid),
+            "total_references": len(all_rr_ids),
+            "resolved": len(resolved),
+            "orphaned": len(orphaned),
             "orphaned_check_ids": sorted(orphaned),
-            "coverage_pct": round(len(valid) / max(len(all_rr_check_ids), 1) * 100, 1),
+            "coverage_pct": round(len(resolved) / max(len(all_rr_ids), 1) * 100, 1),
             "by_domain": by_domain,
         }
 
     def get_mitre_techniques(self, check_id: str) -> list[str]:
-        """Return MITRE ATT&CK technique IDs mapped to a given check_id."""
+        """Return MITRE technique IDs for a check_id (registry or scanner)."""
         try:
             from scanner.mitre.attack_mapping import CHECK_TO_MITRE
         except ImportError:
             return []
-        return CHECK_TO_MITRE.get(check_id, [])
+
+        # Direct lookup
+        techs = CHECK_TO_MITRE.get(check_id, [])
+        if techs:
+            return techs
+
+        # If it's a CIS control, check its scanner_check_ids
+        chk = self._checks.get(check_id)
+        if chk:
+            all_techs = set()
+            for sid in chk.scanner_check_ids:
+                all_techs.update(CHECK_TO_MITRE.get(sid, []))
+            return sorted(all_techs)
+
+        return []
 
     def get_rr_rules(self, check_id: str) -> list[str]:
-        """Return Ransomware Readiness rule_ids that reference a given check_id."""
+        """Return RR rule_ids that reference a check_id (direct or via scanner mapping)."""
         try:
             from scanner.ransomware_readiness.framework import get_all_rules
         except ImportError:
             return []
+
+        # Collect all IDs to search for
+        search_ids = {check_id}
+        chk = self._checks.get(check_id)
+        if chk:
+            search_ids.update(chk.scanner_check_ids)
+
         rule_ids = []
         for rule in get_all_rules():
             for provider_checks in rule.check_ids.values():
-                if check_id in provider_checks:
+                if search_ids & set(provider_checks):
                     rule_ids.append(rule.rule_id)
                     break
         return rule_ids
@@ -267,8 +371,11 @@ class CheckRegistry:
     # ------------------------------------------------------------------
 
     def integrity_report(self) -> dict:
-        """Full integrity report: registry stats + MITRE/RR cross-reference validation."""
+        """Full integrity report with cross-reference validation."""
         stats = self.generate_catalog_report()
+        stats["cis_controls"] = self.cis_count
+        stats["supplementary_scanner_checks"] = self.supplementary_count
+        stats["total_scanner_ids_indexed"] = len(self._scanner_index)
         stats["mitre_validation"] = self.validate_mitre_references()
         stats["rr_validation"] = self.validate_rr_references()
         return stats
@@ -284,6 +391,7 @@ class CheckRegistry:
             "enabled_checks": self.enabled_count,
             "disabled_checks": self.total_count - self.enabled_count,
             "custom_checks": len(self._custom_checks),
+            "by_source": {"cis": self.cis_count, "scanner": self.supplementary_count},
             "by_provider": {},
             "by_severity": {},
             "by_category": {},
@@ -292,8 +400,9 @@ class CheckRegistry:
         for chk in self._checks.values():
             prov = chk.provider
             if prov not in report["by_provider"]:
-                report["by_provider"][prov] = {"total": 0, "by_service": {}}
+                report["by_provider"][prov] = {"total": 0, "cis": 0, "scanner": 0, "by_service": {}}
             report["by_provider"][prov]["total"] += 1
+            report["by_provider"][prov][chk.source] = report["by_provider"][prov].get(chk.source, 0) + 1
             svc = chk.service
             report["by_provider"][prov]["by_service"][svc] = (
                 report["by_provider"][prov]["by_service"].get(svc, 0) + 1
@@ -309,11 +418,12 @@ class CheckRegistry:
 
     def generate_catalog_text(self) -> str:
         lines: list[str] = []
-        lines.append("=" * 90)
-        lines.append("ARCA Cloud Security & SaaS Check Catalog")
+        lines.append("=" * 100)
+        lines.append("ARCA Security Check Registry (CIS-based)")
         lines.append(f"Generated: {datetime.utcnow().isoformat()}")
-        lines.append(f"Total checks: {self.total_count}  (enabled: {self.enabled_count})")
-        lines.append("=" * 90)
+        lines.append(f"Total: {self.total_count} checks "
+                     f"(CIS: {self.cis_count}, Supplementary: {self.supplementary_count})")
+        lines.append("=" * 100)
 
         providers: dict[str, list[CheckDefinition]] = {}
         for chk in self._checks.values():
@@ -321,13 +431,15 @@ class CheckRegistry:
 
         for prov in sorted(providers):
             checks = providers[prov]
+            cis_n = sum(1 for c in checks if c.source == "cis")
+            sup_n = sum(1 for c in checks if c.source == "scanner")
             lines.append("")
-            lines.append(f"--- {prov.upper()} ({len(checks)} checks) ---")
+            lines.append(f"--- {prov.upper()} ({len(checks)} checks: {cis_n} CIS + {sup_n} supplementary) ---")
             for chk in sorted(checks, key=lambda c: c.check_id):
                 lines.append(chk.summary())
 
         lines.append("")
-        lines.append("=" * 90)
+        lines.append("=" * 100)
         return "\n".join(lines)
 
     def export_json(self) -> str:
@@ -338,40 +450,11 @@ class CheckRegistry:
     # ------------------------------------------------------------------
 
     def load_all_definitions(self) -> int:
-        """Load check definitions from all provider definition modules."""
-        total = 0
-        definition_modules = [
-            "scanner.registry.definitions.aws_checks",
-            "scanner.registry.definitions.azure_checks",
-            "scanner.registry.definitions.gcp_checks",
-            "scanner.registry.definitions.oci_checks",
-            "scanner.registry.definitions.alibaba_checks",
-            "scanner.registry.definitions.ibm_cloud_checks",
-            "scanner.registry.definitions.kubernetes_checks",
-            "scanner.registry.definitions.m365_checks",
-            "scanner.registry.definitions.github_checks",
-            "scanner.registry.definitions.google_workspace_checks",
-            "scanner.registry.definitions.salesforce_checks",
-            "scanner.registry.definitions.servicenow_checks",
-            "scanner.registry.definitions.snowflake_checks",
-            "scanner.registry.definitions.cloudflare_checks",
-            "scanner.registry.definitions.openstack_checks",
-        ]
+        """Load CIS controls + supplementary scanner checks."""
+        from scanner.registry.cis_loader import load_all_cis_checks
 
-        for module_path in definition_modules:
-            try:
-                import importlib
-                mod = importlib.import_module(module_path)
-                checks = mod.get_checks()
-                count = self.register_many(checks)
-                total += count
-                logger.debug("Loaded %d checks from %s", count, module_path)
-            except ImportError as e:
-                logger.warning("Could not load %s: %s", module_path, e)
-            except Exception as e:
-                logger.error("Error loading %s: %s", module_path, e)
-
-        return total
+        checks = load_all_cis_checks()
+        return self.register_many(checks)
 
 
 # ======================================================================
