@@ -983,6 +983,23 @@ D-ARCA maps security checks to compliance frameworks at the **control level** â€
 | CIS-K8s-1.8        | CIS Kubernetes Benchmark v1.8                                  | 14       | Kubernetes    |
 | CIS-M365-3.0       | CIS Microsoft 365 Foundations Benchmark v3.0                   | 21       | Microsoft 365 |
 
+### CIS Control Library (781 Controls)
+
+D-ARCA includes a complete CIS control library with full metadata (descriptions, audit procedures, detection commands, remediation guidance) for each control. Controls are classified as automated or manual, and tagged for DSPM and Ransomware Readiness relevance.
+
+| Platform           | Benchmark                                        | Total | Automated | Manual | DSPM | RR  |
+|--------------------|--------------------------------------------------|-------|-----------|--------|------|-----|
+| AWS                | CIS AWS Foundations Benchmark v3.0               | 62    | 34        | 28     | Yes  | Yes |
+| Alibaba Cloud      | CIS Alibaba Cloud Foundation Benchmark v2.0.0    | 85    | 41        | 44     | Yes  | Yes |
+| GCP                | CIS Google Cloud Platform Benchmark v3.0         | 84    | 72        | 12     | Yes  | Yes |
+| Google Workspace   | CIS Google Workspace Benchmark v1.3.0            | 89    | 0         | 89     | Yes  | Yes |
+| IBM Cloud          | CIS IBM Cloud Foundations Benchmark v1.1.0       | 73    | 7         | 66     | Yes  | Yes |
+| Microsoft 365      | CIS Microsoft 365 Foundations Benchmark v6.0.1   | 140   | 129       | 11     | Yes  | Yes |
+| Microsoft Azure    | CIS Microsoft Azure Foundations Benchmark v5.0.0 | 155   | 93        | 62     | Yes  | Yes |
+| OCI                | CIS Oracle Cloud Infrastructure Benchmark v3.1.0 | 54    | 44        | 10     | Yes  | Yes |
+| Snowflake          | CIS Snowflake Foundations Benchmark v1.0.0       | 39    | 23        | 16     | Yes  | Yes |
+| **Total**          |                                                  | **781** | **443** | **338** |    |     |
+
 ### Regulatory & Industry Frameworks
 
 | Framework        | Full Name                                              | Controls | Scope           |
