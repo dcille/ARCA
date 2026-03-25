@@ -2,6 +2,10 @@
 
 Implements 80+ security checks across AWS services following CIS AWS Foundations
 Benchmark v3.0, NIST 800-53, SOC 2, and CSA CCM v4.1 frameworks.
+
+Provides complete CIS AWS Foundations Benchmark v3.0 coverage: automated checks
+emit PASS/FAIL results, while uncovered controls are emitted as MANUAL results
+requiring human review.
 """
 import json
 import logging
@@ -11,13 +15,14 @@ from typing import Optional
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
 
+from scanner.cis_controls.aws_cis_controls import AWS_CIS_CONTROLS
 from scanner.providers.base_check import CheckResult
 
 logger = logging.getLogger(__name__)
 
 
 class AWSScanner:
-    """AWS cloud security scanner with comprehensive service checks."""
+    """AWS cloud security scanner with comprehensive service checks and complete CIS coverage."""
 
     def __init__(self, credentials: dict, regions: Optional[list] = None, services: Optional[list] = None):
         self.credentials = credentials
@@ -2018,4 +2023,112 @@ class AWSScanner:
                 ).to_dict())
             except Exception as e:
                 logger.warning(f"SecurityHub checks in {region} failed: {e}")
+        return results
+
+    def _emit_cis_coverage(self, automated_results: list[dict]) -> list[dict]:
+        """Emit results for ALL CIS controls, filling in MANUAL status for non-automated ones.
+
+        This ensures the framework reports on every single CIS control from the benchmark,
+        marking automated controls with their actual PASS/FAIL status and manual controls
+        with MANUAL status indicating human review is required.
+        """
+        # Build a set of CIS control IDs already covered by automated checks
+        covered_cis_ids = set()
+        for result in automated_results:
+            cis_id = result.get("cis_control_id")
+            if cis_id:
+                covered_cis_ids.add(cis_id)
+
+        # Map check_ids to CIS control IDs based on check names
+        check_to_cis = {
+            "iam_root_mfa_enabled": "1.5",
+            "iam_no_root_access_key": "1.4",
+            "iam_password_policy_strong": "1.8",
+            "iam_password_policy_rotation": "1.8",
+            "iam_password_policy_reuse_prevention": "1.9",
+            "iam_password_policy_exists": "1.8",
+            "iam_user_mfa_enabled": "1.10",
+            "iam_user_no_inline_policies": "1.15",
+            "iam_user_unused_credentials_45days": "1.12",
+            "iam_access_key_rotation": "1.14",
+            "iam_user_single_active_access_key": "1.13",
+            "iam_user_no_attached_policies": "1.15",
+            "iam_group_no_inline_policies": "1.16",
+            "iam_no_star_policies": "1.16",
+            "iam_support_role_created": "1.17",
+            "iam_cloudshell_fullaccess_restricted": "1.16",
+            "iam_ssl_certificate_expiry": "1.19",
+            "iam_access_analyzer_enabled": "1.20",
+            "s3_bucket_public_access_blocked": "2.1.4",
+            "s3_bucket_encryption_enabled": "2.1.1",
+            "s3_bucket_versioning_enabled": "2.1.1",
+            "s3_bucket_logging_enabled": "3.6",
+            "s3_bucket_ssl_required": "2.1.1",
+            "s3_bucket_mfa_delete": "2.1.2",
+            "s3_bucket_object_lock": "2.1.1",
+            "ec2_ebs_volume_encrypted": "2.2.1",
+            "ec2_ebs_default_encryption": "2.2.1",
+            "ec2_imdsv2_required": "5.5",
+            "ec2_default_sg_no_traffic": "5.3",
+            "ec2_sg_no_wide_open_ports": "5.6",
+            "ec2_sg_no_ipv6_wide_open": "5.2",
+            "ec2_instance_no_public_ip": "5.6",
+            "rds_encryption_enabled": "2.3.1",
+            "rds_public_access_disabled": "2.3.3",
+            "rds_auto_minor_upgrade": "2.3.2",
+            "cloudtrail_enabled": "3.1",
+            "cloudtrail_multiregion": "3.1",
+            "cloudtrail_log_validation": "3.2",
+            "cloudtrail_encrypted": "3.7",
+            "cloudtrail_s3_bucket_logging": "3.6",
+            "cloudtrail_s3_object_write_events": "3.10",
+            "cloudtrail_s3_object_read_events": "3.11",
+            "cloudtrail_integrated_cloudwatch": "3.4",
+            "kms_key_rotation_enabled": "3.8",
+            "vpc_flow_logs_enabled": "3.9",
+            "vpc_default_sg_restricts_all": "5.3",
+            "vpc_no_unrestricted_nacl": "5.1",
+            "config_recorder_enabled": "3.5",
+            "securityhub_enabled": "4.16",
+        }
+
+        for result in automated_results:
+            check_id = result.get("check_id", "")
+            if check_id in check_to_cis:
+                covered_cis_ids.add(check_to_cis[check_id])
+
+        # Emit MANUAL results for uncovered CIS controls
+        manual_results = []
+        fw = ["CIS-AWS-3.0.0", "NIST-800-53", "SOC2"]
+
+        for ctrl in AWS_CIS_CONTROLS:
+            cis_id, title, level, assessment_type, severity, service_area = ctrl
+            if cis_id not in covered_cis_ids:
+                manual_results.append(CheckResult(
+                    check_id=f"aws_cis_{cis_id.replace('.', '_')}",
+                    check_title=f"{title} (CIS {cis_id})",
+                    service=service_area,
+                    severity=severity,
+                    status="MANUAL",
+                    resource_id="aws-account",
+                    status_extended=(
+                        f"CIS {cis_id} [{level}] - {assessment_type.upper()} assessment. "
+                        f"This control requires {'manual verification' if assessment_type == 'manual' else 'automated check implementation'}."
+                    ),
+                    remediation=f"Refer to CIS Amazon Web Services Foundations Benchmark v3.0.0, control {cis_id}.",
+                    compliance_frameworks=fw,
+                    assessment_type=assessment_type,
+                    cis_control_id=cis_id,
+                    cis_level=level,
+                ).to_dict())
+
+        return manual_results
+
+    def run_all_checks(self) -> list[dict]:
+        """Run all AWS security checks including complete CIS benchmark coverage."""
+        results = self.scan()
+
+        # Add MANUAL results for any CIS controls not covered by automated checks
+        results.extend(self._emit_cis_coverage(results))
+
         return results

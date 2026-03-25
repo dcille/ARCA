@@ -2,10 +2,13 @@
 
 Implements security checks for OCI services following CIS Oracle Cloud
 Infrastructure Foundations Benchmark v2.0 and v3.1.
+Provides complete CIS OCI Foundations Benchmark v2.0.0 coverage by emitting MANUAL results
+for any controls not covered by automated checks.
 """
 import logging
 from typing import Optional
 
+from scanner.cis_controls.oci_cis_controls import OCI_CIS_CONTROLS
 from scanner.providers.base_check import CheckResult
 
 logger = logging.getLogger(__name__)
@@ -1844,4 +1847,93 @@ class OCIScanner:
         except Exception as e:
             logger.error(f"OCI events checks failed: {e}")
 
+        return results
+
+    # ── CIS coverage ─────────────────────────────────────────────────
+
+    def _emit_cis_coverage(self, automated_results: list[dict]) -> list[dict]:
+        """Emit results for ALL CIS controls, filling in MANUAL status for non-automated ones."""
+        covered_cis_ids = set()
+        for result in automated_results:
+            cis_id = result.get("cis_control_id")
+            if cis_id:
+                covered_cis_ids.add(cis_id)
+
+        check_to_cis = {
+            # Section 1: IAM
+            "oci_iam_policy_no_wildcard": "1.2",
+            "oci_iam_password_expiry": "1.5",
+            "oci_iam_password_reuse": "1.6",
+            "oci_iam_user_mfa_enabled": "1.7",
+            "oci_iam_admin_mfa_enabled": "1.7",
+            "oci_iam_api_key_rotation": "1.8",
+            "oci_iam_single_api_key": "1.8",
+            "oci_iam_secret_key_rotation": "1.9",
+            "oci_iam_auth_token_rotation": "1.10",
+            "oci_iam_admin_no_api_key": "1.11",
+            "oci_iam_user_valid_email": "1.12",
+            "oci_iam_credentials_unused": "1.14",
+            "oci_cloud_guard_enabled": "1.15",
+            # Section 2: Networking
+            "oci_network_default_sl_restrict": "2.5",
+            "oci_network_nsg_no_unrestricted_ingress": "2.3",
+            # Section 3: Logging and Monitoring
+            "oci_logging_audit_retention": "3.1",
+            "oci_logging_log_groups_exist": "3.2",
+            "oci_notifications_topic_configured": "3.3",
+            "oci_notifications_security_topic_exists": "3.3",
+            "oci_events_rule_configured": "3.4",
+            "oci_network_vcn_flow_logs": "3.14",
+            # Section 4: Object Storage
+            "oci_objectstorage_bucket_public_access": "4.1",
+            "oci_objectstorage_bucket_cmk_encryption": "4.2",
+            "oci_objectstorage_bucket_versioning": "4.3",
+            "oci_objectstorage_bucket_emit_events": "4.4",
+            # Section 5: Asset Management
+            "oci_storage_volume_cmk_encryption": "5.2",
+            "oci_storage_boot_volume_cmk_encryption": "5.3",
+            "oci_filestorage_cmk_encryption": "5.4",
+            "oci_oke_cluster_public_endpoint": "5.5",
+            # Section 6: Database
+            "oci_db_autonomous_private_endpoint": "6.1",
+            "oci_db_autonomous_cmk_encryption": "6.2",
+            "oci_db_system_backup_enabled": "6.3",
+            "oci_mysql_backup_enabled": "6.6",
+        }
+
+        for result in automated_results:
+            check_id = result.get("check_id", "")
+            if check_id in check_to_cis:
+                covered_cis_ids.add(check_to_cis[check_id])
+
+        manual_results = []
+        fw = ["CIS-OCI-2.0.0", "NIST-800-53", "SOC2"]
+
+        for ctrl in OCI_CIS_CONTROLS:
+            cis_id, title, level, assessment_type, severity, service_area = ctrl
+            if cis_id not in covered_cis_ids:
+                manual_results.append(CheckResult(
+                    check_id=f"oci_cis_{cis_id.replace('.', '_')}",
+                    check_title=f"{title} (CIS {cis_id})",
+                    service=service_area,
+                    severity=severity,
+                    status="MANUAL",
+                    resource_id="oci-tenancy",
+                    status_extended=(
+                        f"CIS {cis_id} [{level}] - {assessment_type.upper()} assessment. "
+                        f"This control requires {'manual verification' if assessment_type == 'manual' else 'automated check implementation'}."
+                    ),
+                    remediation=f"Refer to CIS Oracle Cloud Infrastructure Foundations Benchmark v2.0.0, control {cis_id}.",
+                    compliance_frameworks=fw,
+                    assessment_type=assessment_type,
+                    cis_control_id=cis_id,
+                    cis_level=level,
+                ).to_dict())
+
+        return manual_results
+
+    def run_all_checks(self) -> list[dict]:
+        """Run all OCI security checks including complete CIS benchmark coverage."""
+        results = self.scan()
+        results.extend(self._emit_cis_coverage(results))
         return results

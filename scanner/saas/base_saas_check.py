@@ -10,13 +10,17 @@ class SaaSCheckResult:
     check_title: str
     service_area: str
     severity: str  # critical, high, medium, low, informational
-    status: str  # PASS, FAIL
+    status: str  # PASS, FAIL, MANUAL (requires manual review)
     resource_id: Optional[str] = None
     resource_name: Optional[str] = None
     description: Optional[str] = None
     remediation: Optional[str] = None
     remediation_url: Optional[str] = None
     compliance_frameworks: list[str] = field(default_factory=list)
+    assessment_type: str = "automated"  # automated, manual
+    cis_control_id: Optional[str] = None  # CIS benchmark control ID (e.g., "1.1.1")
+    cis_level: Optional[str] = None  # L1 (essential), L2 (enhanced)
+    cis_profile: Optional[str] = None  # E3, E5, Enterprise, etc.
 
     def to_dict(self) -> dict:
         return {
@@ -31,6 +35,10 @@ class SaaSCheckResult:
             "remediation": self.remediation,
             "remediation_url": self.remediation_url,
             "compliance_frameworks": self.compliance_frameworks,
+            "assessment_type": self.assessment_type,
+            "cis_control_id": self.cis_control_id,
+            "cis_level": self.cis_level,
+            "cis_profile": self.cis_profile,
         }
 
 

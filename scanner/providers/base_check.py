@@ -11,7 +11,7 @@ class CheckResult:
     check_title: str
     service: str
     severity: str  # critical, high, medium, low, informational
-    status: str  # PASS, FAIL
+    status: str  # PASS, FAIL, MANUAL (requires manual review)
     region: Optional[str] = None
     resource_id: Optional[str] = None
     resource_name: Optional[str] = None
@@ -22,6 +22,9 @@ class CheckResult:
     check_description: Optional[str] = None
     evidence_log: Optional[str] = None  # JSON string: {"api_call": "...", "response": "..."}
     mitre_techniques: list[str] = field(default_factory=list)
+    assessment_type: str = "automated"  # automated, manual
+    cis_control_id: Optional[str] = None  # CIS benchmark control ID (e.g., "1.1")
+    cis_level: Optional[str] = None  # L1 (essential), L2 (enhanced)
 
     def to_dict(self) -> dict:
         return {
@@ -40,6 +43,9 @@ class CheckResult:
             "check_description": self.check_description,
             "evidence_log": self.evidence_log,
             "mitre_techniques": self.mitre_techniques,
+            "assessment_type": self.assessment_type,
+            "cis_control_id": self.cis_control_id,
+            "cis_level": self.cis_level,
         }
 
 
