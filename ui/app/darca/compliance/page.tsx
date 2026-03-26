@@ -21,6 +21,7 @@ const STATUS_COLORS: Record<string, string> = {
   FAIL: 'bg-red-100 text-red-800',
   MANUAL: 'bg-purple-100 text-purple-700',
   NOT_EVALUATED: 'bg-amber-100 text-amber-700',
+  'N/A': 'bg-gray-100 text-gray-600',
   EXCEPTION: 'bg-cyan-100 text-cyan-700',
 }
 
@@ -29,6 +30,7 @@ const STATUS_DOT: Record<string, string> = {
   FAIL: 'bg-red-500',
   MANUAL: 'bg-purple-400',
   NOT_EVALUATED: 'bg-amber-400',
+  'N/A': 'bg-gray-400',
   EXCEPTION: 'bg-cyan-500',
 }
 
@@ -563,6 +565,12 @@ export default function CompliancePage() {
                       <span className="font-medium text-purple-600">{summary.manual}</span>
                     </div>
                   )}
+                  {(summary.na || 0) > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-500">N/A</span>
+                      <span className="font-medium text-gray-500">{summary.na}</span>
+                    </div>
+                  )}
                   {(summary.not_evaluated || 0) > 0 && (
                     <div className="flex justify-between text-xs">
                       <span className="text-amber-600">Not Evaluated</span>
@@ -599,7 +607,10 @@ export default function CompliancePage() {
 
           {/* Summary Stats Bar */}
           {controlsData?.summary && (
-            <div className={`grid gap-4 mb-6 ${(controlsData.summary.exception || 0) > 0 ? 'grid-cols-7' : 'grid-cols-6'}`}>
+            <div className={`grid gap-4 mb-6 ${
+              ((controlsData.summary.na || 0) > 0 && (controlsData.summary.exception || 0) > 0) ? 'grid-cols-8' :
+              ((controlsData.summary.na || 0) > 0 || (controlsData.summary.exception || 0) > 0) ? 'grid-cols-7' : 'grid-cols-6'
+            }`}>
               <div className="bg-brand-gray-50 rounded-lg p-3 text-center">
                 <p className="text-2xl font-bold text-brand-navy">{controlsData.summary.total_checks}</p>
                 <p className="text-xs text-brand-gray-400">Total Checks</p>
@@ -620,6 +631,12 @@ export default function CompliancePage() {
                 <p className="text-2xl font-bold text-purple-600">{controlsData.summary.manual || 0}</p>
                 <p className="text-xs text-purple-600">Manual</p>
               </div>
+              {(controlsData.summary.na || 0) > 0 && (
+                <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-gray-500">{controlsData.summary.na}</p>
+                  <p className="text-xs text-gray-500">N/A</p>
+                </div>
+              )}
               {(controlsData.summary.exception || 0) > 0 && (
                 <div className="bg-cyan-50 rounded-lg p-3 text-center">
                   <p className="text-2xl font-bold text-cyan-700">{controlsData.summary.exception}</p>
@@ -637,11 +654,11 @@ export default function CompliancePage() {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-brand-gray-700">Filter:</label>
-              {['all', 'PASS', 'FAIL', 'MANUAL', 'NOT_EVALUATED', 'EXCEPTION'].map((s) => {
+              {['all', 'PASS', 'FAIL', 'MANUAL', 'NOT_EVALUATED', 'N/A', 'EXCEPTION'].map((s) => {
                 const count = s === 'all'
                   ? controlsData?.controls?.length || 0
                   : controlsData?.controls?.filter((c: any) => c.status === s).length || 0
-                if (s === 'EXCEPTION' && count === 0) return null
+                if ((s === 'EXCEPTION' || s === 'N/A') && count === 0) return null
                 return (
                   <button
                     key={s}
@@ -652,12 +669,13 @@ export default function CompliancePage() {
                         : s === 'FAIL' ? 'bg-red-100 text-red-800'
                         : s === 'MANUAL' ? 'bg-purple-100 text-purple-700'
                         : s === 'NOT_EVALUATED' ? 'bg-amber-100 text-amber-700'
+                        : s === 'N/A' ? 'bg-gray-100 text-gray-600'
                         : s === 'EXCEPTION' ? 'bg-cyan-100 text-cyan-700'
                         : 'bg-brand-green text-white'
                         : 'border border-brand-gray-300 text-brand-gray-500 hover:bg-brand-gray-50'
                     }`}
                   >
-                    {s === 'all' ? 'All' : s === 'NOT_EVALUATED' ? 'Not Evaluated' : s === 'MANUAL' ? 'Manual' : s === 'PASS' ? 'Passed' : s === 'EXCEPTION' ? 'Excepted' : 'Failed'}
+                    {s === 'all' ? 'All' : s === 'NOT_EVALUATED' ? 'Not Evaluated' : s === 'N/A' ? 'N/A' : s === 'MANUAL' ? 'Manual' : s === 'PASS' ? 'Passed' : s === 'EXCEPTION' ? 'Excepted' : 'Failed'}
                     <span className="ml-1.5 opacity-70">({count})</span>
                   </button>
                 )
@@ -887,6 +905,11 @@ export default function CompliancePage() {
                                   Excepted — this control has been marked as an exception
                                 </span>
                               )}
+                              {ctrl.status === 'N/A' && (
+                                <span className="text-[10px] text-gray-500">
+                                  Not applicable — no resources found in the account to evaluate this control
+                                </span>
+                              )}
                               {ctrl.status === 'NOT_EVALUATED' && (
                                 <span className="text-[10px] text-amber-500">
                                   No scan data — run a scan on the relevant cloud account to evaluate these checks
@@ -1042,6 +1065,11 @@ export default function CompliancePage() {
                                           {check.status === 'EXCEPTION' && (
                                             <p className="text-[10px] text-cyan-600 mt-1 italic">
                                               Excepted — this control has been marked as an exception with justification.
+                                            </p>
+                                          )}
+                                          {check.status === 'N/A' && (
+                                            <p className="text-[10px] text-gray-500 mt-1 italic">
+                                              Not applicable — no resources found in the account to evaluate this check.
                                             </p>
                                           )}
                                           {check.status === 'NOT_EVALUATED' && (

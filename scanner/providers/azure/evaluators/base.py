@@ -265,24 +265,24 @@ def safe_evaluate(
     """Run an evaluator with error handling — never let one check crash the scan.
 
     If the evaluator returns an empty list (no resources found to evaluate),
-    emit a PASS result so the control doesn't show as "Not Evaluated".
+    emit an N/A result — the control cannot be assessed without applicable resources.
     """
     try:
         results = evaluator(clients, config)
         if not results:
-            # No resources found — emit PASS (nothing to flag as non-compliant)
+            # No resources found — mark as N/A (nothing to evaluate)
             return [make_result(
                 cis_id=cis_id,
                 check_id=check_id,
                 title=title,
                 service=service,
                 severity=severity,
-                status="PASS",
+                status="N/A",
                 resource_id=config.subscription_id,
                 resource_name="(no applicable resources)",
                 status_extended=(
                     f"No applicable resources found for {cis_id} in subscription "
-                    f"{config.subscription_id}. Control passes by default."
+                    f"{config.subscription_id}. Control not applicable."
                 ),
                 remediation="",
             )]

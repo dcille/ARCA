@@ -84,9 +84,9 @@ def evaluate_cis_7_1(clients: AzureClientCache, config: EvalConfig) -> list[dict
         results.append(make_result(
             cis_id="7.1", check_id="azure_cis_7_1",
             title="Ensure RDP access from the Internet is restricted",
-            service="networking", severity="high", status="PASS",
+            service="networking", severity="high", status="N/A",
             resource_id=config.subscription_id,
-            status_extended="No NSGs found in subscription",
+            status_extended="No NSGs found in subscription. Control not applicable.",
             compliance_frameworks=FW,
         ))
         return results
@@ -333,9 +333,9 @@ def evaluate_cis_7_7(clients: AzureClientCache, config: EvalConfig) -> list[dict
         results.append(make_result(
             cis_id="7.7", check_id="azure_cis_7_7",
             title="Ensure Public IP addresses are evaluated periodically",
-            service="networking", severity="medium", status="PASS",
+            service="networking", severity="medium", status="N/A",
             resource_id=config.subscription_id,
-            status_extended="No public IP addresses found.",
+            status_extended="No public IP addresses found. Control not applicable.",
             compliance_frameworks=FW,
         ))
     return results
