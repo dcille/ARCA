@@ -322,6 +322,16 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/attack-paths/compare', undefined, { params: { run1, run2 } })
   }
 
+  async getDetectionHeatmap(runId?: string) {
+    const params = runId ? { analysis_run_id: runId } : undefined
+    return this.request<any>('GET', '/api/v1/attack-paths/detection-heatmap', undefined, { params })
+  }
+
+  async getShadowAdmins(runId?: string) {
+    const params = runId ? { analysis_run_id: runId } : undefined
+    return this.request<any[]>('GET', '/api/v1/attack-paths/shadow-admins', undefined, { params })
+  }
+
   // MITRE ATT&CK (extended)
   async getMitreCoverageGaps(params?: Record<string, string>) {
     return this.request<any>('GET', '/api/v1/mitre/coverage-gaps', undefined, { params })

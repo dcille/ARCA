@@ -17,6 +17,7 @@ from api.schemas.attack_path import (
     AttackPathResponse,
     AttackPathDetailResponse,
     AttackPathSummary,
+    ShadowAdminResponse,
 )
 from api.services.auth_service import get_current_user
 from scanner.attack_paths.graph_engine import AttackPathAnalyzer
@@ -31,6 +32,15 @@ def _parse_json_field(value: Optional[str]) -> list:
         return json.loads(value)
     except (json.JSONDecodeError, TypeError):
         return []
+
+
+def _parse_json_dict(value: Optional[str]) -> Optional[dict]:
+    if not value:
+        return None
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return None
 
 
 def _model_to_response(ap: AttackPath) -> AttackPathResponse:
@@ -48,6 +58,10 @@ def _model_to_response(ap: AttackPath) -> AttackPathResponse:
         techniques=_parse_json_field(ap.techniques),
         affected_resources=_parse_json_field(ap.affected_resources),
         remediation=_parse_json_field(ap.remediation),
+        blast_radius=_parse_json_dict(getattr(ap, 'blast_radius', None)),
+        detection_coverage=_parse_json_dict(getattr(ap, 'detection_coverage', None)),
+        confidence=getattr(ap, 'confidence', 'template') or 'template',
+        source=getattr(ap, 'source', 'scenario') or 'scenario',
         created_at=ap.created_at,
     )
 
@@ -74,6 +88,10 @@ def _model_to_detail(ap: AttackPath) -> AttackPathDetailResponse:
         techniques=_parse_json_field(ap.techniques),
         affected_resources=_parse_json_field(ap.affected_resources),
         remediation=_parse_json_field(ap.remediation),
+        blast_radius=_parse_json_dict(getattr(ap, 'blast_radius', None)),
+        detection_coverage=_parse_json_dict(getattr(ap, 'detection_coverage', None)),
+        confidence=getattr(ap, 'confidence', 'template') or 'template',
+        source=getattr(ap, 'source', 'scenario') or 'scenario',
         graph_data=graph,
         created_at=ap.created_at,
     )
@@ -82,27 +100,47 @@ def _model_to_detail(ap: AttackPath) -> AttackPathDetailResponse:
 @router.post("/analyze")
 async def analyze_attack_paths(
     scan_id: Optional[str] = None,
+    include_iam_analysis: bool = False,
+    provider_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Run attack path analysis on existing findings. Preserves history via analysis_run_id."""
-    query = (
+    """
+    Run attack path analysis on existing findings. Preserves history via analysis_run_id.
+
+    BAS 2.0: Now includes blast radius and detection coverage analysis automatically.
+    Set include_iam_analysis=true + provider_id to also run IAM privilege escalation discovery.
+    """
+    # Load FAIL findings (for path discovery)
+    fail_query = (
         select(Finding)
         .join(Scan, Finding.scan_id == Scan.id)
         .where(Scan.user_id == current_user.id)
         .where(Finding.status == "FAIL")
     )
     if scan_id:
-        query = query.where(Finding.scan_id == scan_id)
+        fail_query = fail_query.where(Finding.scan_id == scan_id)
 
-    result = await db.execute(query)
-    findings_models = result.scalars().all()
+    fail_result = await db.execute(fail_query)
+    fail_models = fail_result.scalars().all()
 
-    if not findings_models:
+    if not fail_models:
         return {"message": "No failed findings to analyze", "paths_discovered": 0}
 
-    findings_dicts = [
-        {
+    # Load ALL findings (PASS + FAIL) for detection coverage analysis
+    all_query = (
+        select(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id)
+    )
+    if scan_id:
+        all_query = all_query.where(Finding.scan_id == scan_id)
+
+    all_result = await db.execute(all_query)
+    all_models = all_result.scalars().all()
+
+    def _finding_to_dict(f):
+        return {
             "id": f.id,
             "check_id": f.check_id,
             "check_title": f.check_title,
@@ -114,10 +152,15 @@ async def analyze_attack_paths(
             "resource_name": f.resource_name,
             "remediation": f.remediation,
         }
-        for f in findings_models
-    ]
 
-    analyzer = AttackPathAnalyzer(findings_dicts)
+    findings_dicts = [_finding_to_dict(f) for f in fail_models]
+    all_findings_dicts = [_finding_to_dict(f) for f in all_models]
+
+    # Run analysis with BAS 2.0 enrichment
+    analyzer = AttackPathAnalyzer(
+        findings=findings_dicts,
+        all_findings=all_findings_dicts,
+    )
     paths = analyzer.analyze()
 
     # Generate a unique run_id for this analysis (keeps history)
@@ -165,6 +208,10 @@ async def analyze_attack_paths(
             affected_resources=json.dumps(p.affected_resources),
             remediation=json.dumps(p.remediation),
             graph_data=json.dumps(graph_data),
+            blast_radius=json.dumps(p.blast_radius) if p.blast_radius else None,
+            detection_coverage=json.dumps(p.detection_coverage) if p.detection_coverage else None,
+            confidence=getattr(p, 'confidence', 'template'),
+            source=getattr(p, 'source', 'scenario'),
         )
         db.add(db_path)
 
@@ -457,12 +504,26 @@ async def attack_paths_summary(
     all_resources = []
     total_score = 0
 
+    blast_radius_totals = []
+    detection_coverage_totals = []
+    blind_count = 0
+
     for p in paths:
         severity_counts[p.severity] = severity_counts.get(p.severity, 0) + 1
         category_counts[p.category] = category_counts.get(p.category, 0) + 1
         total_score += p.risk_score
         resources = _parse_json_field(p.affected_resources)
         all_resources.extend(resources)
+
+        # BAS 2.0: aggregate blast radius and detection coverage
+        br = _parse_json_dict(getattr(p, 'blast_radius', None))
+        if br:
+            blast_radius_totals.append(br.get('total_reachable', 0))
+        dc = _parse_json_dict(getattr(p, 'detection_coverage', None))
+        if dc:
+            detection_coverage_totals.append(dc.get('coverage_pct', 0))
+            if dc.get('verdict') == 'blind':
+                blind_count += 1
 
     service_counts: dict[str, int] = {}
     for r in all_resources:
@@ -480,7 +541,159 @@ async def attack_paths_summary(
         top_categories=category_counts,
         avg_risk_score=round(total_score / len(paths), 1),
         most_affected_services=most_affected,
+        avg_blast_radius=round(sum(blast_radius_totals) / max(len(blast_radius_totals), 1), 1),
+        avg_detection_coverage=round(sum(detection_coverage_totals) / max(len(detection_coverage_totals), 1), 1),
+        blind_paths=blind_count,
     )
+
+
+@router.get("/detection-heatmap")
+async def detection_heatmap(
+    analysis_run_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get a detection coverage heatmap across all attack paths.
+
+    Returns per-edge-type detection statistics: how many times each edge type
+    appears across paths, and how often it is detected vs undetected.
+    """
+    query = select(AttackPath).where(AttackPath.user_id == current_user.id)
+    if analysis_run_id:
+        query = query.where(AttackPath.analysis_run_id == analysis_run_id)
+    else:
+        sub = (
+            select(AttackPath.analysis_run_id)
+            .where(AttackPath.user_id == current_user.id)
+            .where(AttackPath.analysis_run_id.isnot(None))
+            .order_by(AttackPath.created_at.desc())
+            .limit(1)
+        )
+        sub_result = await db.execute(sub)
+        latest_run = sub_result.scalar_one_or_none()
+        if latest_run:
+            query = query.where(AttackPath.analysis_run_id == latest_run)
+
+    result = await db.execute(query)
+    paths = result.scalars().all()
+
+    if not paths:
+        return {"heatmap": [], "total_paths": 0, "overall_coverage_pct": 0}
+
+    # Aggregate detection coverage per edge type
+    edge_type_stats: dict[str, dict] = {}
+    total_detected = 0
+    total_steps = 0
+
+    for p in paths:
+        dc = _parse_json_dict(getattr(p, 'detection_coverage', None))
+        if not dc:
+            continue
+        total_detected += dc.get('detected_steps', 0)
+        total_steps += dc.get('total_steps', 0)
+
+        # If per-step details are stored, aggregate them
+        graph = None
+        try:
+            graph = json.loads(p.graph_data) if p.graph_data else None
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        if graph:
+            for edge in graph.get('edges', []):
+                etype = edge.get('edge_type', 'unknown')
+                if etype not in edge_type_stats:
+                    edge_type_stats[etype] = {'total': 0, 'label': etype}
+                edge_type_stats[etype]['total'] += 1
+
+    # Build heatmap entries sorted by frequency
+    heatmap = sorted(
+        [
+            {
+                'edge_type': etype,
+                'occurrences': stats['total'],
+            }
+            for etype, stats in edge_type_stats.items()
+        ],
+        key=lambda x: x['occurrences'],
+        reverse=True,
+    )
+
+    overall_coverage = round(total_detected / max(total_steps, 1) * 100, 1)
+
+    return {
+        "heatmap": heatmap,
+        "total_paths": len(paths),
+        "total_steps": total_steps,
+        "total_detected_steps": total_detected,
+        "overall_coverage_pct": overall_coverage,
+    }
+
+
+@router.get("/shadow-admins", response_model=list[ShadowAdminResponse])
+async def get_shadow_admins(
+    analysis_run_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get shadow admins discovered via IAM privilege escalation analysis.
+
+    Shadow admins are non-admin principals that can escalate to admin-level
+    access through known IAM misconfigurations.
+    Requires prior analysis run with include_iam_analysis=true.
+    """
+    query = select(AttackPath).where(
+        AttackPath.user_id == current_user.id,
+        AttackPath.source == "iam_discovery",
+        AttackPath.category == "privilege_escalation",
+    )
+    if analysis_run_id:
+        query = query.where(AttackPath.analysis_run_id == analysis_run_id)
+    else:
+        sub = (
+            select(AttackPath.analysis_run_id)
+            .where(AttackPath.user_id == current_user.id)
+            .where(AttackPath.analysis_run_id.isnot(None))
+            .where(AttackPath.source == "iam_discovery")
+            .order_by(AttackPath.created_at.desc())
+            .limit(1)
+        )
+        sub_result = await db.execute(sub)
+        latest_run = sub_result.scalar_one_or_none()
+        if latest_run:
+            query = query.where(AttackPath.analysis_run_id == latest_run)
+
+    result = await db.execute(query)
+    paths = result.scalars().all()
+
+    # Aggregate paths by principal (entry_point) to build shadow admin view
+    admin_map: dict[str, dict] = {}
+    for p in paths:
+        entry = p.entry_point
+        if entry not in admin_map:
+            admin_map[entry] = {
+                "principal_id": entry,
+                "principal_name": entry.split(":")[-1] if ":" in entry else entry,
+                "principal_type": entry.split(":")[1] if ":" in entry and len(entry.split(":")) > 1 else "unknown",
+                "provider": "aws",
+                "escalation_paths": [],
+                "shortest_path_steps": 999,
+                "blast_radius_estimate": 0,
+            }
+        admin_map[entry]["escalation_paths"].append(p.title)
+        admin_map[entry]["shortest_path_steps"] = min(
+            admin_map[entry]["shortest_path_steps"], p.node_count
+        )
+        br = _parse_json_dict(getattr(p, 'blast_radius', None))
+        if br:
+            admin_map[entry]["blast_radius_estimate"] = max(
+                admin_map[entry]["blast_radius_estimate"],
+                br.get("total_reachable", 0),
+            )
+
+    return [ShadowAdminResponse(**v) for v in admin_map.values()]
 
 
 @router.get("/{path_id}", response_model=AttackPathDetailResponse)

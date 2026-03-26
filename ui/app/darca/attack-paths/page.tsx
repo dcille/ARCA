@@ -22,6 +22,9 @@ import {
   LockOpenIcon,
   ChevronRightIcon,
   XMarkIcon,
+  SignalIcon,
+  FireIcon,
+  EyeIcon,
 } from '@heroicons/react/24/outline'
 
 // ── Graph visualization types ──────────────────────────────
@@ -259,6 +262,32 @@ function AttackPathCard({
       <h3 className="text-sm font-bold text-brand-navy mb-1">{path.title}</h3>
       <p className="text-xs text-brand-gray-500 mb-3 line-clamp-2">{path.description}</p>
 
+      {/* BAS 2.0: Blast Radius + Detection Coverage indicators */}
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
+        {path.blast_radius && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-50 border border-orange-200 rounded text-[10px] font-medium text-orange-700">
+            <FireIcon className="w-3 h-3" />
+            Blast: {path.blast_radius.total_reachable} resources
+            {path.blast_radius.pii_exposure && ' · PII'}
+            {path.blast_radius.admin_escalation && ' · Admin'}
+          </span>
+        )}
+        {path.detection_coverage && (
+          <span className={cn(
+            'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border',
+            path.detection_coverage.coverage_pct >= 75
+              ? 'bg-green-50 border-green-200 text-green-700'
+              : path.detection_coverage.coverage_pct >= 25
+              ? 'bg-amber-50 border-amber-200 text-amber-700'
+              : 'bg-red-50 border-red-200 text-red-700'
+          )}>
+            <EyeIcon className="w-3 h-3" />
+            Detection: {path.detection_coverage.coverage_pct}%
+            {path.detection_coverage.verdict === 'blind' && ' · BLIND'}
+          </span>
+        )}
+      </div>
+
       <div className="flex items-center justify-between text-xs text-brand-gray-400">
         <div className="flex items-center gap-4">
           <span>{path.node_count} nodes</span>
@@ -326,6 +355,126 @@ function PathDetailPanel({
           <p className="text-sm font-medium text-brand-navy">{path.target}</p>
         </div>
       </div>
+
+      {/* BAS 2.0: Blast Radius */}
+      {path.blast_radius && (
+        <div className="card bg-orange-50/50 border-orange-200">
+          <h3 className="text-sm font-semibold text-brand-navy mb-3 flex items-center gap-2">
+            <FireIcon className="w-4 h-4 text-orange-500" />
+            Blast Radius
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <p className="text-[10px] font-semibold text-brand-gray-400 uppercase">Reachable</p>
+              <p className="text-lg font-bold text-orange-700">{path.blast_radius.total_reachable}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-brand-gray-400 uppercase">Data Stores</p>
+              <p className="text-lg font-bold text-brand-navy">{path.blast_radius.data_stores || 0}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-brand-gray-400 uppercase">Compute</p>
+              <p className="text-lg font-bold text-brand-navy">{path.blast_radius.compute_instances || 0}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-brand-gray-400 uppercase">Identities</p>
+              <p className="text-lg font-bold text-brand-navy">{path.blast_radius.identities || 0}</p>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-3 flex-wrap">
+            {path.blast_radius.pii_exposure && (
+              <span className="px-2 py-0.5 bg-red-100 border border-red-300 rounded text-[10px] font-semibold text-red-700">PII Exposure</span>
+            )}
+            {path.blast_radius.admin_escalation && (
+              <span className="px-2 py-0.5 bg-red-100 border border-red-300 rounded text-[10px] font-semibold text-red-700">Admin Escalation</span>
+            )}
+            {path.blast_radius.backup_exposure && (
+              <span className="px-2 py-0.5 bg-amber-100 border border-amber-300 rounded text-[10px] font-semibold text-amber-700">Backup Exposure</span>
+            )}
+            <span className={cn(
+              'px-2 py-0.5 rounded text-[10px] font-semibold border',
+              path.blast_radius.severity === 'critical' ? 'bg-red-100 border-red-300 text-red-700' :
+              path.blast_radius.severity === 'high' ? 'bg-orange-100 border-orange-300 text-orange-700' :
+              path.blast_radius.severity === 'medium' ? 'bg-amber-100 border-amber-300 text-amber-700' :
+              'bg-green-100 border-green-300 text-green-700'
+            )}>
+              Severity: {path.blast_radius.severity}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* BAS 2.0: Detection Coverage */}
+      {path.detection_coverage && (
+        <div className={cn(
+          'card border',
+          path.detection_coverage.coverage_pct >= 75
+            ? 'bg-green-50/50 border-green-200'
+            : path.detection_coverage.coverage_pct >= 25
+            ? 'bg-amber-50/50 border-amber-200'
+            : 'bg-red-50/50 border-red-200'
+        )}>
+          <h3 className="text-sm font-semibold text-brand-navy mb-3 flex items-center gap-2">
+            <EyeIcon className="w-4 h-4 text-blue-500" />
+            Detection Coverage
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+            <div>
+              <p className="text-[10px] font-semibold text-brand-gray-400 uppercase">Coverage</p>
+              <p className={cn(
+                'text-lg font-bold',
+                path.detection_coverage.coverage_pct >= 75 ? 'text-green-700' :
+                path.detection_coverage.coverage_pct >= 25 ? 'text-amber-700' : 'text-red-700'
+              )}>
+                {path.detection_coverage.coverage_pct}%
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-brand-gray-400 uppercase">Detected Steps</p>
+              <p className="text-lg font-bold text-green-700">{path.detection_coverage.detected_steps}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-brand-gray-400 uppercase">Undetected</p>
+              <p className="text-lg font-bold text-red-700">{path.detection_coverage.undetected_steps}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-brand-gray-400 uppercase">Verdict</p>
+              <p className={cn(
+                'text-sm font-bold uppercase',
+                path.detection_coverage.verdict === 'well_monitored' ? 'text-green-700' :
+                path.detection_coverage.verdict === 'partially_monitored' ? 'text-amber-700' :
+                path.detection_coverage.verdict === 'blind' ? 'text-red-700' : 'text-brand-gray-500'
+              )}>
+                {(path.detection_coverage.verdict || '').replace(/_/g, ' ')}
+              </p>
+            </div>
+          </div>
+          {/* Coverage bar */}
+          <div className="w-full bg-brand-gray-200 rounded-full h-2 mb-3">
+            <div
+              className={cn(
+                'h-2 rounded-full transition-all',
+                path.detection_coverage.coverage_pct >= 75 ? 'bg-green-500' :
+                path.detection_coverage.coverage_pct >= 25 ? 'bg-amber-500' : 'bg-red-500'
+              )}
+              style={{ width: `${Math.min(path.detection_coverage.coverage_pct, 100)}%` }}
+            />
+          </div>
+          {/* Blind spots */}
+          {path.detection_coverage.blind_spot_summary?.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold text-brand-gray-400 uppercase mb-1">Blind Spots</p>
+              <div className="flex flex-wrap gap-1.5">
+                {path.detection_coverage.blind_spot_summary.map((spot: string, i: number) => (
+                  <span key={i} className="px-2 py-0.5 bg-red-100 border border-red-200 rounded text-[10px] text-red-700">
+                    {spot}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Techniques (MITRE ATT&CK linked) */}
       {path.techniques?.length > 0 && (
@@ -402,6 +551,8 @@ export default function AttackPathsPage() {
   const [filters, setFilters] = useState({ severity: '', category: '' })
   const [chokePoints, setChokePoints] = useState<any>(null)
   const [showChoke, setShowChoke] = useState(false)
+  const [heatmap, setHeatmap] = useState<any>(null)
+  const [showHeatmap, setShowHeatmap] = useState(false)
 
   const loadData = async () => {
     setLoading(true)
@@ -450,6 +601,15 @@ export default function AttackPathsPage() {
     } catch (err) { console.error(err) }
   }
 
+  const handleShowHeatmap = async () => {
+    if (showHeatmap) { setShowHeatmap(false); return }
+    try {
+      const data = await api.getDetectionHeatmap()
+      setHeatmap(data)
+      setShowHeatmap(true)
+    } catch (err) { console.error(err) }
+  }
+
   const handleSelectPath = async (path: any) => {
     setSelectedPath(path)
     try {
@@ -467,18 +627,32 @@ export default function AttackPathsPage() {
         <Header title="Attack Paths" subtitle="Graph-based analysis of exploitable attack chains across your cloud environment" breadcrumbs={[{ label: 'Posture', href: '/darca/overview' }, { label: 'Attack Paths' }]} />
         <div className="flex items-center gap-2">
           {paths.length > 0 && (
-            <button
-              onClick={handleShowChoke}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border',
-                showChoke
-                  ? 'bg-amber-50 border-amber-300 text-amber-700'
-                  : 'border-brand-gray-200 text-brand-gray-600 hover:bg-brand-gray-50'
-              )}
-            >
-              <ExclamationTriangleIcon className="w-4 h-4" />
-              Choke Points
-            </button>
+            <>
+              <button
+                onClick={handleShowHeatmap}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border',
+                  showHeatmap
+                    ? 'bg-blue-50 border-blue-300 text-blue-700'
+                    : 'border-brand-gray-200 text-brand-gray-600 hover:bg-brand-gray-50'
+                )}
+              >
+                <SignalIcon className="w-4 h-4" />
+                Detection Heatmap
+              </button>
+              <button
+                onClick={handleShowChoke}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border',
+                  showChoke
+                    ? 'bg-amber-50 border-amber-300 text-amber-700'
+                    : 'border-brand-gray-200 text-brand-gray-600 hover:bg-brand-gray-50'
+                )}
+              >
+                <ExclamationTriangleIcon className="w-4 h-4" />
+                Choke Points
+              </button>
+            </>
           )}
           <button
             onClick={handleAnalyze}
@@ -555,6 +729,76 @@ export default function AttackPathsPage() {
                 : 'text-brand-navy'
             }
           />
+        </div>
+      )}
+
+      {/* BAS 2.0 Summary Stats */}
+      {summary && (summary.avg_blast_radius > 0 || summary.avg_detection_coverage > 0 || summary.blind_paths > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <StatCard
+            title="Avg Blast Radius"
+            value={summary.avg_blast_radius}
+            icon={<FireIcon className="w-5 h-5" />}
+            valueColor={summary.avg_blast_radius >= 20 ? 'text-severity-critical' : summary.avg_blast_radius >= 10 ? 'text-severity-high' : 'text-brand-navy'}
+          />
+          <StatCard
+            title="Avg Detection Coverage"
+            value={`${summary.avg_detection_coverage}%`}
+            icon={<EyeIcon className="w-5 h-5" />}
+            valueColor={summary.avg_detection_coverage >= 75 ? 'text-green-600' : summary.avg_detection_coverage >= 25 ? 'text-amber-600' : 'text-severity-critical'}
+          />
+          <StatCard
+            title="Blind Paths"
+            value={summary.blind_paths}
+            icon={<EyeSlashIcon className="w-5 h-5" />}
+            valueColor={summary.blind_paths > 0 ? 'text-severity-critical' : 'text-green-600'}
+          />
+        </div>
+      )}
+
+      {/* Detection Heatmap Panel */}
+      {showHeatmap && heatmap && (
+        <div className="card mb-6">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-bold text-brand-navy">Detection Coverage Heatmap</h3>
+              <p className="text-xs text-brand-gray-400 mt-0.5">
+                Overall detection: {heatmap.overall_coverage_pct}% ({heatmap.total_detected_steps}/{heatmap.total_steps} steps detected across {heatmap.total_paths} paths)
+              </p>
+            </div>
+            <button onClick={() => setShowHeatmap(false)} className="p-1 hover:bg-brand-gray-100 rounded">
+              <XMarkIcon className="w-4 h-4 text-brand-gray-400" />
+            </button>
+          </div>
+          {/* Overall coverage bar */}
+          <div className="w-full bg-brand-gray-200 rounded-full h-3 mb-4">
+            <div
+              className={cn(
+                'h-3 rounded-full transition-all',
+                heatmap.overall_coverage_pct >= 75 ? 'bg-green-500' :
+                heatmap.overall_coverage_pct >= 25 ? 'bg-amber-500' : 'bg-red-500'
+              )}
+              style={{ width: `${Math.min(heatmap.overall_coverage_pct, 100)}%` }}
+            />
+          </div>
+          {heatmap.heatmap?.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold text-brand-gray-400 uppercase mb-2">Edge Type Frequency</p>
+              {heatmap.heatmap.slice(0, 15).map((entry: any, i: number) => {
+                const maxOccurrences = heatmap.heatmap[0]?.occurrences || 1
+                const pct = Math.round((entry.occurrences / maxOccurrences) * 100)
+                return (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="text-xs text-brand-gray-600 w-40 truncate font-mono">{entry.edge_type}</span>
+                    <div className="flex-1 bg-brand-gray-100 rounded-full h-2">
+                      <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-xs text-brand-gray-500 w-8 text-right">{entry.occurrences}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 

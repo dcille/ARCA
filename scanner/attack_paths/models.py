@@ -1,6 +1,9 @@
 """Shared data models for attack path analysis."""
+from __future__ import annotations
 
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import Optional
 
 
 class AttackCategory(str, Enum):
@@ -66,3 +69,64 @@ SEVERITY_WEIGHTS = {
     'medium': 4.0,
     'low': 1.0,
 }
+
+
+# ── BAS 2.0 Confidence Levels ───────────────────────────────────────
+
+
+class PathConfidence(str, Enum):
+    """How confident we are that the attack path is exploitable."""
+    TEMPLATE = "template"          # Discovered via CSPM template matching
+    THEORETICAL = "theoretical"    # Discovered via IAM policy analysis (read-only)
+    CONFIRMED = "confirmed"        # Confirmed via BAS simulation (future)
+
+
+class PathSource(str, Enum):
+    """How the attack path was discovered."""
+    SCENARIO = "scenario"          # From SCENARIO_TEMPLATES
+    IAM_DISCOVERY = "iam_discovery"  # From IAM Privesc Discovery engine
+    COMBINED = "combined"          # From both
+
+
+# ── IAM Privesc Pattern (for Phase 2+) ──────────────────────────────
+
+
+@dataclass
+class PrivescPattern:
+    """A known IAM privilege escalation pattern."""
+    id: str
+    name: str
+    required_perms: list[str]
+    mitre_id: str
+    description: str
+    provider: str = "aws"
+
+    def matches(self, effective_perms: set[str]) -> bool:
+        """Check if the principal's effective permissions match this pattern."""
+        for perm in self.required_perms:
+            if perm.endswith("*"):
+                prefix = perm[:-1]
+                if not any(p.startswith(prefix) for p in effective_perms):
+                    return False
+            elif perm not in effective_perms:
+                # Also check wildcard in effective_perms
+                perm_parts = perm.split(":")
+                if len(perm_parts) == 2:
+                    service_wildcard = f"{perm_parts[0]}:*"
+                    if service_wildcard not in effective_perms and "*" not in effective_perms:
+                        return False
+                else:
+                    return False
+        return True
+
+
+@dataclass
+class ShadowAdmin:
+    """A non-admin principal that can escalate to admin."""
+    principal_id: str
+    principal_name: str
+    principal_type: str  # iam_user, iam_role, service_account
+    provider: str
+    escalation_paths: list[str]  # list of PrivescPattern.id
+    shortest_path_steps: int
+    blast_radius_estimate: int = 0
