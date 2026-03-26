@@ -21,6 +21,7 @@ const STATUS_COLORS: Record<string, string> = {
   FAIL: 'bg-red-100 text-red-800',
   MANUAL: 'bg-purple-100 text-purple-700',
   NOT_EVALUATED: 'bg-amber-100 text-amber-700',
+  EXCEPTION: 'bg-cyan-100 text-cyan-700',
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -28,6 +29,7 @@ const STATUS_DOT: Record<string, string> = {
   FAIL: 'bg-red-500',
   MANUAL: 'bg-purple-400',
   NOT_EVALUATED: 'bg-amber-400',
+  EXCEPTION: 'bg-cyan-500',
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -91,6 +93,17 @@ export default function CompliancePage() {
   const [showLibrary, setShowLibrary] = useState(false)
   const [libraryData, setLibraryData] = useState<any>(null)
   const [libraryLoading, setLibraryLoading] = useState(false)
+
+  // Manual override modal state
+  const [overrideModal, setOverrideModal] = useState<{
+    checkId: string
+    checkTitle: string
+    controlId: string
+  } | null>(null)
+  const [overrideAction, setOverrideAction] = useState<string>('')
+  const [overrideReason, setOverrideReason] = useState('')
+  const [overrideEvidence, setOverrideEvidence] = useState<File | null>(null)
+  const [overrideSubmitting, setOverrideSubmitting] = useState(false)
 
   // Load accounts on mount
   useEffect(() => {
@@ -204,6 +217,35 @@ export default function CompliancePage() {
     setExpandedControls(new Set())
     setShowLibrary(false)
     setLibraryData(null)
+  }
+
+  const openOverrideModal = (checkId: string, checkTitle: string, controlId: string) => {
+    setOverrideModal({ checkId, checkTitle, controlId })
+    setOverrideAction('')
+    setOverrideReason('')
+    setOverrideEvidence(null)
+  }
+
+  const submitOverride = async () => {
+    if (!overrideModal || !overrideAction) return
+    setOverrideSubmitting(true)
+    try {
+      await api.overrideControlStatus(
+        overrideModal.checkId,
+        overrideAction,
+        overrideReason,
+        overrideEvidence || undefined,
+      )
+      setOverrideModal(null)
+      // Reload controls data
+      if (selectedFramework) {
+        loadFrameworkControls(selectedFramework)
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to update control status')
+    } finally {
+      setOverrideSubmitting(false)
+    }
   }
 
   const toggleFrameworkFilter = (fwId: string) => {
@@ -557,7 +599,7 @@ export default function CompliancePage() {
 
           {/* Summary Stats Bar */}
           {controlsData?.summary && (
-            <div className="grid grid-cols-6 gap-4 mb-6">
+            <div className={`grid gap-4 mb-6 ${(controlsData.summary.exception || 0) > 0 ? 'grid-cols-7' : 'grid-cols-6'}`}>
               <div className="bg-brand-gray-50 rounded-lg p-3 text-center">
                 <p className="text-2xl font-bold text-brand-navy">{controlsData.summary.total_checks}</p>
                 <p className="text-xs text-brand-gray-400">Total Checks</p>
@@ -578,6 +620,12 @@ export default function CompliancePage() {
                 <p className="text-2xl font-bold text-purple-600">{controlsData.summary.manual || 0}</p>
                 <p className="text-xs text-purple-600">Manual</p>
               </div>
+              {(controlsData.summary.exception || 0) > 0 && (
+                <div className="bg-cyan-50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-cyan-700">{controlsData.summary.exception}</p>
+                  <p className="text-xs text-cyan-600">Excepted</p>
+                </div>
+              )}
               <div className="rounded-lg p-3 text-center" style={{ backgroundColor: `${getPassRateStroke(controlsData.summary.pass_rate)}10` }}>
                 <p className={`text-2xl font-bold ${getPassRateColor(controlsData.summary.pass_rate)}`}>{controlsData.summary.pass_rate}%</p>
                 <p className="text-xs text-brand-gray-500">Pass Rate</p>
@@ -589,31 +637,31 @@ export default function CompliancePage() {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-brand-gray-700">Filter:</label>
-              {['all', 'PASS', 'FAIL', 'MANUAL', 'NOT_EVALUATED'].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setControlStatusFilter(s)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    controlStatusFilter === s
-                      ? s === 'PASS' ? 'bg-green-100 text-green-800'
-                      : s === 'FAIL' ? 'bg-red-100 text-red-800'
-                      : s === 'MANUAL' ? 'bg-purple-100 text-purple-700'
-                      : s === 'NOT_EVALUATED' ? 'bg-amber-100 text-amber-700'
-                      : 'bg-brand-green text-white'
-                      : 'border border-brand-gray-300 text-brand-gray-500 hover:bg-brand-gray-50'
-                  }`}
-                >
-                  {s === 'all' ? 'All' : s === 'NOT_EVALUATED' ? 'Not Evaluated' : s === 'MANUAL' ? 'Manual' : s === 'PASS' ? 'Passed' : 'Failed'}
-                  {controlsData?.controls && (
-                    <span className="ml-1.5 opacity-70">
-                      ({s === 'all'
-                        ? controlsData.controls.length
-                        : controlsData.controls.filter((c: any) => c.status === s).length
-                      })
-                    </span>
-                  )}
-                </button>
-              ))}
+              {['all', 'PASS', 'FAIL', 'MANUAL', 'NOT_EVALUATED', 'EXCEPTION'].map((s) => {
+                const count = s === 'all'
+                  ? controlsData?.controls?.length || 0
+                  : controlsData?.controls?.filter((c: any) => c.status === s).length || 0
+                if (s === 'EXCEPTION' && count === 0) return null
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setControlStatusFilter(s)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      controlStatusFilter === s
+                        ? s === 'PASS' ? 'bg-green-100 text-green-800'
+                        : s === 'FAIL' ? 'bg-red-100 text-red-800'
+                        : s === 'MANUAL' ? 'bg-purple-100 text-purple-700'
+                        : s === 'NOT_EVALUATED' ? 'bg-amber-100 text-amber-700'
+                        : s === 'EXCEPTION' ? 'bg-cyan-100 text-cyan-700'
+                        : 'bg-brand-green text-white'
+                        : 'border border-brand-gray-300 text-brand-gray-500 hover:bg-brand-gray-50'
+                    }`}
+                  >
+                    {s === 'all' ? 'All' : s === 'NOT_EVALUATED' ? 'Not Evaluated' : s === 'MANUAL' ? 'Manual' : s === 'PASS' ? 'Passed' : s === 'EXCEPTION' ? 'Excepted' : 'Failed'}
+                    <span className="ml-1.5 opacity-70">({count})</span>
+                  </button>
+                )
+              })}
             </div>
             <button
               onClick={toggleLibrary}
@@ -802,7 +850,7 @@ export default function CompliancePage() {
                                 {ctrl.id}
                               </span>
                               <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_COLORS[ctrl.status] || 'bg-gray-100 text-gray-500'}`}>
-                                {ctrl.status === 'NOT_EVALUATED' ? 'NOT EVALUATED' : ctrl.status}
+                                {ctrl.status === 'NOT_EVALUATED' ? 'NOT EVALUATED' : ctrl.status === 'EXCEPTION' ? 'EXCEPTED' : ctrl.status}
                               </span>
                               {ctrl.assessment_type && (
                                 <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${
@@ -832,6 +880,11 @@ export default function CompliancePage() {
                               {ctrl.status === 'MANUAL' && (
                                 <span className="text-[10px] text-purple-500">
                                   Manual verification required — this control cannot be fully automated
+                                </span>
+                              )}
+                              {ctrl.status === 'EXCEPTION' && (
+                                <span className="text-[10px] text-cyan-600">
+                                  Excepted — this control has been marked as an exception
                                 </span>
                               )}
                               {ctrl.status === 'NOT_EVALUATED' && (
@@ -936,6 +989,8 @@ export default function CompliancePage() {
                                           ? 'border-red-200 bg-red-50/50'
                                           : check.status === 'MANUAL'
                                           ? 'border-purple-200 bg-purple-50/30'
+                                          : check.status === 'EXCEPTION'
+                                          ? 'border-cyan-200 bg-cyan-50/30'
                                           : 'border-amber-200 bg-amber-50/30'
                                       }`}
                                     >
@@ -958,8 +1013,35 @@ export default function CompliancePage() {
                                             </p>
                                           )}
                                           {check.status === 'MANUAL' && (
-                                            <p className="text-[10px] text-purple-600 mt-1 italic">
-                                              Manual verification required — this check requires manual audit procedures that cannot be fully automated. Refer to the audit procedure above.
+                                            <div className="mt-1">
+                                              <p className="text-[10px] text-purple-600 italic mb-2">
+                                                Manual verification required — this check requires manual audit procedures that cannot be fully automated.
+                                              </p>
+                                              <div className="flex gap-1.5">
+                                                <button
+                                                  onClick={(e) => { e.stopPropagation(); openOverrideModal(check.check_id, check.description, ctrl.id); setTimeout(() => setOverrideAction('pass'), 0) }}
+                                                  className="text-[10px] px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 font-medium"
+                                                >
+                                                  Mark as Pass
+                                                </button>
+                                                <button
+                                                  onClick={(e) => { e.stopPropagation(); openOverrideModal(check.check_id, check.description, ctrl.id); setTimeout(() => setOverrideAction('fail'), 0) }}
+                                                  className="text-[10px] px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 font-medium"
+                                                >
+                                                  Mark as Fail
+                                                </button>
+                                                <button
+                                                  onClick={(e) => { e.stopPropagation(); openOverrideModal(check.check_id, check.description, ctrl.id); setTimeout(() => setOverrideAction('exception'), 0) }}
+                                                  className="text-[10px] px-2 py-1 rounded bg-cyan-100 text-cyan-700 hover:bg-cyan-200 font-medium"
+                                                >
+                                                  Exception
+                                                </button>
+                                              </div>
+                                            </div>
+                                          )}
+                                          {check.status === 'EXCEPTION' && (
+                                            <p className="text-[10px] text-cyan-600 mt-1 italic">
+                                              Excepted — this control has been marked as an exception with justification.
                                             </p>
                                           )}
                                           {check.status === 'NOT_EVALUATED' && (
@@ -989,6 +1071,108 @@ export default function CompliancePage() {
               )}
             </div>
           )}
+        </div>
+      )}
+      {/* Manual Override Modal */}
+      {overrideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setOverrideModal(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-base font-semibold text-brand-navy">Manual Control Assessment</h3>
+                <p className="text-xs text-brand-gray-400 mt-1">
+                  Control {overrideModal.controlId} &mdash; {overrideModal.checkId}
+                </p>
+              </div>
+              <button onClick={() => setOverrideModal(null)} className="p-1 rounded hover:bg-brand-gray-100">
+                <XMarkIcon className="w-5 h-5 text-brand-gray-400" />
+              </button>
+            </div>
+
+            <p className="text-sm text-brand-gray-600 mb-4">{overrideModal.checkTitle}</p>
+
+            {/* Action selection */}
+            <div className="mb-4">
+              <label className="text-sm font-medium text-brand-gray-700 block mb-2">Assessment Result</label>
+              <div className="flex gap-2">
+                {[
+                  { value: 'pass', label: 'Compliant (Pass)', color: 'border-green-300 bg-green-50 text-green-700', active: 'ring-2 ring-green-500' },
+                  { value: 'fail', label: 'Non-Compliant (Fail)', color: 'border-red-300 bg-red-50 text-red-700', active: 'ring-2 ring-red-500' },
+                  { value: 'exception', label: 'Exception', color: 'border-cyan-300 bg-cyan-50 text-cyan-700', active: 'ring-2 ring-cyan-500' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setOverrideAction(opt.value)}
+                    className={`flex-1 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${opt.color} ${
+                      overrideAction === opt.value ? opt.active : 'opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Reason / Comment */}
+            <div className="mb-4">
+              <label className="text-sm font-medium text-brand-gray-700 block mb-1">
+                {overrideAction === 'exception' ? 'Exception Justification' : overrideAction === 'pass' ? 'Evidence / Comments' : 'Comments'}
+                {overrideAction === 'exception' && <span className="text-red-500 ml-0.5">*</span>}
+              </label>
+              <textarea
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                placeholder={
+                  overrideAction === 'pass' ? 'Describe how compliance was verified...'
+                  : overrideAction === 'exception' ? 'Justify why this control is excepted...'
+                  : 'Add any comments...'
+                }
+                className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-brand-green focus:border-brand-green"
+                rows={3}
+              />
+            </div>
+
+            {/* Evidence file upload */}
+            <div className="mb-6">
+              <label className="text-sm font-medium text-brand-gray-700 block mb-1">
+                Evidence (optional)
+              </label>
+              <div className="flex items-center gap-3">
+                <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-2 border border-brand-gray-300 rounded-lg text-sm text-brand-gray-600 hover:bg-brand-gray-50">
+                  <PlusIcon className="w-4 h-4" />
+                  Attach file
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => setOverrideEvidence(e.target.files?.[0] || null)}
+                  />
+                </label>
+                {overrideEvidence && (
+                  <span className="text-xs text-brand-gray-500">
+                    {overrideEvidence.name}
+                    <button onClick={() => setOverrideEvidence(null)} className="ml-1 text-red-400 hover:text-red-600">&times;</button>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setOverrideModal(null)}
+                className="px-4 py-2 text-sm text-brand-gray-600 hover:bg-brand-gray-50 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitOverride}
+                disabled={!overrideAction || (overrideAction === 'exception' && !overrideReason.trim()) || overrideSubmitting}
+                className="px-4 py-2 text-sm font-medium text-white bg-brand-green rounded-lg hover:bg-brand-green/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {overrideSubmitting ? 'Saving...' : 'Save Assessment'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

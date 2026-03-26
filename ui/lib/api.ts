@@ -222,6 +222,32 @@ class ApiClient {
     return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/controls`, undefined, { params: Object.keys(params).length ? params : undefined })
   }
 
+  async overrideControlStatus(checkId: string, action: string, reason: string, evidence?: File) {
+    const formData = new FormData()
+    formData.append('action', action)
+    formData.append('reason', reason)
+    if (evidence) formData.append('evidence', evidence)
+
+    const token = this.getToken()
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    const response = await fetch(`/api/v1/compliance/controls/${checkId}/override`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      throw new Error(error.detail || `Request failed: ${response.status}`)
+    }
+    return response.json()
+  }
+
+  async getControlActions(checkId: string) {
+    return this.request<any[]>('GET', `/api/v1/compliance/controls/${checkId}/actions`)
+  }
+
   async updateProvider(id: string, data: any) {
     return this.request<any>('PUT', `/api/v1/providers/${id}`, data)
   }
