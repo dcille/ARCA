@@ -117,16 +117,9 @@ export default function MitreAttackPage() {
         setSaasConnections(saasData)
       } catch {}
 
-      // Restore previous analysis from localStorage
-      try {
-        const cached = localStorage.getItem(STORAGE_KEY)
-        if (cached) {
-          const { data, timestamp, providerId } = JSON.parse(cached)
-          setMatrixData(data)
-          setLastAnalyzed(timestamp)
-          if (providerId) setSelectedProvider(providerId)
-        }
-      } catch {}
+      // Do NOT auto-restore cached analysis — require user to explicitly
+      // run analysis so stale data is never shown on page load.
+      // Users can click "Run Analysis" to generate fresh results.
     }
     loadData()
   }, [])
