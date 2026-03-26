@@ -15,6 +15,7 @@ from api.models.api_key import ApiKey
 from api.models.rr_score import RRScore
 from api.models.rr_finding import RRFinding
 from api.models.rr_governance import RRGovernance
+from api.models.custom_framework import CustomFramework, CustomFrameworkCheck, CustomControl
 
 __all__ = [
     "User", "Provider", "Scan", "Finding",
@@ -23,4 +24,5 @@ __all__ = [
     "Integration", "Organization", "FindingAction",
     "AuditLog", "ApiKey",
     "RRScore", "RRFinding", "RRGovernance",
+    "CustomFramework", "CustomFrameworkCheck", "CustomControl",
 ]

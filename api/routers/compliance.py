@@ -159,12 +159,14 @@ async def list_compliance_accounts(
 @router.get("/frameworks")
 async def list_frameworks(
     provider_type: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """List frameworks, optionally filtering to those relevant to a provider_type."""
+    """List built-in + custom frameworks, optionally filtering by provider_type."""
     results = []
+    # Built-in frameworks
     for fw_id, fw in FRAMEWORKS.items():
         fw_providers = get_framework_providers(fw_id)
-        # If filtering by provider, skip frameworks that don't cover it
         if provider_type and provider_type not in fw_providers:
             continue
         if provider_type:
@@ -180,7 +182,42 @@ async def list_frameworks(
             "providers": fw_providers,
             "total_controls": len(controls),
             "total_checks": total_checks,
+            "type": "built_in",
         })
+
+    # Custom frameworks
+    from api.models.custom_framework import CustomFramework
+    from sqlalchemy.orm import selectinload
+    import json
+
+    query = (
+        select(CustomFramework)
+        .options(
+            selectinload(CustomFramework.selected_checks),
+            selectinload(CustomFramework.custom_controls),
+        )
+        .where(CustomFramework.user_id == current_user.id, CustomFramework.is_active == True)
+    )
+    result = await db.execute(query)
+    custom_fws = result.scalars().all()
+
+    for cfw in custom_fws:
+        cfw_providers = json.loads(cfw.providers) if cfw.providers else []
+        if provider_type and provider_type not in cfw_providers:
+            continue
+        total = len(cfw.selected_checks) + len(cfw.custom_controls)
+        results.append({
+            "id": cfw.id,
+            "name": cfw.name,
+            "description": cfw.description or "",
+            "category": "Custom",
+            "providers": cfw_providers,
+            "total_controls": 0,
+            "total_checks": total,
+            "type": "custom",
+            "version": cfw.version,
+        })
+
     return results
 
 
@@ -193,6 +230,26 @@ async def compliance_summary(
     current_user: User = Depends(get_current_user),
 ):
     if framework:
+        # Check if it's a custom framework (UUID format)
+        if len(framework) == 36 and "-" in framework and framework not in FRAMEWORKS:
+            from api.models.custom_framework import CustomFramework
+            from sqlalchemy.orm import selectinload
+            result = await db.execute(
+                select(CustomFramework)
+                .options(
+                    selectinload(CustomFramework.selected_checks),
+                    selectinload(CustomFramework.custom_controls),
+                )
+                .where(
+                    CustomFramework.id == framework,
+                    CustomFramework.user_id == current_user.id,
+                    CustomFramework.is_active == True,
+                )
+            )
+            cfw = result.scalars().first()
+            if cfw:
+                from api.services.custom_framework_service import evaluate_custom_framework
+                return await evaluate_custom_framework(cfw, db, current_user.id, provider_id)
         return await _per_check_summary(db, current_user.id, framework, provider_id, provider_type)
 
     # Overall summary across all frameworks
