@@ -36,6 +36,7 @@ D-ARCA is a comprehensive CSPM platform that combines cloud infrastructure secur
   - [Reports & Data Export](#reports--data-export)
 - [API Reference](#api-reference)
 - [Frontend Pages](#frontend-pages)
+- [Custom Framework Builder](#custom-framework-builder)
 - [Compliance Frameworks](#compliance-frameworks)
 - [Configuration](#configuration)
 - [Project Structure](#project-structure)
@@ -175,6 +176,19 @@ The API reloads on file changes automatically. The frontend runs on http://local
 - Per-framework pass rate calculation (per-unique-check, not per-resource)
 - Visual progress rings and Check Library with control descriptions
 - Framework descriptions, metadata, and per-cloud check mappings
+- **Custom Framework Builder**: Create your own frameworks by selecting from 1,600+ registry checks and/or defining custom controls
+
+### Custom Framework Builder
+- Create user-defined compliance frameworks integrated with the Check Registry (1,600+ CIS and scanner checks)
+- **3 ways to build**: select existing checks from the registry, create custom controls, or bulk-import via Excel
+- 3-step creation wizard: metadata (name, description, providers) -> check selection -> review
+- Custom controls with automatic `assessment_type` detection: if mapped `scanner_check_ids` exist in the registry -> automated, otherwise -> manual
+- Full lifecycle management: create, update, clone, delete frameworks
+- Excel import/export with registry-generated templates (4 sheets: Controls, Instructions, Available Scanner IDs, Registry Checks)
+- Validation against registry enums (ProviderType, Severity, Category) at every entry point
+- Pass rate evaluation using the same per-unique-check logic as built-in frameworks
+- Custom frameworks appear alongside built-in frameworks in the Compliance page with CUSTOM badge
+- BD <-> Registry sync: custom controls persist in PostgreSQL and load into the runtime registry on startup
 
 ### MITRE ATT&CK Analysis
 - Interactive MITRE ATT&CK matrix visualization
@@ -816,6 +830,29 @@ Query parameters: `severity`, `status`, `service`, `region`, `scan_id`, `limit`,
 | GET    | `/api/v1/compliance/frameworks/{id}/library`     | Framework control library      |
 | GET    | `/api/v1/compliance/frameworks/{id}/controls`    | Control-level drill-down       |
 
+### Custom Frameworks
+
+| Method | Endpoint                                              | Description                        |
+|--------|-------------------------------------------------------|------------------------------------|
+| GET    | `/api/v1/custom-frameworks/available-checks`          | Browse registry checks (paginated) |
+| GET    | `/api/v1/custom-frameworks/registry-stats`            | Registry statistics for filters    |
+| POST   | `/api/v1/custom-frameworks`                           | Create custom framework            |
+| GET    | `/api/v1/custom-frameworks`                           | List user's custom frameworks      |
+| GET    | `/api/v1/custom-frameworks/{id}`                      | Framework detail + compliance eval |
+| PUT    | `/api/v1/custom-frameworks/{id}`                      | Update framework metadata          |
+| DELETE | `/api/v1/custom-frameworks/{id}`                      | Soft delete framework              |
+| POST   | `/api/v1/custom-frameworks/{id}/clone`                | Clone framework with all checks    |
+| POST   | `/api/v1/custom-frameworks/{id}/checks`               | Add registry checks to framework   |
+| DELETE | `/api/v1/custom-frameworks/{id}/checks/{rid}`         | Remove a registry check            |
+| POST   | `/api/v1/custom-frameworks/{id}/controls`             | Create custom control              |
+| PUT    | `/api/v1/custom-frameworks/{id}/controls/{cid}`       | Update custom control              |
+| DELETE | `/api/v1/custom-frameworks/{id}/controls/{cid}`       | Delete custom control              |
+| GET    | `/api/v1/custom-frameworks/{id}/template.xlsx`        | Download Excel template            |
+| POST   | `/api/v1/custom-frameworks/{id}/import-excel`         | Upload Excel for validation        |
+| POST   | `/api/v1/custom-frameworks/{id}/import-confirm`       | Confirm Excel import               |
+
+Query parameters for `/available-checks`: `search`, `provider`, `category`, `severity`, `source` (cis/scanner/custom), `limit`, `offset`
+
 ### SaaS Security
 
 | Method | Endpoint                                      | Description              |
@@ -962,6 +999,8 @@ Query parameters: `severity`, `status`, `service`, `region`, `scan_id`, `limit`,
 | **Attack Paths**        | `/darca/attack-paths`               | Attack path visualization and analysis                   |
 | **Findings**            | `/darca/findings`                   | Cloud findings browser with filters and actions          |
 | **Compliance**          | `/darca/compliance`                 | Compliance frameworks with control-level library         |
+| **Custom Frameworks**   | `/darca/compliance/custom`          | Custom framework builder: list, create, clone, delete    |
+| **Framework Detail**    | `/darca/compliance/custom/[id]`     | Framework editor: add checks, create controls, import    |
 | **MITRE ATT&CK**       | `/darca/mitre-attack`               | MITRE ATT&CK matrix and technique analysis               |
 | **Ransomware Readiness**| `/darca/ransomware-readiness`       | Readiness dashboard with domains, findings, governance   |
 | **Security Graph**      | `/darca/security-graph`             | Interactive resource relationship graph                  |
@@ -988,6 +1027,73 @@ Query parameters: `severity`, `status`, `service`, `region`, `scan_id`, `limit`,
 | Black         | `#000000` | Text                                   |
 | Gray 100      | `#F2F2F2` | Page backgrounds                       |
 | Gray 200      | `#E6E6E6` | Borders                                |
+
+---
+
+## Custom Framework Builder
+
+D-ARCA allows users to create their own compliance frameworks that integrate directly with the centralized Check Registry (1,600+ CIS and scanner checks). Custom frameworks use the registry as the single source of truth in runtime, with PostgreSQL as the persistence layer.
+
+### Architecture
+
+```
+                    ┌─────────────────────────────────────────┐
+                    │          Check Registry (Runtime)        │
+                    │   904 CIS controls + 699 supplementary   │
+                    │        + N custom controls (synced)       │
+                    ├──────────────────┬──────────────────────┤
+                    │  get_check()     │  has_scanner_id()     │
+                    │  search_checks() │  register_check()     │
+                    │  list_checks()   │  unregister_check()   │
+                    └────────┬─────────┴──────────┬───────────┘
+                             │                    │
+               ┌─────────────┤                    │
+               │             │                    │
+    ┌──────────▼───┐  ┌──────▼────────┐  ┌───────▼────────────┐
+    │ Built-in     │  │ Custom        │  │ Custom Controls    │
+    │ Frameworks   │  │ Framework     │  │ (DB + Registry)    │
+    │ (FRAMEWORKS  │  │ Selected      │  │                    │
+    │  dict)       │  │ Checks (refs) │  │ check_id (unique)  │
+    │              │  │               │  │ scanner_check_ids  │
+    │ CIS, NIST,   │  │ registry_     │  │ assessment_type    │
+    │ PCI-DSS, etc │  │ check_id only │  │ (auto-detected)    │
+    └──────────────┘  └───────────────┘  └────────────────────┘
+```
+
+### Data Model (3 tables)
+
+| Table                     | Purpose                                                    |
+|---------------------------|------------------------------------------------------------|
+| `custom_frameworks`       | Framework metadata: name, description, version, providers  |
+| `custom_framework_checks` | References to existing registry checks (only `registry_check_id`) |
+| `custom_controls`         | New user-defined controls (persisted + synced to registry)  |
+
+### Key Design Decisions
+
+1. **No data duplication**: `CustomFrameworkCheck` only stores `registry_check_id`. All metadata (title, severity, scanner_check_ids, etc.) is resolved at runtime via `registry.get_check()`.
+2. **Automatic assessment_type**: Users don't choose it. If `scanner_check_ids` contains at least one ID found via `registry.has_scanner_id()` -> `automated`. Otherwise -> `manual`.
+3. **BD <-> Registry sync**: On startup, all `CustomControl` rows are loaded from DB and registered in the runtime registry via `register_check(custom=True)`. CRUD operations maintain sync in real-time.
+4. **Unified evaluation**: Both selected registry checks and custom controls pass through the same pass rate calculation pipeline using `Finding.check_id` queries.
+
+### Flows
+
+| Flow | Description |
+|------|-------------|
+| **Create framework** | Wizard: name/providers -> select checks from 1,600+ registry -> review -> create |
+| **Add custom control** | Form with auto assessment_type detection based on scanner_check_ids mapping |
+| **Excel import** | Download registry-powered template -> fill controls -> upload -> validate -> confirm |
+| **Evaluate compliance** | Query findings for all scanner_check_ids -> calculate pass/fail per check -> pass rate |
+
+### Frontend Components
+
+| Component                     | Description                                                        |
+|-------------------------------|--------------------------------------------------------------------|
+| `RegistryCheckSelector`       | Paginated selector with search, filters (provider/category/severity/source) |
+| `CreateFrameworkWizard`       | 3-step wizard: metadata -> check selection -> review               |
+| `CreateControlWizard`         | Control form with auto assessment_type indicator                   |
+| `ExcelImportModal`            | Drag-drop upload + validation preview + confirm                    |
+| `custom/page.tsx`             | Framework list with create, clone, delete                          |
+| `custom/[id]/page.tsx`        | Framework detail with tabs, stats, expandable checks, add/import   |
 
 ---
 
@@ -1078,12 +1184,12 @@ D-ARCA includes a complete CIS control library with full metadata (descriptions,
 ```
 ARCA/
 ├── api/                              # Backend (Python / FastAPI)
-│   ├── main.py                       # FastAPI application entry point (20 routers)
+│   ├── main.py                       # FastAPI application entry point (21 routers)
 │   ├── config.py                     # Settings (env vars)
 │   ├── database.py                   # SQLAlchemy async engine setup
 │   ├── celery_app.py                 # Celery configuration
 │   ├── requirements.txt              # Python dependencies
-│   ├── models/                       # SQLAlchemy ORM models (17 tables)
+│   ├── models/                       # SQLAlchemy ORM models (20 tables)
 │   │   ├── user.py                   # User model (auth)
 │   │   ├── provider.py               # Cloud provider model
 │   │   ├── scan.py                   # Scan model (cloud + SaaS)
@@ -1100,15 +1206,17 @@ ARCA/
 │   │   ├── api_key.py                # API key model (programmatic access)
 │   │   ├── rr_score.py               # Ransomware readiness scores
 │   │   ├── rr_finding.py             # Ransomware readiness findings
-│   │   └── rr_governance.py          # Ransomware readiness governance
+│   │   ├── rr_governance.py          # Ransomware readiness governance
+│   │   └── custom_framework.py       # Custom frameworks, checks, controls (3 models)
 │   ├── schemas/                      # Pydantic request/response schemas
 │   │   ├── auth.py                   # Auth DTOs
 │   │   ├── provider.py               # Provider DTOs
 │   │   ├── scan.py                   # Scan DTOs
 │   │   ├── finding.py                # Finding DTOs
 │   │   ├── saas.py                   # SaaS DTOs + credential validators
-│   │   └── dashboard.py              # Dashboard DTOs
-│   ├── routers/                      # API route handlers (20 modules)
+│   │   ├── dashboard.py              # Dashboard DTOs
+│   │   └── custom_framework.py       # Custom framework schemas + validation
+│   ├── routers/                      # API route handlers (21 modules)
 │   │   ├── auth.py                   # Auth + API key management
 │   │   ├── providers.py              # CRUD cloud providers
 │   │   ├── scans.py                  # Create/list/get scans
@@ -1127,14 +1235,18 @@ ARCA/
 │   │   ├── notifications.py          # Notification management
 │   │   ├── integrations.py           # Third-party integrations
 │   │   ├── organizations.py          # Multi-tenancy + membership
-│   │   └── audit_log.py              # Audit log + statistics
+│   │   ├── audit_log.py              # Audit log + statistics
+│   │   └── custom_frameworks.py      # Custom framework CRUD + registry integration
 │   ├── services/                     # Business logic
 │   │   ├── auth_service.py           # JWT, password hashing, encryption
 │   │   ├── report_service.py         # PDF report builder with chart embedding
 │   │   ├── chart_service.py          # Matplotlib chart generation (donut, bar, radar, line, stacked)
 │   │   ├── rr_report_service.py      # Ransomware readiness report builder
 │   │   ├── notification_service.py   # Notification dispatch
-│   │   └── audit_service.py          # Audit log recording
+│   │   ├── audit_service.py          # Audit log recording
+│   │   ├── custom_framework_service.py # Custom framework sync, evaluation, lifecycle
+│   │   ├── excel_template_service.py # Excel template generation from registry
+│   │   └── excel_import_service.py   # Excel parsing + registry validation
 │   └── tasks/                        # Celery background tasks
 │       ├── scan_tasks.py             # Cloud scan execution
 │       └── saas_tasks.py             # SaaS scan execution
@@ -1246,6 +1358,8 @@ ARCA/
 │   │       ├── attack-paths/page.tsx # Attack path visualization
 │   │       ├── findings/page.tsx     # Cloud findings browser
 │   │       ├── compliance/page.tsx   # Compliance frameworks + Check Library
+│   │       ├── compliance/custom/page.tsx    # Custom framework list + create wizard
+│   │       ├── compliance/custom/[id]/page.tsx # Custom framework editor + detail
 │   │       ├── mitre-attack/page.tsx # MITRE ATT&CK matrix analysis
 │   │       ├── ransomware-readiness/ # Ransomware readiness (4 sub-pages)
 │   │       ├── security-graph/page.tsx# Interactive security graph
@@ -1264,12 +1378,17 @@ ARCA/
 │   │   ├── layout/
 │   │   │   ├── Sidebar.tsx           # Navigation sidebar (collapsible, mobile-responsive)
 │   │   │   └── Header.tsx            # Page header
+│   │   ├── compliance/
+│   │   │   ├── RegistryCheckSelector.tsx  # Registry check browser (paginated, filtered)
+│   │   │   ├── CreateFrameworkWizard.tsx  # 3-step framework creation wizard
+│   │   │   ├── CreateControlWizard.tsx    # Custom control creation form
+│   │   │   └── ExcelImportModal.tsx       # Excel upload + validation + confirm
 │   │   └── ui/
 │   │       ├── StatCard.tsx          # Metric stat card
 │   │       ├── Badge.tsx             # Severity/status badge
 │   │       └── DataTable.tsx         # Reusable data table
 │   ├── lib/
-│   │   ├── api.ts                    # API client (75+ methods)
+│   │   ├── api.ts                    # API client (90+ methods)
 │   │   └── utils.ts                  # Utility functions
 │   ├── store/
 │   │   └── auth.ts                   # Zustand auth store (persisted)
