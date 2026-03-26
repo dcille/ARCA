@@ -2544,14 +2544,34 @@ class GCPScanner:
     def run_all_checks(self) -> list[dict]:
         """Run all GCP security checks including complete CIS benchmark coverage.
 
-        Executes every automated check via :meth:`scan`, then calls
-        :meth:`_emit_cis_coverage` to fill in ``MANUAL`` results for any CIS
-        controls not already covered, ensuring 100 % benchmark representation
-        in the output.
+        Three-phase approach:
+          1. Service checks (existing scan() method)
+          2. CIS Evaluator Engine (84 controls — CIS GCP v4.0.0)
+          3. Fallback: _emit_cis_coverage() if engine fails
         """
+        # Phase 1: Service checks
         results = self.scan()
 
-        # Add MANUAL results for any CIS controls not covered by automated checks
-        results.extend(self._emit_cis_coverage(results))
+        # Phase 2: CIS Evaluator Engine (84 controls)
+        try:
+            from .gcp_cis_evaluator_engine import GCPCISEvaluatorEngine
+            engine = GCPCISEvaluatorEngine(
+                credentials=self.credentials,
+                services=self.services,
+            )
+            cis_results = engine.evaluate_all()
+
+            # Deduplicate: CIS evaluator results take precedence
+            existing_check_ids = {r.get("check_id") for r in results if r.get("check_id")}
+            for r in cis_results:
+                cid = r.get("check_id", "")
+                if cid not in existing_check_ids:
+                    results.append(r)
+                    existing_check_ids.add(cid)
+
+            logger.info("GCP CIS engine added %d results", len(cis_results))
+        except Exception as e:
+            logger.warning("GCP CIS engine failed, falling back to CIS coverage gap-fill: %s", e)
+            results.extend(self._emit_cis_coverage(results))
 
         return results
