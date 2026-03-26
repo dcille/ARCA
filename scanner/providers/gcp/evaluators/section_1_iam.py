@@ -75,9 +75,9 @@ def evaluate_cis_1_4(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not sas:
         return [make_result(cis_id="1.4", check_id="gcp_cis_1_4",
             title="Ensure only GCP-managed service account keys for each SA",
-            service="iam", severity="medium", status="PASS",
+            service="iam", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No user-managed service accounts found",
+            status_extended="No user-managed service accounts found. Control not applicable.",
             compliance_frameworks=FW)]
 
     for sa in sas:
@@ -128,9 +128,9 @@ def evaluate_cis_1_5(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not admin_sas:
         return [make_result(cis_id="1.5", check_id="gcp_cis_1_5",
             title="Ensure that Service Account has no Admin Privileges",
-            service="iam", severity="critical", status="PASS",
+            service="iam", severity="critical", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No service accounts have admin/owner/editor roles",
+            status_extended="No service accounts have admin/owner/editor roles. Control not applicable.",
             compliance_frameworks=FW)]
 
     for sa in admin_sas:
@@ -188,9 +188,9 @@ def evaluate_cis_1_6(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="1.6", check_id="gcp_cis_1_6",
             title="Ensure user-managed SA keys are rotated within 90 days",
-            service="iam", severity="medium", status="PASS",
+            service="iam", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No user-managed SA keys found",
+            status_extended="No user-managed SA keys found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -356,9 +356,9 @@ def evaluate_cis_1_10(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="1.10", check_id="gcp_cis_1_10",
             title="Ensure KMS Encryption Keys Are Not Anonymously or Publicly Accessible",
-            service="iam", severity="high", status="PASS",
+            service="iam", severity="high", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No KMS keys found",
+            status_extended="No KMS keys found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -403,9 +403,9 @@ def evaluate_cis_1_11(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="1.11", check_id="gcp_cis_1_11",
             title="Ensure API Keys Are Rotated Within 90 Days",
-            service="iam", severity="medium", status="PASS",
+            service="iam", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No API keys found",
+            status_extended="No API keys found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -448,9 +448,9 @@ def evaluate_cis_1_12(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="1.12", check_id="gcp_cis_1_12",
             title="Ensure API Keys Are Restricted to Only APIs That Application Needs Access",
-            service="iam", severity="medium", status="PASS",
+            service="iam", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No API keys found",
+            status_extended="No API keys found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -505,9 +505,9 @@ def evaluate_cis_1_14(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="1.14", check_id="gcp_cis_1_14",
             title="Ensure API Keys Are Restricted To Necessary APIs",
-            service="iam", severity="medium", status="PASS",
+            service="iam", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No API keys found",
+            status_extended="No API keys found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 

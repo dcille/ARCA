@@ -107,9 +107,9 @@ def _check_sql_flag(c: GCPClientCache, cfg: EvalConfig, cis_id: str,
 
     if not results:
         return [make_result(cis_id=cis_id, check_id=check_id, title=title,
-            service="sql", severity="medium", status="PASS",
+            service="sql", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended=f"No {db_prefix} SQL instances found",
+            status_extended=f"No {db_prefix} SQL instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -150,9 +150,9 @@ def evaluate_cis_5_1(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="5.1", check_id="gcp_cis_5_1",
             title="Ensure That Cloud Storage Bucket Is Not Anonymously or Publicly Accessible",
-            service="storage", severity="critical", status="PASS",
+            service="storage", severity="critical", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No storage buckets found",
+            status_extended="No storage buckets found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -181,9 +181,9 @@ def evaluate_cis_5_2(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="5.2", check_id="gcp_cis_5_2",
             title="Ensure That Cloud Storage Buckets Have Uniform Bucket-Level Access Enabled",
-            service="storage", severity="medium", status="PASS",
+            service="storage", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No storage buckets found",
+            status_extended="No storage buckets found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -335,9 +335,9 @@ def evaluate_cis_6_3_3(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="6.3.3", check_id="gcp_cis_6_3_3",
             title="Ensure 'User Connections' Database Flag for Cloud SQL SQL Server Instance Is Set to a Non-limiting Value",
-            service="sql", severity="medium", status="PASS",
+            service="sql", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No SQL Server instances found",
+            status_extended="No SQL Server instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -398,9 +398,9 @@ def evaluate_cis_6_4(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="6.4", check_id="gcp_cis_6_4",
             title="Ensure That the Cloud SQL Database Instance Requires All Incoming Connections To Use SSL",
-            service="sql", severity="high", status="PASS",
+            service="sql", severity="high", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No SQL instances found",
+            status_extended="No SQL instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -426,9 +426,9 @@ def evaluate_cis_6_5(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="6.5", check_id="gcp_cis_6_5",
             title="Ensure That Cloud SQL Database Instances Do Not Implicitly Whitelist All Public IP Addresses",
-            service="sql", severity="critical", status="PASS",
+            service="sql", severity="critical", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No SQL instances found",
+            status_extended="No SQL instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -453,9 +453,9 @@ def evaluate_cis_6_6(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="6.6", check_id="gcp_cis_6_6",
             title="Ensure That Cloud SQL Database Instances Do Not Have Public IPs",
-            service="sql", severity="high", status="PASS",
+            service="sql", severity="high", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No SQL instances found",
+            status_extended="No SQL instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -480,9 +480,9 @@ def evaluate_cis_6_7(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="6.7", check_id="gcp_cis_6_7",
             title="Ensure That Cloud SQL Database Instances Are Configured With Automated Backups",
-            service="sql", severity="medium", status="PASS",
+            service="sql", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No SQL instances found",
+            status_extended="No SQL instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -520,9 +520,9 @@ def evaluate_cis_7_1(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="7.1", check_id="gcp_cis_7_1",
             title="Ensure That BigQuery Datasets Are Not Anonymously or Publicly Accessible",
-            service="bigquery", severity="critical", status="PASS",
+            service="bigquery", severity="critical", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No BigQuery datasets found",
+            status_extended="No BigQuery datasets found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -556,9 +556,9 @@ def evaluate_cis_7_2(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="7.2", check_id="gcp_cis_7_2",
             title="Ensure That All BigQuery Tables Are Encrypted With Customer-Managed Encryption Key (CMEK)",
-            service="bigquery", severity="medium", status="PASS",
+            service="bigquery", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No BigQuery tables found",
+            status_extended="No BigQuery tables found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -591,9 +591,9 @@ def evaluate_cis_7_3(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="7.3", check_id="gcp_cis_7_3",
             title="Ensure That a Default Customer-Managed Encryption Key (CMEK) Is Specified for All BigQuery Data Sets",
-            service="bigquery", severity="medium", status="PASS",
+            service="bigquery", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No BigQuery datasets found",
+            status_extended="No BigQuery datasets found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -648,8 +648,8 @@ def evaluate_cis_8_1(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="8.1", check_id="gcp_cis_8_1",
             title="Ensure That Dataproc Cluster Is Encrypted With Customer-Managed Encryption Keys",
-            service="dataproc", severity="medium", status="PASS",
+            service="dataproc", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No Dataproc clusters found",
+            status_extended="No Dataproc clusters found. Control not applicable.",
             compliance_frameworks=FW)]
     return results

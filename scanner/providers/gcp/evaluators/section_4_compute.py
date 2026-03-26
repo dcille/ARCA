@@ -63,9 +63,9 @@ def evaluate_cis_4_1(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="4.1", check_id="gcp_cis_4_1",
             title="Ensure That Instances Are Not Configured To Use Default Service Accounts",
-            service="compute", severity="high", status="PASS",
+            service="compute", severity="high", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No compute instances found",
+            status_extended="No compute instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -94,9 +94,9 @@ def evaluate_cis_4_2(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="4.2", check_id="gcp_cis_4_2",
             title="Ensure That Instances Are Not Configured To Use Default Service Accounts With Full Access to All Cloud APIs",
-            service="compute", severity="high", status="PASS",
+            service="compute", severity="high", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No compute instances found",
+            status_extended="No compute instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -125,9 +125,9 @@ def evaluate_cis_4_3(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="4.3", check_id="gcp_cis_4_3",
             title="Ensure 'Block Project-Wide SSH Keys' Is Enabled for VM Instances",
-            service="compute", severity="medium", status="PASS",
+            service="compute", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No compute instances found",
+            status_extended="No compute instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -170,9 +170,9 @@ def evaluate_cis_4_4(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="4.4", check_id="gcp_cis_4_4",
             title="Ensure Oslogin Is Enabled for a Project",
-            service="compute", severity="medium", status="PASS",
+            service="compute", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No compute instances found",
+            status_extended="No compute instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -201,9 +201,9 @@ def evaluate_cis_4_5(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="4.5", check_id="gcp_cis_4_5",
             title="Ensure 'Enable Connecting to Serial Ports' Is Not Enabled for VM Instance",
-            service="compute", severity="medium", status="PASS",
+            service="compute", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No compute instances found",
+            status_extended="No compute instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -229,9 +229,9 @@ def evaluate_cis_4_6(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="4.6", check_id="gcp_cis_4_6",
             title="Ensure That IP Forwarding Is Not Enabled on Instances",
-            service="compute", severity="medium", status="PASS",
+            service="compute", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No compute instances found",
+            status_extended="No compute instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -260,9 +260,9 @@ def evaluate_cis_4_7(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="4.7", check_id="gcp_cis_4_7",
             title="Ensure VM Disks Are Encrypted With Customer-Supplied Encryption Keys (CSEK)",
-            service="compute", severity="medium", status="PASS",
+            service="compute", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No compute instances found",
+            status_extended="No compute instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -292,9 +292,9 @@ def evaluate_cis_4_8(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="4.8", check_id="gcp_cis_4_8",
             title="Ensure Compute Instances Are Launched With Shielded VM Enabled",
-            service="compute", severity="medium", status="PASS",
+            service="compute", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No compute instances found",
+            status_extended="No compute instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -324,9 +324,9 @@ def evaluate_cis_4_9(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="4.9", check_id="gcp_cis_4_9",
             title="Ensure That Compute Instances Do Not Have Public IP Addresses",
-            service="compute", severity="medium", status="PASS",
+            service="compute", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No compute instances found",
+            status_extended="No compute instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -364,9 +364,9 @@ def evaluate_cis_4_11(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="4.11", check_id="gcp_cis_4_11",
             title="Ensure That Compute Instances Have Confidential Computing Enabled",
-            service="compute", severity="low", status="PASS",
+            service="compute", severity="low", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No compute instances found",
+            status_extended="No compute instances found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
