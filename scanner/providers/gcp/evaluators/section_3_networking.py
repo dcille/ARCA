@@ -65,9 +65,9 @@ def evaluate_cis_3_2(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not legacy_nets:
         return [make_result(cis_id="3.2", check_id="gcp_cis_3_2",
             title="Ensure Legacy Networks Do Not Exist",
-            service="networking", severity="medium", status="PASS",
+            service="networking", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No legacy networks found",
+            status_extended="No legacy networks found. Control not applicable.",
             compliance_frameworks=FW)]
 
     for net in legacy_nets:
@@ -117,9 +117,9 @@ def evaluate_cis_3_3(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="3.3", check_id="gcp_cis_3_3",
             title="Ensure That DNSSEC Is Enabled for Cloud DNS",
-            service="networking", severity="medium", status="PASS",
+            service="networking", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No public DNS managed zones found",
+            status_extended="No public DNS managed zones found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -156,9 +156,9 @@ def _check_dnssec_algo(c: GCPClientCache, cfg: EvalConfig, cis_id: str,
 
     if not results:
         return [make_result(cis_id=cis_id, check_id=check_id, title=title,
-            service="networking", severity="medium", status="PASS",
+            service="networking", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended=f"No DNSSEC-enabled zones with {key_type} keys found",
+            status_extended=f"No DNSSEC-enabled zones with {key_type} keys found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -302,9 +302,9 @@ def evaluate_cis_3_8(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="3.8", check_id="gcp_cis_3_8",
             title="Ensure VPC Flow Logs Is Enabled for Every Subnet",
-            service="networking", severity="medium", status="PASS",
+            service="networking", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No subnets found",
+            status_extended="No subnets found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 

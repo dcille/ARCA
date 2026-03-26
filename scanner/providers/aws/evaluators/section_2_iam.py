@@ -337,8 +337,8 @@ def evaluate_cis_2_18(c, cfg):
     if not results:
         results.append(make_result(cis_id="2.18", check_id="aws_cis_2_18",
             title="Ensure all expired SSL/TLS certificates stored in AWS IAM are removed",
-            service="iam", severity="high", status="PASS", resource_id=cfg.account_id,
-            status_extended="No IAM server certificates found.", compliance_frameworks=FW))
+            service="iam", severity="high", status="N/A", resource_id=cfg.account_id,
+            status_extended="No IAM server certificates found. Control not applicable.", compliance_frameworks=FW))
     return results
 
 # 2.19 — IAM Access Analyzer enabled for all regions

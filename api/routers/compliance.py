@@ -1,5 +1,8 @@
 """Compliance router — per-unique-check calculation and control-level library."""
-from fastapi import APIRouter, Depends, HTTPException, Query
+import os
+import uuid as _uuid_mod
+
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, case, or_
 from typing import Optional
@@ -9,6 +12,7 @@ from pydantic import BaseModel
 from api.database import get_db
 from api.models.user import User
 from api.models.finding import Finding
+from api.models.finding_action import FindingAction
 from api.models.scan import Scan
 from api.models.framework_preference import FrameworkPreference
 from api.services.auth_service import get_current_user
@@ -21,6 +25,8 @@ from scanner.compliance.frameworks import (
     get_framework_controls,
     get_framework_providers,
 )
+
+EVIDENCE_UPLOAD_DIR = os.environ.get("EVIDENCE_UPLOAD_DIR", "/app/data/evidence")
 
 router = APIRouter()
 
@@ -66,7 +72,7 @@ async def _per_check_summary(
     else:
         all_check_ids = get_all_checks_for_framework(framework_id)
 
-    # Query: for each check_id, get fail_count, pass_count, manual_count
+    # Query: for each check_id, get fail_count, pass_count, manual_count, exception_count, na_count
     fw_filter = _build_fw_filter(framework_id)
     query = (
         select(
@@ -74,6 +80,8 @@ async def _per_check_summary(
             func.sum(case((Finding.status == "FAIL", 1), else_=0)).label("fail_count"),
             func.sum(case((Finding.status == "PASS", 1), else_=0)).label("pass_count"),
             func.sum(case((Finding.status == "MANUAL", 1), else_=0)).label("manual_count"),
+            func.sum(case((Finding.status == "EXCEPTION", 1), else_=0)).label("exception_count"),
+            func.sum(case((Finding.status == "N/A", 1), else_=0)).label("na_count"),
         )
         .join(Scan, Finding.scan_id == Scan.id)
         .where(Scan.user_id == user_id)
@@ -86,7 +94,10 @@ async def _per_check_summary(
     query = query.group_by(Finding.check_id)
 
     result = await db.execute(query)
-    rows = {row.check_id: (row.fail_count or 0, row.pass_count or 0, row.manual_count or 0) for row in result.all()}
+    rows = {
+        row.check_id: (row.fail_count or 0, row.pass_count or 0, row.manual_count or 0, row.exception_count or 0, row.na_count or 0)
+        for row in result.all()
+    }
 
     # Calculate per-check status
     total_defined = len(all_check_ids) if all_check_ids else len(rows)
@@ -94,18 +105,24 @@ async def _per_check_summary(
     failed_checks = 0
     manual_checks = 0
     not_evaluated = 0
+    na_checks = 0
+    exception_checks = 0
 
     check_ids_to_evaluate = all_check_ids if all_check_ids else sorted(rows.keys())
 
     for cid in check_ids_to_evaluate:
         if cid in rows:
-            fail_count, pass_count, manual_count = rows[cid]
+            fail_count, pass_count, manual_count, exception_count, na_count = rows[cid]
             if fail_count > 0:
                 failed_checks += 1
             elif pass_count > 0:
                 passed_checks += 1
+            elif exception_count > 0:
+                exception_checks += 1
             elif manual_count > 0:
                 manual_checks += 1
+            elif na_count > 0:
+                na_checks += 1
             else:
                 not_evaluated += 1
         else:
@@ -120,6 +137,8 @@ async def _per_check_summary(
         "failed": failed_checks,
         "manual": manual_checks,
         "not_evaluated": not_evaluated,
+        "na": na_checks,
+        "exception": exception_checks,
         "pass_rate": round(pass_rate, 1),
     }
 
@@ -509,18 +528,24 @@ async def framework_controls_with_results(
     for f in all_findings:
         findings_by_check.setdefault(f.check_id, []).append(f)
 
-    # Build per-check status: PASS/FAIL/MANUAL/NOT_EVALUATED
+    # Build per-check status: PASS/FAIL/MANUAL/EXCEPTION/N/A/NOT_EVALUATED
     check_statuses: dict = {}
     for cid, findings_list in findings_by_check.items():
         has_fail = any(f.status == "FAIL" for f in findings_list)
         has_pass = any(f.status == "PASS" for f in findings_list)
+        has_exception = any(f.status == "EXCEPTION" for f in findings_list)
         has_manual = any(f.status == "MANUAL" for f in findings_list)
+        has_na = any(f.status == "N/A" for f in findings_list)
         if has_fail:
             check_statuses[cid] = "FAIL"
         elif has_pass:
             check_statuses[cid] = "PASS"
+        elif has_exception:
+            check_statuses[cid] = "EXCEPTION"
         elif has_manual:
             check_statuses[cid] = "MANUAL"
+        elif has_na:
+            check_statuses[cid] = "N/A"
         else:
             check_statuses[cid] = "NOT_EVALUATED"
 
@@ -534,6 +559,8 @@ async def framework_controls_with_results(
         ctrl_failed = 0
         ctrl_manual = 0
         ctrl_not_evaluated = 0
+        ctrl_na = 0
+        ctrl_exception = 0
 
         if isinstance(checks_map, dict):
             for provider, cids in checks_map.items():
@@ -547,8 +574,12 @@ async def framework_controls_with_results(
                         ctrl_passed += 1
                     elif status == "FAIL":
                         ctrl_failed += 1
+                    elif status == "EXCEPTION":
+                        ctrl_exception += 1
                     elif status == "MANUAL":
                         ctrl_manual += 1
+                    elif status == "N/A":
+                        ctrl_na += 1
                     else:
                         ctrl_not_evaluated += 1
 
@@ -569,8 +600,12 @@ async def framework_controls_with_results(
             ctrl_status = "FAIL"
         elif ctrl_passed > 0:
             ctrl_status = "PASS"
+        elif ctrl_exception > 0:
+            ctrl_status = "EXCEPTION"
         elif ctrl_manual > 0:
             ctrl_status = "MANUAL"
+        elif ctrl_na > 0 and ctrl_not_evaluated == 0:
+            ctrl_status = "N/A"
         else:
             ctrl_status = "NOT_EVALUATED"
 
@@ -587,6 +622,8 @@ async def framework_controls_with_results(
             "failed": ctrl_failed,
             "manual": ctrl_manual,
             "not_evaluated": ctrl_not_evaluated,
+            "na": ctrl_na,
+            "exception": ctrl_exception,
             "checks": provider_checks,
             # Rich metadata from framework definition
             "rationale": ctrl.get("rationale", ""),
@@ -606,6 +643,120 @@ async def framework_controls_with_results(
         "total_controls": len(controls_out),
         "controls": controls_out,
     }
+
+
+# ---------------------------------------------------------------------------
+# Manual control overrides (pass / fail / exception)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/controls/{check_id}/override")
+async def override_control_status(
+    check_id: str,
+    action: str = Form(...),  # "pass", "fail", "exception"
+    reason: str = Form(""),
+    evidence: Optional[UploadFile] = File(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Override a manual/not-evaluated control status.
+
+    action values:
+      - "pass"      → finding status becomes PASS
+      - "fail"      → finding status becomes FAIL
+      - "exception" → finding status becomes EXCEPTION
+    """
+    if action not in ("pass", "fail", "exception"):
+        raise HTTPException(status_code=400, detail="action must be 'pass', 'fail', or 'exception'")
+
+    # Find all MANUAL findings with this check_id for the user
+    result = await db.execute(
+        select(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id, Finding.check_id == check_id)
+    )
+    findings = result.scalars().all()
+
+    if not findings:
+        raise HTTPException(status_code=404, detail=f"No findings found for check_id {check_id}")
+
+    new_status = action.upper()  # PASS, FAIL, EXCEPTION
+
+    # Handle evidence upload
+    evidence_file_name = None
+    evidence_file_path = None
+    if evidence:
+        os.makedirs(EVIDENCE_UPLOAD_DIR, exist_ok=True)
+        ext = os.path.splitext(evidence.filename or "")[1]
+        safe_name = f"{_uuid_mod.uuid4()}{ext}"
+        file_path = os.path.join(EVIDENCE_UPLOAD_DIR, safe_name)
+        content = await evidence.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+        evidence_file_name = evidence.filename
+        evidence_file_path = file_path
+
+    # Update all findings for this check_id and record the action
+    updated_count = 0
+    for finding in findings:
+        finding.status = new_status
+        # Record the action in finding_actions
+        fa = FindingAction(
+            finding_id=finding.id,
+            user_id=current_user.id,
+            action_type=action,
+            reason=reason or f"Manual override to {action}",
+            evidence_file_name=evidence_file_name,
+            evidence_file_path=evidence_file_path,
+        )
+        db.add(fa)
+        updated_count += 1
+
+    await db.commit()
+
+    return {
+        "check_id": check_id,
+        "new_status": new_status,
+        "updated_findings": updated_count,
+        "reason": reason,
+        "evidence_file_name": evidence_file_name,
+    }
+
+
+@router.get("/controls/{check_id}/actions")
+async def get_control_actions(
+    check_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get override action history for a specific check_id."""
+    # Get finding IDs for this check_id belonging to the user
+    result = await db.execute(
+        select(Finding.id)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id, Finding.check_id == check_id)
+    )
+    finding_ids = [row[0] for row in result.all()]
+    if not finding_ids:
+        return []
+
+    result = await db.execute(
+        select(FindingAction)
+        .where(FindingAction.finding_id.in_(finding_ids))
+        .order_by(FindingAction.created_at.desc())
+    )
+    actions = result.scalars().all()
+
+    return [
+        {
+            "id": a.id,
+            "action_type": a.action_type,
+            "reason": a.reason,
+            "evidence_file_name": a.evidence_file_name,
+            "created_at": a.created_at.isoformat(),
+        }
+        for a in actions
+    ]
 
 
 # ---------------------------------------------------------------------------

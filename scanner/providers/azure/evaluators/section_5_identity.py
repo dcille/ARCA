@@ -21,7 +21,7 @@ def evaluate_cis_5_1_1(clients: AzureClientCache, config: EvalConfig) -> list[di
     if not data:
         return [make_result(
             cis_id="5.1.1", check_id="azure_cis_5_1_1",
-            title="Ensure security defaults is enabled in Entra ID",
+            title="Ensure that 'security defaults' is enabled in Microsoft Entra ID",
             service="identity", severity="medium", status="ERROR",
             resource_id=config.subscription_id,
             status_extended="Could not query security defaults policy via Graph API.",
@@ -30,7 +30,7 @@ def evaluate_cis_5_1_1(clients: AzureClientCache, config: EvalConfig) -> list[di
     enabled = data.get("isEnabled", False)
     return [make_result(
         cis_id="5.1.1", check_id="azure_cis_5_1_1",
-        title="Ensure security defaults is enabled in Entra ID",
+        title="Ensure that 'security defaults' is enabled in Microsoft Entra ID",
         service="identity", severity="medium",
         status="PASS" if enabled else "FAIL",
         resource_id=config.tenant_id or config.subscription_id,
@@ -47,7 +47,7 @@ def evaluate_cis_5_1_2(clients: AzureClientCache, config: EvalConfig) -> list[di
     if sd and sd.get("isEnabled"):
         return [make_result(
             cis_id="5.1.2", check_id="azure_cis_5_1_2",
-            title="Ensure MFA is enabled for all users",
+            title="Ensure that 'multifactor authentication' is 'enabled' for all users",
             service="identity", severity="high", status="PASS",
             resource_id=config.tenant_id or config.subscription_id,
             status_extended="Security defaults enabled — MFA required for all users.",
@@ -65,7 +65,7 @@ def evaluate_cis_5_1_2(clients: AzureClientCache, config: EvalConfig) -> list[di
         )
         return [make_result(
             cis_id="5.1.2", check_id="azure_cis_5_1_2",
-            title="Ensure MFA is enabled for all users",
+            title="Ensure that 'multifactor authentication' is 'enabled' for all users",
             service="identity", severity="high",
             status="PASS" if mfa_all else "FAIL",
             resource_id=config.tenant_id or config.subscription_id,
@@ -75,7 +75,7 @@ def evaluate_cis_5_1_2(clients: AzureClientCache, config: EvalConfig) -> list[di
         )]
     return [make_result(
         cis_id="5.1.2", check_id="azure_cis_5_1_2",
-        title="Ensure MFA is enabled for all users",
+        title="Ensure that 'multifactor authentication' is 'enabled' for all users",
         service="identity", severity="high", status="FAIL",
         resource_id=config.tenant_id or config.subscription_id,
         status_extended="Neither Security Defaults nor Conditional Access MFA policy detected.",
@@ -88,7 +88,7 @@ def evaluate_cis_5_1_2(clients: AzureClientCache, config: EvalConfig) -> list[di
 def evaluate_cis_5_1_3(clients: AzureClientCache, config: EvalConfig) -> list[dict]:
     return [make_manual_result(
         cis_id="5.1.3", check_id="azure_cis_5_1_3",
-        title="Ensure 'Allow users to remember MFA on devices they trust' is disabled",
+        title="Ensure that 'Allow users to remember multifactor authentication on devices they trust' is disabled",
         service="identity", severity="high",
         subscription_id=config.subscription_id,
         reason="Per-user MFA service settings are only accessible via the legacy MFA portal, not Graph API.",
@@ -128,14 +128,14 @@ def evaluate_cis_5_2_1(c, cfg):
     locs = c.graph_get("/identity/conditionalAccess/namedLocations", beta=True)
     if not locs:
         return [make_result(cis_id="5.2.1", check_id="azure_cis_5_2_1",
-            title="Ensure trusted locations are defined", service="identity",
+            title="Ensure that 'trusted locations' are defined", service="identity",
             severity="medium", status="FAIL", resource_id="tenant",
             status_extended="No named locations found or could not query.",
             remediation="Define trusted IP-based named locations in Entra ID > Security > Conditional Access > Named locations.",
             compliance_frameworks=FW)]
     trusted = [l for l in locs.get("value", []) if l.get("isTrusted")]
     return [make_result(cis_id="5.2.1", check_id="azure_cis_5_2_1",
-        title="Ensure trusted locations are defined", service="identity",
+        title="Ensure that 'trusted locations' are defined", service="identity",
         severity="medium", status="PASS" if trusted else "FAIL",
         resource_id="tenant",
         status_extended=f"Named locations: {len(locs.get('value', []))}, trusted: {len(trusted)}",
@@ -221,13 +221,13 @@ def evaluate_cis_5_3_2(c, cfg):
     data = c.graph_get("/users?$filter=userType eq 'Guest'&$count=true&$top=1",)
     if not data:
         return [make_manual_result(cis_id="5.3.2", check_id="azure_cis_5_3_2",
-            title="Ensure guest users are reviewed regularly",
+            title="Ensure that guest users are reviewed on a regular basis",
             service="identity", severity="medium", subscription_id=cfg.subscription_id,
             reason="Could not query guest users via Graph API.")]
     guests = data.get("value", [])
     count = data.get("@odata.count", len(guests))
     return [make_result(cis_id="5.3.2", check_id="azure_cis_5_3_2",
-        title="Ensure guest users are reviewed regularly",
+        title="Ensure that guest users are reviewed on a regular basis",
         service="identity", severity="medium",
         status="PASS" if count == 0 else "MANUAL",
         resource_id="tenant",
@@ -243,7 +243,7 @@ def evaluate_cis_5_3_3(c, cfg):
             scope="/", filter="atScope()"))
         ua_admins = [ra for ra in ras if "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9" in str(ra.role_definition_id)]
         return [make_result(cis_id="5.3.3", check_id="azure_cis_5_3_3",
-            title="Ensure User Access Administrator role usage is restricted",
+            title="Ensure that use of the 'User Access Administrator' role is restricted",
             service="identity", severity="critical",
             status="PASS" if not ua_admins else "FAIL",
             resource_id=cfg.subscription_id,
@@ -252,7 +252,7 @@ def evaluate_cis_5_3_3(c, cfg):
             compliance_frameworks=FW)]
     except Exception:
         return [make_result(cis_id="5.3.3", check_id="azure_cis_5_3_3",
-            title="Ensure User Access Administrator role usage is restricted",
+            title="Ensure that use of the 'User Access Administrator' role is restricted",
             service="identity", severity="critical", status="PASS",
             resource_id=cfg.subscription_id,
             status_extended="No elevated access detected (could not query root scope — likely no elevation).",
@@ -261,21 +261,21 @@ def evaluate_cis_5_3_3(c, cfg):
 
 def evaluate_cis_5_3_4(c, cfg):
     return [make_manual_result(cis_id="5.3.4", check_id="azure_cis_5_3_4",
-        title="Ensure all privileged role assignments are periodically reviewed",
+        title="Ensure that all 'privileged' role assignments are periodically reviewed",
         service="identity", severity="medium", subscription_id=cfg.subscription_id,
         reason="Requires manual review of privileged role assignments for appropriateness.")]
 
 
 def evaluate_cis_5_3_5(c, cfg):
     return [make_manual_result(cis_id="5.3.5", check_id="azure_cis_5_3_5",
-        title="Ensure disabled accounts have no read/write/owner permissions",
+        title="Ensure disabled user accounts do not have read, write, or owner permissions",
         service="identity", severity="medium", subscription_id=cfg.subscription_id,
         reason="Requires cross-referencing disabled Entra ID accounts with Azure RBAC assignments.")]
 
 
 def evaluate_cis_5_3_6(c, cfg):
     return [make_manual_result(cis_id="5.3.6", check_id="azure_cis_5_3_6",
-        title="Ensure Tenant Creator role assignments are periodically reviewed",
+        title="Ensure 'Tenant Creator' role assignments are periodically reviewed",
         service="identity", severity="medium", subscription_id=cfg.subscription_id,
         reason="Requires reviewing Tenant Creator role assignments for appropriateness.")]
 
@@ -296,14 +296,14 @@ def evaluate_cis_5_4(c, cfg):
     data = c.graph_get("/policies/authorizationPolicy")
     if not data:
         return [make_result(cis_id="5.4", check_id="azure_cis_5_4",
-            title="Ensure non-admin users cannot create tenants",
+            title="Ensure that 'Restrict non-admin users from creating tenants' is set to 'Yes'",
             service="identity", severity="medium", status="ERROR",
             resource_id="tenant", status_extended="Could not query authorization policy.",
             compliance_frameworks=FW)]
     perms = data.get("defaultUserRolePermissions", {})
     restricted = perms.get("allowedToCreateTenants") is False
     return [make_result(cis_id="5.4", check_id="azure_cis_5_4",
-        title="Ensure non-admin users cannot create tenants",
+        title="Ensure that 'Restrict non-admin users from creating tenants' is set to 'Yes'",
         service="identity", severity="medium",
         status="PASS" if restricted else "FAIL",
         resource_id="tenant",
@@ -335,43 +335,43 @@ def _graph_auth_policy_check(c, cfg, cis_id, check_id, title, severity, field_pa
 
 def evaluate_cis_5_5(c, cfg):
     return [make_manual_result(cis_id="5.5", check_id="azure_cis_5_5",
-        title="Ensure SSPR requires 2 authentication methods",
+        title="Ensure that 'Number of methods required to reset' is set to '2'",
         service="identity", severity="medium", subscription_id=cfg.subscription_id,
         reason="SSPR settings accessible only via Azure Portal (Entra ID > Users > Password reset > Authentication methods).")]
 
 def evaluate_cis_5_6(c, cfg):
     return [make_manual_result(cis_id="5.6", check_id="azure_cis_5_6",
-        title="Ensure account lockout threshold ≤ 10",
+        title="Ensure that account 'Lockout threshold' is less than or equal to '10'",
         service="identity", severity="medium", subscription_id=cfg.subscription_id,
         reason="Lockout settings accessible via Entra ID > Security > Authentication methods > Password protection.")]
 
 def evaluate_cis_5_7(c, cfg):
     return [make_manual_result(cis_id="5.7", check_id="azure_cis_5_7",
-        title="Ensure account lockout duration ≥ 60 seconds",
+        title="Ensure that account 'Lockout duration in seconds' is greater than or equal to '60'",
         service="identity", severity="medium", subscription_id=cfg.subscription_id,
         reason="Lockout settings accessible via Entra ID > Security > Authentication methods > Password protection.")]
 
 def evaluate_cis_5_8(c, cfg):
     return [make_manual_result(cis_id="5.8", check_id="azure_cis_5_8",
-        title="Ensure custom banned password list is enforced",
+        title="Ensure that a 'Custom banned password list' is set to 'Enforce'",
         service="identity", severity="high", subscription_id=cfg.subscription_id,
         reason="Custom banned passwords accessible via Entra ID > Security > Authentication methods > Password protection.")]
 
 def evaluate_cis_5_9(c, cfg):
     return [make_manual_result(cis_id="5.9", check_id="azure_cis_5_9",
-        title="Ensure auth reconfirmation days is not 0",
+        title="Ensure that 'Number of days before users are asked to re-confirm their authentication information' is not set to '0'",
         service="identity", severity="medium", subscription_id=cfg.subscription_id,
         reason="SSPR registration settings accessible via Entra ID > Users > Password reset > Registration.")]
 
 def evaluate_cis_5_10(c, cfg):
     return [make_manual_result(cis_id="5.10", check_id="azure_cis_5_10",
-        title="Ensure 'Notify users on password resets' is set to Yes",
+        title="Ensure that 'Notify users on password resets?' is set to 'Yes'",
         service="identity", severity="medium", subscription_id=cfg.subscription_id,
         reason="Password reset notification settings accessible via Entra ID > Users > Password reset > Notifications.")]
 
 def evaluate_cis_5_11(c, cfg):
     return [make_manual_result(cis_id="5.11", check_id="azure_cis_5_11",
-        title="Ensure 'Notify all admins when other admins reset their password' is Yes",
+        title="Ensure that 'Notify all admins when other admins reset their password?' is set to 'Yes'",
         service="identity", severity="critical", subscription_id=cfg.subscription_id,
         reason="Password reset notification settings accessible via Entra ID > Users > Password reset > Notifications.")]
 
@@ -381,13 +381,13 @@ def evaluate_cis_5_12(c, cfg):
     data = c.graph_get("/policies/authorizationPolicy")
     if not data:
         return [make_result(cis_id="5.12", check_id="azure_cis_5_12",
-            title="Ensure user consent for applications is disabled", service="identity",
+            title="Ensure that 'User consent for applications' is set to 'Do not allow user consent'", service="identity",
             severity="medium", status="ERROR", resource_id="tenant",
             status_extended="Could not query.", compliance_frameworks=FW)]
     policies = data.get("defaultUserRolePermissions", {}).get("permissionGrantPoliciesAssigned", [])
     disabled = len(policies) == 0
     return [make_result(cis_id="5.12", check_id="azure_cis_5_12",
-        title="Ensure user consent for applications is disabled",
+        title="Ensure that 'User consent for applications' is set to 'Do not allow user consent'",
         service="identity", severity="medium",
         status="PASS" if disabled else "FAIL",
         resource_id="tenant",
@@ -401,14 +401,14 @@ def evaluate_cis_5_13(c, cfg):
     data = c.graph_get("/policies/authorizationPolicy")
     if not data:
         return [make_manual_result(cis_id="5.13", check_id="azure_cis_5_13",
-            title="Ensure consent is restricted to verified publishers",
+            title="Ensure that 'User consent for applications' is set to 'Allow user consent for apps from verified publishers, for selected permissions'",
             service="identity", severity="medium", subscription_id=cfg.subscription_id,
             reason="Could not query authorization policy.")]
     policies = data.get("defaultUserRolePermissions", {}).get("permissionGrantPoliciesAssigned", [])
     ok = (len(policies) == 0 or
           "ManagePermissionGrantsForSelf.microsoft-user-default-low" in str(policies))
     return [make_result(cis_id="5.13", check_id="azure_cis_5_13",
-        title="Ensure consent is restricted to verified publishers",
+        title="Ensure that 'User consent for applications' is set to 'Allow user consent for apps from verified publishers, for selected permissions'",
         service="identity", severity="medium",
         status="PASS" if ok else "FAIL", resource_id="tenant",
         status_extended=f"Consent policies: {policies}",
@@ -421,12 +421,12 @@ def evaluate_cis_5_14(c, cfg):
     data = c.graph_get("/policies/authorizationPolicy")
     if not data:
         return [make_result(cis_id="5.14", check_id="azure_cis_5_14",
-            title="Ensure users cannot register applications", service="identity",
+            title="Ensure that 'Users can register applications' is set to 'No'", service="identity",
             severity="medium", status="ERROR", resource_id="tenant",
             status_extended="Could not query.", compliance_frameworks=FW)]
     restricted = data.get("defaultUserRolePermissions", {}).get("allowedToCreateApps") is False
     return [make_result(cis_id="5.14", check_id="azure_cis_5_14",
-        title="Ensure users cannot register applications",
+        title="Ensure that 'Users can register applications' is set to 'No'",
         service="identity", severity="medium",
         status="PASS" if restricted else "FAIL", resource_id="tenant",
         status_extended=f"allowedToCreateApps = {data.get('defaultUserRolePermissions', {}).get('allowedToCreateApps')}",
@@ -439,13 +439,13 @@ def evaluate_cis_5_15(c, cfg):
     data = c.graph_get("/policies/authorizationPolicy")
     if not data:
         return [make_result(cis_id="5.15", check_id="azure_cis_5_15",
-            title="Ensure guest user access is restricted", service="identity",
+            title="Ensure that 'Guest users access restrictions' is set to 'Guest user access is restricted to properties and memberships of their own directory objects'", service="identity",
             severity="medium", status="ERROR", resource_id="tenant",
             status_extended="Could not query.", compliance_frameworks=FW)]
     gid = data.get("guestUserRoleId", "")
     most_restrictive = gid == "2af84b1e-32c8-42b7-82bc-daa82404023b"
     return [make_result(cis_id="5.15", check_id="azure_cis_5_15",
-        title="Ensure guest user access is restricted",
+        title="Ensure that 'Guest users access restrictions' is set to 'Guest user access is restricted to properties and memberships of their own directory objects'",
         service="identity", severity="medium",
         status="PASS" if most_restrictive else "FAIL", resource_id="tenant",
         status_extended=f"guestUserRoleId = {gid} ({'most restrictive' if most_restrictive else 'NOT most restrictive'})",
@@ -458,13 +458,13 @@ def evaluate_cis_5_16(c, cfg):
     data = c.graph_get("/policies/authorizationPolicy")
     if not data:
         return [make_result(cis_id="5.16", check_id="azure_cis_5_16",
-            title="Ensure guest invite is restricted", service="identity",
+            title="Ensure that 'Guest invite restrictions' is set to 'Only users assigned to specific admin roles [...]' or 'No one [..]'", service="identity",
             severity="medium", status="ERROR", resource_id="tenant",
             status_extended="Could not query.", compliance_frameworks=FW)]
     allow = data.get("allowInvitesFrom", "everyone")
     ok = allow in ("adminsAndGuestInviters", "none")
     return [make_result(cis_id="5.16", check_id="azure_cis_5_16",
-        title="Ensure guest invite is restricted to admins",
+        title="Ensure that 'Guest invite restrictions' is set to 'Only users assigned to specific admin roles [...]' or 'No one [..]'",
         service="identity", severity="medium",
         status="PASS" if ok else "FAIL", resource_id="tenant",
         status_extended=f"allowInvitesFrom = {allow}",
@@ -474,37 +474,37 @@ def evaluate_cis_5_16(c, cfg):
 
 def evaluate_cis_5_17(c, cfg):
     return [make_manual_result(cis_id="5.17", check_id="azure_cis_5_17",
-        title="Ensure 'Restrict access to Entra admin center' is Yes",
+        title="Ensure that 'Restrict access to Microsoft Entra admin center' is set to 'Yes'",
         service="identity", severity="medium", subscription_id=cfg.subscription_id,
         reason="This setting is only in the Entra portal (Users > User settings > Administration centre).")]
 
 def evaluate_cis_5_18(c, cfg):
     return [make_manual_result(cis_id="5.18", check_id="azure_cis_5_18",
-        title="Ensure 'Restrict user ability to access groups in My Groups' is Yes",
+        title="Ensure that 'Restrict user ability to access groups features in My Groups' is set to 'Yes'",
         service="identity", severity="medium", subscription_id=cfg.subscription_id,
         reason="Group self-service settings accessible via Entra ID > Groups > General.")]
 
 def evaluate_cis_5_19(c, cfg):
     return [make_manual_result(cis_id="5.19", check_id="azure_cis_5_19",
-        title="Ensure users cannot create security groups in Azure portals",
+        title="Ensure that 'Users can create security groups in Azure portals, API or PowerShell' is set to 'No'",
         service="identity", severity="high", subscription_id=cfg.subscription_id,
         reason="Security group creation settings accessible via Entra ID > Groups > General.")]
 
 def evaluate_cis_5_20(c, cfg):
     return [make_manual_result(cis_id="5.20", check_id="azure_cis_5_20",
-        title="Ensure 'Owners can manage group membership requests in My Groups' is No",
+        title="Ensure that 'Owners can manage group membership requests in My Groups' is set to 'No'",
         service="identity", severity="high", subscription_id=cfg.subscription_id,
         reason="Group self-service settings accessible via Entra ID > Groups > General.")]
 
 def evaluate_cis_5_21(c, cfg):
     return [make_manual_result(cis_id="5.21", check_id="azure_cis_5_21",
-        title="Ensure users cannot create M365 groups in Azure portals",
+        title="Ensure that 'Users can create Microsoft 365 groups in Azure portals, API or PowerShell' is set to 'No'",
         service="identity", severity="medium", subscription_id=cfg.subscription_id,
         reason="M365 group creation settings accessible via Entra ID > Groups > General.")]
 
 def evaluate_cis_5_22(c, cfg):
     return [make_manual_result(cis_id="5.22", check_id="azure_cis_5_22",
-        title="Ensure MFA required to register/join devices with Entra",
+        title="Ensure that 'Require Multifactor Authentication to register or join devices with Microsoft Entra' is set to 'Yes'",
         service="identity", severity="high", subscription_id=cfg.subscription_id,
         reason="Device registration settings accessible via Entra ID > Devices > Device Settings.")]
 
@@ -518,7 +518,7 @@ def evaluate_cis_5_23(c, cfg):
         bad = [r for r in roles if r.permissions and
                any("*" in (p.actions or []) for p in r.permissions)]
         return [make_result(cis_id="5.23", check_id="azure_cis_5_23",
-            title="Ensure no custom subscription administrator roles exist",
+            title="Ensure that no custom subscription administrator roles exist",
             service="identity", severity="critical",
             status="PASS" if not bad else "FAIL",
             resource_id=cfg.subscription_id,
@@ -527,7 +527,7 @@ def evaluate_cis_5_23(c, cfg):
             compliance_frameworks=FW)]
     except Exception as e:
         return [make_result(cis_id="5.23", check_id="azure_cis_5_23",
-            title="Ensure no custom subscription administrator roles exist",
+            title="Ensure that no custom subscription administrator roles exist",
             service="identity", severity="critical", status="ERROR",
             resource_id=cfg.subscription_id, status_extended=str(e),
             compliance_frameworks=FW)]
@@ -535,13 +535,13 @@ def evaluate_cis_5_23(c, cfg):
 
 def evaluate_cis_5_24(c, cfg):
     return [make_manual_result(cis_id="5.24", check_id="azure_cis_5_24",
-        title="Ensure custom role exists for administering resource locks",
+        title="Ensure that a custom role is assigned permissions for administering resource locks",
         service="identity", severity="medium", subscription_id=cfg.subscription_id,
         reason="Requires reviewing custom roles for Microsoft.Authorization/locks/* permission.")]
 
 def evaluate_cis_5_25(c, cfg):
     return [make_manual_result(cis_id="5.25", check_id="azure_cis_5_25",
-        title="Ensure subscription leaving/entering Entra tenant is set to 'Permit no one'",
+        title="Ensure that 'Subscription leaving Microsoft Entra tenant' and 'Subscription entering Microsoft Entra tenant' is set to 'Permit no one'",
         service="identity", severity="medium", subscription_id=cfg.subscription_id,
         reason="Subscription transfer policies are only in the Azure Portal > Subscriptions > Manage Policies.")]
 
@@ -551,14 +551,14 @@ def evaluate_cis_5_26(c, cfg):
     data = c.graph_get("/directoryRoles/roleTemplateId=62e90394-69f5-4237-9190-012177145e10/members")
     if not data:
         return [make_manual_result(cis_id="5.26", check_id="azure_cis_5_26",
-            title="Ensure fewer than 5 global administrators",
+            title="Ensure fewer than 5 users have global administrator assignment",
             service="identity", severity="critical", subscription_id=cfg.subscription_id,
             reason="Could not query Global Administrator role members.")]
     members = data.get("value", [])
     count = len(members)
     ok = 2 <= count <= 4
     return [make_result(cis_id="5.26", check_id="azure_cis_5_26",
-        title="Ensure fewer than 5 global administrators",
+        title="Ensure fewer than 5 users have global administrator assignment",
         service="identity", severity="critical",
         status="PASS" if ok else "FAIL", resource_id="tenant",
         status_extended=f"Global Administrators: {count} (recommended: 2–4)",

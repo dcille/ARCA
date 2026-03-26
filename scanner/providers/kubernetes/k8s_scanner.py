@@ -424,9 +424,9 @@ class K8sScanner:
                 check_id="k8s_no_pods_in_default",
                 check_title="No workload pods in default namespace",
                 service="namespaces", severity="medium",
-                status="PASS" if not non_system_pods else "FAIL",
+                status="N/A" if not non_system_pods else "FAIL",
                 resource_id="default",
-                status_extended=f"Default namespace has {len(non_system_pods)} non-system pod(s)",
+                status_extended=f"Default namespace has {len(non_system_pods)} non-system pod(s). Control not applicable." if not non_system_pods else f"Default namespace has {len(non_system_pods)} non-system pod(s)",
                 remediation="Move workloads out of the default namespace",
                 compliance_frameworks=COMPLIANCE,
             ).to_dict())

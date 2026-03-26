@@ -262,9 +262,31 @@ def safe_evaluate(
     service: str,
     severity: str,
 ) -> list[dict]:
-    """Run an evaluator with error handling — never let one check crash the scan."""
+    """Run an evaluator with error handling — never let one check crash the scan.
+
+    If the evaluator returns an empty list (no resources found to evaluate),
+    emit an N/A result — the control cannot be assessed without applicable resources.
+    """
     try:
-        return evaluator(clients, config)
+        results = evaluator(clients, config)
+        if not results:
+            # No resources found — mark as N/A (nothing to evaluate)
+            return [make_result(
+                cis_id=cis_id,
+                check_id=check_id,
+                title=title,
+                service=service,
+                severity=severity,
+                status="N/A",
+                resource_id=config.subscription_id,
+                resource_name="(no applicable resources)",
+                status_extended=(
+                    f"No applicable resources found for {cis_id} in subscription "
+                    f"{config.subscription_id}. Control not applicable."
+                ),
+                remediation="",
+            )]
+        return results
     except Exception as e:
         logger.warning("Evaluator %s failed: %s", cis_id, e)
         return [make_error_result(

@@ -146,9 +146,9 @@ def evaluate_cis_2_3(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="2.3", check_id="gcp_cis_2_3",
             title="Ensure Retention Policies on Log Buckets with Bucket Lock",
-            service="logging", severity="medium", status="PASS",
+            service="logging", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No log buckets found",
+            status_extended="No log buckets found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -228,9 +228,9 @@ def evaluate_cis_2_12(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="2.12", check_id="gcp_cis_2_12",
             title="Ensure That Cloud DNS Logging Is Enabled for All VPC Networks",
-            service="logging", severity="medium", status="PASS",
+            service="logging", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No DNS managed zones found",
+            status_extended="No DNS managed zones found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -307,9 +307,9 @@ def evaluate_cis_2_15(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="2.15", check_id="gcp_cis_2_15",
             title="Ensure Logging Is Enabled for HTTP(S) Load Balancer",
-            service="logging", severity="medium", status="PASS",
+            service="logging", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No backend services found",
+            status_extended="No backend services found. Control not applicable.",
             compliance_frameworks=FW)]
     return results
 
@@ -344,8 +344,8 @@ def evaluate_cis_2_16(c: GCPClientCache, cfg: EvalConfig) -> list[dict]:
     if not results:
         return [make_result(cis_id="2.16", check_id="gcp_cis_2_16",
             title="Ensure That VPC Flow Logs Is Enabled for Every Subnet",
-            service="logging", severity="medium", status="PASS",
+            service="logging", severity="medium", status="N/A",
             resource_id=cfg.project_id,
-            status_extended="No subnets found",
+            status_extended="No subnets found. Control not applicable.",
             compliance_frameworks=FW)]
     return results

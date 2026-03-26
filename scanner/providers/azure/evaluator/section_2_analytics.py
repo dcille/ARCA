@@ -38,7 +38,7 @@ def evaluate_cis_2_1_1(clients: AzureClientCache, config: EvalConfig) -> list[di
             custom_vnet = cvn is not None and cvn.value is not None if cvn else False
         results.append(make_result(
             cis_id="2.1.1", check_id="azure_cis_2_1_1",
-            title="Ensure Databricks is deployed in customer-managed VNet",
+            title="Ensure that Azure Databricks is deployed in a customer-managed virtual network (VNet)",
             service="analytics", severity="high",
             status="PASS" if custom_vnet else "FAIL",
             resource_id=ws.id, resource_name=ws.name, region=ws.location,
@@ -49,10 +49,10 @@ def evaluate_cis_2_1_1(clients: AzureClientCache, config: EvalConfig) -> list[di
     if not results:
         results.append(make_result(
             cis_id="2.1.1", check_id="azure_cis_2_1_1",
-            title="Ensure Databricks is deployed in customer-managed VNet",
-            service="analytics", severity="high", status="PASS",
+            title="Ensure that Azure Databricks is deployed in a customer-managed virtual network (VNet)",
+            service="analytics", severity="high", status="N/A",
             resource_id=config.subscription_id,
-            status_extended="No Databricks workspaces found.",
+            status_extended="No Databricks workspaces found. Control not applicable.",
             compliance_frameworks=FW,
         ))
     return results
@@ -82,7 +82,7 @@ def evaluate_cis_2_1_2(clients: AzureClientCache, config: EvalConfig) -> list[di
                     pass
         results.append(make_result(
             cis_id="2.1.2", check_id="azure_cis_2_1_2",
-            title="Ensure NSGs are configured for Databricks subnets",
+            title="Ensure that network security groups are configured for Databricks subnets",
             service="analytics", severity="high",
             status="PASS" if has_nsg else "FAIL",
             resource_id=ws.id, resource_name=ws.name, region=ws.location,
@@ -97,7 +97,7 @@ def evaluate_cis_2_1_2(clients: AzureClientCache, config: EvalConfig) -> list[di
 def evaluate_cis_2_1_3(clients: AzureClientCache, config: EvalConfig) -> list[dict]:
     return [make_manual_result(
         cis_id="2.1.3", check_id="azure_cis_2_1_3",
-        title="Ensure traffic is encrypted between cluster worker nodes",
+        title="Ensure that traffic is encrypted between cluster worker nodes",
         service="analytics", severity="high",
         subscription_id=config.subscription_id,
         reason="Requires verifying init scripts configure TLS 1.3 encryption between Spark workers. No API available.",
@@ -108,7 +108,7 @@ def evaluate_cis_2_1_3(clients: AzureClientCache, config: EvalConfig) -> list[di
 def evaluate_cis_2_1_4(clients: AzureClientCache, config: EvalConfig) -> list[dict]:
     return [make_manual_result(
         cis_id="2.1.4", check_id="azure_cis_2_1_4",
-        title="Ensure users/groups are synced from Entra ID to Databricks",
+        title="Ensure that users and groups are synced from Microsoft Entra ID to Azure Databricks",
         service="analytics", severity="medium",
         subscription_id=config.subscription_id,
         reason="Requires verifying SCIM provisioning configuration in Entra ID Enterprise Applications.",
@@ -119,7 +119,7 @@ def evaluate_cis_2_1_4(clients: AzureClientCache, config: EvalConfig) -> list[di
 def evaluate_cis_2_1_5(clients: AzureClientCache, config: EvalConfig) -> list[dict]:
     return [make_manual_result(
         cis_id="2.1.5", check_id="azure_cis_2_1_5",
-        title="Ensure Unity Catalog is configured for Azure Databricks",
+        title="Ensure that Unity Catalog is configured for Azure Databricks",
         service="analytics", severity="high",
         subscription_id=config.subscription_id,
         reason="Requires checking Databricks account console for metastore attachment. No Azure management API.",
@@ -130,7 +130,7 @@ def evaluate_cis_2_1_5(clients: AzureClientCache, config: EvalConfig) -> list[di
 def evaluate_cis_2_1_6(clients: AzureClientCache, config: EvalConfig) -> list[dict]:
     return [make_manual_result(
         cis_id="2.1.6", check_id="azure_cis_2_1_6",
-        title="Ensure PAT usage is restricted and expiry is enforced",
+        title="Ensure that usage is restricted and expiry is enforced for Databricks personal access tokens",
         service="analytics", severity="high",
         subscription_id=config.subscription_id,
         reason="Requires Databricks workspace admin console or Databricks CLI to verify PAT policies.",
@@ -146,7 +146,7 @@ def evaluate_cis_2_1_7(clients: AzureClientCache, config: EvalConfig) -> list[di
             has_diag = len(diag) > 0
             results.append(make_result(
                 cis_id="2.1.7", check_id="azure_cis_2_1_7",
-                title="Ensure diagnostic log delivery is configured for Databricks",
+                title="Ensure that diagnostic log delivery is configured for Azure Databricks",
                 service="analytics", severity="high",
                 status="PASS" if has_diag else "FAIL",
                 resource_id=ws.id, resource_name=ws.name, region=ws.location,
@@ -157,7 +157,7 @@ def evaluate_cis_2_1_7(clients: AzureClientCache, config: EvalConfig) -> list[di
         except Exception:
             results.append(make_result(
                 cis_id="2.1.7", check_id="azure_cis_2_1_7",
-                title="Ensure diagnostic log delivery is configured for Databricks",
+                title="Ensure that diagnostic log delivery is configured for Azure Databricks",
                 service="analytics", severity="high", status="ERROR",
                 resource_id=ws.id, resource_name=ws.name,
                 status_extended=f"Could not query diagnostic settings for {ws.name}",
@@ -174,7 +174,7 @@ def evaluate_cis_2_1_8(clients: AzureClientCache, config: EvalConfig) -> list[di
         cmk = enc and getattr(enc, "key_source", None) == "Microsoft.Keyvault" if enc else False
         results.append(make_result(
             cis_id="2.1.8", check_id="azure_cis_2_1_8",
-            title="Ensure critical data in Databricks is encrypted with CMK",
+            title="Ensure critical data in Azure Databricks is encrypted with customer-managed keys (CMK)",
             service="analytics", severity="high",
             status="PASS" if cmk else "MANUAL",
             resource_id=ws.id, resource_name=ws.name, region=ws.location,
@@ -196,7 +196,7 @@ def evaluate_cis_2_1_9(clients: AzureClientCache, config: EvalConfig) -> list[di
             no_public_ip = npip.value if npip and npip.value else False
         results.append(make_result(
             cis_id="2.1.9", check_id="azure_cis_2_1_9",
-            title="Ensure 'No Public IP' is enabled for Databricks",
+            title="Ensure 'No Public IP' is set to 'Enabled'",
             service="analytics", severity="medium",
             status="PASS" if no_public_ip else "FAIL",
             resource_id=ws.id, resource_name=ws.name, region=ws.location,
@@ -215,7 +215,7 @@ def evaluate_cis_2_1_10(clients: AzureClientCache, config: EvalConfig) -> list[d
         disabled = pna == "Disabled"
         results.append(make_result(
             cis_id="2.1.10", check_id="azure_cis_2_1_10",
-            title="Ensure public network access is disabled for Databricks",
+            title="Ensure 'Allow Public Network Access' is set to 'Disabled'",
             service="analytics", severity="high",
             status="PASS" if disabled else "FAIL",
             resource_id=ws.id, resource_name=ws.name, region=ws.location,
@@ -235,7 +235,7 @@ def evaluate_cis_2_1_11(clients: AzureClientCache, config: EvalConfig) -> list[d
                     if getattr(getattr(p, "private_link_service_connection_state", None), "status", "") == "Approved"]
         results.append(make_result(
             cis_id="2.1.11", check_id="azure_cis_2_1_11",
-            title="Ensure private endpoints are used for Databricks",
+            title="Ensure private endpoints are used to access Azure Databricks workspaces",
             service="analytics", severity="high",
             status="PASS" if approved else "FAIL",
             resource_id=ws.id, resource_name=ws.name, region=ws.location,
