@@ -85,6 +85,11 @@ class CustomControlCreate(BaseModel):
     tags: list[str] = []
     references: list[str] = []
 
+    # Executable evaluation fields
+    evaluation_script: Optional[str] = None
+    cli_command: Optional[str] = None
+    pass_condition: Optional[str] = "empty"
+
     @field_validator("severity")
     @classmethod
     def validate_severity(cls, v: str) -> str:
@@ -124,6 +129,11 @@ class CustomControlUpdate(BaseModel):
     scanner_check_ids: Optional[list[str]] = None
     tags: Optional[list[str]] = None
     references: Optional[list[str]] = None
+
+    # Executable evaluation fields
+    evaluation_script: Optional[str] = None
+    cli_command: Optional[str] = None
+    pass_condition: Optional[str] = None
 
     @field_validator("severity")
     @classmethod
@@ -173,6 +183,10 @@ class CustomControlResponse(BaseModel):
     scanner_check_ids: list[str] = []
     tags: list[str] = []
     references: list[str] = []
+    evaluation_script: Optional[str] = None
+    cli_command: Optional[str] = None
+    pass_condition: Optional[str] = None
+    evaluation_type: Optional[str] = None
     display_order: int = 0
     created_at: datetime
 

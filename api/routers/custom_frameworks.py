@@ -428,6 +428,9 @@ async def clone_framework(
             scanner_check_ids=ctrl.scanner_check_ids,
             tags=ctrl.tags,
             references=ctrl.references,
+            evaluation_script=ctrl.evaluation_script,
+            cli_command=ctrl.cli_command,
+            pass_condition=ctrl.pass_condition,
             display_order=ctrl.display_order,
         )
         db.add(new_ctrl)
@@ -526,11 +529,42 @@ async def create_custom_control(
             detail=f"check_id '{body.check_id}' already exists in the registry",
         )
 
-    # Determine assessment_type
-    assessment = determine_assessment_type(body.scanner_check_ids)
+    # Determine assessment_type: if eval fields present, it's automated
+    has_evaluation = bool(body.evaluation_script or body.cli_command)
+    if has_evaluation:
+        assessment = "automated"
+    else:
+        assessment = determine_assessment_type(body.scanner_check_ids)
+
+    # Validate evaluation script syntax
+    warnings = []
+    if body.evaluation_script:
+        try:
+            compile(body.evaluation_script, f"<control:{body.check_id}>", "exec")
+        except SyntaxError as e:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Python script has syntax error at line {e.lineno}: {e.msg}",
+            )
+
+    # Validate CLI command (basic safety checks)
+    if body.cli_command:
+        cmd = body.cli_command.strip()
+        if not cmd.startswith("az "):
+            raise HTTPException(
+                status_code=422,
+                detail="CLI command must start with 'az ' (Azure CLI).",
+            )
+        cmd_parts = cmd.split()
+        dangerous = {"delete", "remove", "purge", "update", "create", "set"}
+        if len(cmd_parts) > 2 and cmd_parts[2] in dangerous:
+            raise HTTPException(
+                status_code=422,
+                detail=f"CLI command contains destructive operation '{cmd_parts[2]}'. "
+                       "Only read operations (list, show, get) are allowed.",
+            )
 
     # Validate scanner_check_ids (warn but don't block)
-    warnings = []
     for sid in body.scanner_check_ids:
         if not registry.has_scanner_id(sid):
             warnings.append(f"scanner_check_id '{sid}' not found in registry")
@@ -555,6 +589,9 @@ async def create_custom_control(
         scanner_check_ids=_to_json(body.scanner_check_ids),
         tags=_to_json(body.tags),
         references=_to_json(body.references),
+        evaluation_script=body.evaluation_script,
+        cli_command=body.cli_command,
+        pass_condition=body.pass_condition,
         display_order=max_order,
     )
     db.add(ctrl)
@@ -621,6 +658,29 @@ async def update_custom_control(
         ctrl.tags = _to_json(body.tags)
     if body.references is not None:
         ctrl.references = _to_json(body.references)
+    if body.evaluation_script is not None:
+        # Validate syntax
+        try:
+            compile(body.evaluation_script, f"<control:{ctrl.check_id}>", "exec")
+        except SyntaxError as e:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Python script has syntax error at line {e.lineno}: {e.msg}",
+            )
+        ctrl.evaluation_script = body.evaluation_script
+    if body.cli_command is not None:
+        if body.cli_command and not body.cli_command.strip().startswith("az "):
+            raise HTTPException(status_code=422, detail="CLI command must start with 'az '.")
+        ctrl.cli_command = body.cli_command
+    if body.pass_condition is not None:
+        ctrl.pass_condition = body.pass_condition
+
+    # Re-evaluate assessment_type based on all evaluation fields
+    has_eval = bool(ctrl.evaluation_script or ctrl.cli_command)
+    if has_eval:
+        ctrl.assessment_type = "automated"
+    elif body.scanner_check_ids is not None:
+        ctrl.assessment_type = determine_assessment_type(body.scanner_check_ids)
 
     await db.commit()
     await db.refresh(ctrl)
@@ -657,6 +717,101 @@ async def delete_custom_control(
     await db.delete(ctrl)
     await db.commit()
     return {"detail": "Custom control deleted"}
+
+
+@router.post("/{fw_id}/controls/{ctrl_id}/test")
+async def test_custom_control(
+    fw_id: str,
+    ctrl_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Dry-run a custom control's evaluation logic.
+
+    Returns evaluation results without saving them as scan findings.
+    Requires the control to have evaluation_script or cli_command.
+    """
+    await _get_framework(fw_id, current_user.id, db)
+
+    result = await db.execute(
+        select(CustomControl)
+        .where(CustomControl.id == ctrl_id, CustomControl.framework_id == fw_id)
+    )
+    ctrl = result.scalars().first()
+    if not ctrl:
+        raise HTTPException(status_code=404, detail="Custom control not found")
+
+    eval_script = getattr(ctrl, "evaluation_script", None)
+    cli_cmd = getattr(ctrl, "cli_command", None)
+
+    if not eval_script and not cli_cmd:
+        raise HTTPException(
+            status_code=400,
+            detail="This control has no evaluation logic (no evaluation_script or cli_command).",
+        )
+
+    # We need credentials for the test — get the user's Azure provider
+    from api.models.provider import Provider
+    from api.services.auth_service import decrypt_credentials
+
+    provider_result = await db.execute(
+        select(Provider).where(
+            Provider.user_id == current_user.id,
+            Provider.provider_type == "azure",
+        ).limit(1)
+    )
+    provider = provider_result.scalars().first()
+    if not provider:
+        raise HTTPException(
+            status_code=400,
+            detail="No Azure provider configured. Add an Azure provider to test controls.",
+        )
+
+    credentials = decrypt_credentials(provider.credentials_encrypted)
+
+    # Build the custom control and execute
+    from scanner.providers.azure.custom_control_executor import CustomControl as ExecControl, CustomControlExecutor
+
+    try:
+        from azure.identity import ClientSecretCredential
+        credential = ClientSecretCredential(
+            tenant_id=credentials.get("tenant_id"),
+            client_id=credentials.get("client_id"),
+            client_secret=credentials.get("client_secret"),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create Azure credential: {e}")
+
+    exec_control = ExecControl(
+        control_id=ctrl.check_id,
+        title=ctrl.title,
+        description=ctrl.description or "",
+        severity=ctrl.severity,
+        service=ctrl.service,
+        framework_id=fw_id,
+        remediation=ctrl.remediation or "",
+        evaluation_script=eval_script,
+        cli_command=cli_cmd,
+        pass_condition=getattr(ctrl, "pass_condition", "empty") or "empty",
+    )
+
+    executor = CustomControlExecutor(
+        credential=credential,
+        subscription_id=credentials.get("subscription_id", ""),
+        tenant_id=credentials.get("tenant_id", ""),
+    )
+
+    results = executor.execute(exec_control)
+
+    return {
+        "control_id": ctrl.check_id,
+        "evaluation_type": "python_script" if eval_script else "cli_command",
+        "results": results,
+        "total": len(results),
+        "passed": sum(1 for r in results if r.get("status") == "PASS"),
+        "failed": sum(1 for r in results if r.get("status") == "FAIL"),
+        "errors": sum(1 for r in results if r.get("status") == "ERROR"),
+    }
 
 
 # ---------------------------------------------------------------
@@ -725,6 +880,10 @@ async def import_excel_confirm(
 
         assessment = determine_assessment_type(ctrl_data.scanner_check_ids)
 
+        has_eval = bool(getattr(ctrl_data, "evaluation_script", None) or getattr(ctrl_data, "cli_command", None))
+        if has_eval:
+            assessment = "automated"
+
         ctrl = CustomControl(
             id=str(uuid.uuid4()),
             framework_id=fw.id,
@@ -743,6 +902,9 @@ async def import_excel_confirm(
             scanner_check_ids=_to_json(ctrl_data.scanner_check_ids),
             tags=_to_json(ctrl_data.tags),
             references=_to_json(ctrl_data.references),
+            evaluation_script=getattr(ctrl_data, "evaluation_script", None),
+            cli_command=getattr(ctrl_data, "cli_command", None),
+            pass_condition=getattr(ctrl_data, "pass_condition", None),
             display_order=max_order,
         )
         db.add(ctrl)

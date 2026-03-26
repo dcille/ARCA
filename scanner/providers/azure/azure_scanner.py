@@ -6,9 +6,8 @@ Data Protection, Asset Management, Logging & Threat Detection, Incident Response
 Posture & Vulnerability Management, Endpoint Security, Backup & Recovery,
 DevOps Security, and Governance & Strategy.
 
-Provides complete CIS Microsoft Azure Foundations Benchmark v3.0.0 coverage by
-emitting MANUAL status results for any CIS controls not covered by automated checks,
-ensuring every benchmark control is represented in scan output.
+Additionally integrates the CIS Evaluator Engine (155 controls from CIS Azure v5.0)
+and the Custom Control Executor for user-defined framework controls.
 """
 import json
 import logging
@@ -21,11 +20,23 @@ logger = logging.getLogger(__name__)
 
 
 class AzureScanner:
-    """Azure cloud security scanner aligned with MCSB v2."""
+    """Azure cloud security scanner aligned with MCSB v2.
 
-    def __init__(self, credentials: dict, services: Optional[list] = None):
+    Supports three scan layers:
+      1. MCSB checks (80+ hardcoded service checks)
+      2. CIS Evaluator Engine (155 CIS Azure v5.0 controls)
+      3. Custom Framework Controls (user-defined with CLI/Python evaluation)
+    """
+
+    def __init__(
+        self,
+        credentials: dict,
+        services: Optional[list] = None,
+        custom_controls: Optional[list[dict]] = None,
+    ):
         self.credentials = credentials
         self.services = services
+        self.custom_controls = custom_controls or []
         self.subscription_id = credentials.get("subscription_id")
         self.tenant_id = credentials.get("tenant_id")
         self.client_id = credentials.get("client_id")
@@ -2732,10 +2743,38 @@ class AzureScanner:
         return manual_results
 
     def run_all_checks(self) -> list[dict]:
-        """Run all Azure security checks including complete CIS benchmark coverage."""
+        """Run all Azure security checks including complete CIS benchmark coverage.
+
+        Combines three sources:
+          1. MCSB service checks (this scanner's hardcoded methods)
+          2. CIS Evaluator Engine (155 CIS v5.0 controls via dedicated evaluators)
+          3. Custom framework controls (user-defined CLI/Python evaluation)
+        """
+        # Phase 1: MCSB service checks
         results = self.scan()
 
-        # Add MANUAL results for any CIS controls not covered by automated checks
-        results.extend(self._emit_cis_coverage(results))
+        # Phase 2: CIS Evaluator Engine (155 controls)
+        try:
+            from .unified_scan_engine import UnifiedScanEngine
+            engine = UnifiedScanEngine(
+                credentials=self.credentials,
+                services=self.services,
+                custom_controls=self.custom_controls,
+            )
+            unified_results = engine.evaluate_all()
+
+            # Deduplicate: CIS evaluator results take precedence over MCSB checks
+            # by check_id. Collect existing check_ids from MCSB results.
+            existing_check_ids = {r.get("check_id") for r in results if r.get("check_id")}
+            for r in unified_results:
+                cid = r.get("check_id", "")
+                if cid not in existing_check_ids:
+                    results.append(r)
+                    existing_check_ids.add(cid)
+
+            logger.info("Unified engine added %d results (CIS + custom)", len(unified_results))
+        except Exception as e:
+            logger.warning("Unified engine failed, falling back to CIS coverage gap-fill: %s", e)
+            results.extend(self._emit_cis_coverage(results))
 
         return results

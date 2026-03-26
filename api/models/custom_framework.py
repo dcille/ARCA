@@ -62,6 +62,11 @@ class CustomControl(Base):
     remediation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     remediation_steps: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON
     scanner_check_ids: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON array
+
+    # Executable evaluation fields for automated custom controls
+    evaluation_script: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cli_command: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    pass_condition: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default="empty")
     tags: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON array
     references: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON array
     display_order: Mapped[int] = mapped_column(Integer, default=0)

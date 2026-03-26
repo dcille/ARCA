@@ -19,6 +19,63 @@ def get_sync_session() -> Session:
     return SessionLocal()
 
 
+def _load_custom_controls(session: Session, user_id: str, provider_type: str) -> list[dict]:
+    """Load custom controls with evaluation logic for the given provider from DB."""
+    from api.models.custom_framework import CustomFramework, CustomControl
+
+    try:
+        frameworks = (
+            session.query(CustomFramework)
+            .filter(CustomFramework.user_id == user_id, CustomFramework.is_active == True)
+            .all()
+        )
+
+        controls = []
+        for fw in frameworks:
+            # Check if this framework applies to the provider
+            providers_json = fw.providers
+            if providers_json:
+                import json as _json
+                try:
+                    fw_providers = _json.loads(providers_json)
+                except (ValueError, TypeError):
+                    fw_providers = []
+                if fw_providers and provider_type not in fw_providers:
+                    continue
+
+            fw_controls = (
+                session.query(CustomControl)
+                .filter(CustomControl.framework_id == fw.id)
+                .all()
+            )
+
+            for ctrl in fw_controls:
+                # Only include controls that have executable evaluation logic
+                eval_script = getattr(ctrl, "evaluation_script", None)
+                cli_cmd = getattr(ctrl, "cli_command", None)
+                if not eval_script and not cli_cmd:
+                    continue
+
+                controls.append({
+                    "control_id": ctrl.check_id,
+                    "title": ctrl.title,
+                    "description": ctrl.description or "",
+                    "severity": ctrl.severity,
+                    "service": ctrl.service,
+                    "framework_id": fw.id,
+                    "remediation": ctrl.remediation or "",
+                    "compliance_frameworks": [fw.name],
+                    "evaluation_script": eval_script,
+                    "cli_command": cli_cmd,
+                    "pass_condition": getattr(ctrl, "pass_condition", "empty") or "empty",
+                })
+
+        return controls
+    except Exception as e:
+        logger.warning("Failed to load custom controls: %s", e)
+        return []
+
+
 @celery_app.task(bind=True, name="api.tasks.scan_tasks.run_cloud_scan")
 def run_cloud_scan(self, scan_id: str, provider_id: str, services=None, regions=None):
     """Execute a cloud security scan."""
@@ -48,6 +105,10 @@ def run_cloud_scan(self, scan_id: str, provider_id: str, services=None, regions=
 
         credentials = decrypt_credentials(provider.credentials_encrypted)
 
+        # Load custom controls with evaluation logic for this provider type
+        custom_controls = _load_custom_controls(session, scan.user_id, provider.provider_type)
+        logger.info("Loaded %d custom controls for scan %s", len(custom_controls), scan_id)
+
         from scanner.providers.cloud_scanner import CloudScanner
         scanner = CloudScanner(
             provider_type=provider.provider_type,
@@ -55,6 +116,7 @@ def run_cloud_scan(self, scan_id: str, provider_id: str, services=None, regions=
             region=provider.region,
             services=services,
             regions=regions,
+            custom_controls=custom_controls,
         )
 
         results = scanner.run_checks()
