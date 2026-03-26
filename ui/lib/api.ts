@@ -624,6 +624,99 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/audit-log/stats', undefined, { params })
   }
 
+  // Custom Frameworks
+  async getCustomFrameworks() {
+    return this.request<any[]>('GET', '/api/v1/custom-frameworks')
+  }
+
+  async createCustomFramework(data: { name: string; description?: string; version?: string; providers: string[]; selected_check_ids?: string[] }) {
+    return this.request<any>('POST', '/api/v1/custom-frameworks', data)
+  }
+
+  async getCustomFramework(id: string) {
+    return this.request<any>('GET', `/api/v1/custom-frameworks/${id}`)
+  }
+
+  async updateCustomFramework(id: string, data: any) {
+    return this.request<any>('PUT', `/api/v1/custom-frameworks/${id}`, data)
+  }
+
+  async deleteCustomFramework(id: string) {
+    return this.request<void>('DELETE', `/api/v1/custom-frameworks/${id}`)
+  }
+
+  async cloneCustomFramework(id: string) {
+    return this.request<any>('POST', `/api/v1/custom-frameworks/${id}/clone`)
+  }
+
+  async getAvailableChecks(params?: Record<string, string>) {
+    return this.request<any>('GET', '/api/v1/custom-frameworks/available-checks', undefined, { params })
+  }
+
+  async getRegistryStats() {
+    return this.request<any>('GET', '/api/v1/custom-frameworks/registry-stats')
+  }
+
+  async addChecksToFramework(fwId: string, checkIds: string[]) {
+    return this.request<any>('POST', `/api/v1/custom-frameworks/${fwId}/checks`, { registry_check_ids: checkIds })
+  }
+
+  async removeCheckFromFramework(fwId: string, checkRecordId: string) {
+    return this.request<void>('DELETE', `/api/v1/custom-frameworks/${fwId}/checks/${checkRecordId}`)
+  }
+
+  async createCustomControl(fwId: string, data: any) {
+    return this.request<any>('POST', `/api/v1/custom-frameworks/${fwId}/controls`, data)
+  }
+
+  async updateCustomControl(fwId: string, ctrlId: string, data: any) {
+    return this.request<any>('PUT', `/api/v1/custom-frameworks/${fwId}/controls/${ctrlId}`, data)
+  }
+
+  async deleteCustomControl(fwId: string, ctrlId: string) {
+    return this.request<void>('DELETE', `/api/v1/custom-frameworks/${fwId}/controls/${ctrlId}`)
+  }
+
+  async downloadFrameworkTemplate(fwId: string) {
+    const url = new URL(`/api/v1/custom-frameworks/${fwId}/template.xlsx`, window.location.origin)
+    const token = this.getToken()
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    const response = await fetch(url.toString(), { headers })
+    if (!response.ok) throw new Error(`Template download failed: ${response.status}`)
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    a.download = 'custom_controls_template.xlsx'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(downloadUrl)
+  }
+
+  async importExcelPreview(fwId: string, file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const token = this.getToken()
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    const response = await fetch(`/api/v1/custom-frameworks/${fwId}/import-excel`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      throw new Error(error.detail || `Import failed: ${response.status}`)
+    }
+    return response.json()
+  }
+
+  async importExcelConfirm(fwId: string, controls: any[]) {
+    return this.request<any>('POST', `/api/v1/custom-frameworks/${fwId}/import-confirm`, { controls })
+  }
+
   // API Keys
   async getApiKeys() {
     return this.request<any[]>('GET', '/api/v1/auth/api-keys')

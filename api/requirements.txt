@@ -83,5 +83,8 @@ openstacksdk>=3.0.0,<4.0
 # PDF Generation
 fpdf2>=2.7.0,<3.0
 
+# Excel
+openpyxl>=3.1.0,<4.0
+
 # Utilities
 pyyaml>=6.0.1,<7.0

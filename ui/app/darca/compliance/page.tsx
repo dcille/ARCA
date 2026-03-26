@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react'
 import Header from '@/components/layout/Header'
 import { api } from '@/lib/api'
 import { formatPercent, getPassRateColor, getPassRateStroke } from '@/lib/utils'
-import { XMarkIcon, ChevronDownIcon, ChevronRightIcon, BookOpenIcon, FunnelIcon, CheckIcon, CloudIcon, ServerIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, ChevronDownIcon, ChevronRightIcon, BookOpenIcon, FunnelIcon, CheckIcon, CloudIcon, ServerIcon, PlusIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 const SEVERITY_COLORS: Record<string, string> = {
   critical: 'bg-red-100 text-red-800',
@@ -138,7 +140,15 @@ export default function CompliancePage() {
     }
   }
 
+  const complianceRouter = useRouter()
+
   const handleFrameworkClick = (frameworkId: string) => {
+    // Custom frameworks redirect to their own detail page
+    const fw = frameworks.find((f: any) => f.id === frameworkId)
+    if (fw?.type === 'custom') {
+      complianceRouter.push(`/darca/compliance/custom/${frameworkId}`)
+      return
+    }
     if (selectedFramework === frameworkId) {
       setSelectedFramework(null)
       setControlsData(null)
@@ -215,7 +225,14 @@ export default function CompliancePage() {
 
   return (
     <div>
-      <Header title="Compliance" subtitle="Compliance framework assessment results" breadcrumbs={[{ label: 'Posture', href: '/darca/overview' }, { label: 'Compliance' }]} />
+      <Header title="Compliance" subtitle="Compliance framework assessment results" breadcrumbs={[{ label: 'Posture', href: '/darca/overview' }, { label: 'Compliance' }]}
+        actions={
+          <Link href="/darca/compliance/custom" className="btn-outline px-4 py-2 text-sm inline-flex items-center gap-2">
+            <WrenchScrewdriverIcon className="w-4 h-4" />
+            Custom Frameworks
+          </Link>
+        }
+      />
 
       {/* Account / Provider Filter Bar */}
       {!loading && (
@@ -409,7 +426,12 @@ export default function CompliancePage() {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h3 className="font-semibold text-brand-navy text-sm">{fw.name}</h3>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="font-semibold text-brand-navy text-sm">{fw.name}</h3>
+                      {fw.type === 'custom' && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium">CUSTOM</span>
+                      )}
+                    </div>
                     <p className="text-xs text-brand-gray-400 mt-1">{fw.description}</p>
                     {fw.total_controls > 0 && (
                       <p className="text-[10px] text-brand-gray-400 mt-1">

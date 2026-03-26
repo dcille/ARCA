@@ -13,7 +13,7 @@ from api.routers import (
     auth, providers, scans, findings, compliance, saas, dashboard,
     attack_paths, reports, inventory, schedules, notifications, integrations,
     organizations, mitre, dspm, security_graph, ransomware_readiness,
-    audit_log,
+    audit_log, custom_frameworks,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,6 +33,18 @@ async def lifespan(app: FastAPI):
             )
     except (IntegrityError, OperationalError) as exc:
         logger.warning("Table creation race condition (safe to ignore): %s", exc)
+
+    # Sync custom controls from DB into the runtime registry
+    try:
+        from api.database import async_session
+        from api.services.custom_framework_service import sync_custom_controls_to_registry
+        async with async_session() as db:
+            n = await sync_custom_controls_to_registry(db)
+            if n > 0:
+                logger.info("Synced %d custom controls to registry", n)
+    except Exception as exc:
+        logger.warning("Could not sync custom controls to registry: %s", exc)
+
     yield
 
 
@@ -75,6 +87,7 @@ app.include_router(dspm.router, prefix="/api/v1/dspm", tags=["DSPM"])
 app.include_router(security_graph.router, prefix="/api/v1/security-graph", tags=["Security Graph"])
 app.include_router(ransomware_readiness.router, prefix="/api/v1/ransomware-readiness", tags=["Ransomware Readiness"])
 app.include_router(audit_log.router, prefix="/api/v1/audit-log", tags=["Audit Log"])
+app.include_router(custom_frameworks.router, prefix="/api/v1/custom-frameworks", tags=["Custom Frameworks"])
 
 
 @app.get("/api/v1/health")
