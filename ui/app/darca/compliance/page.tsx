@@ -19,12 +19,14 @@ const SEVERITY_COLORS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   PASS: 'bg-green-100 text-green-800',
   FAIL: 'bg-red-100 text-red-800',
+  MANUAL: 'bg-purple-100 text-purple-700',
   NOT_EVALUATED: 'bg-amber-100 text-amber-700',
 }
 
 const STATUS_DOT: Record<string, string> = {
   PASS: 'bg-green-500',
   FAIL: 'bg-red-500',
+  MANUAL: 'bg-purple-400',
   NOT_EVALUATED: 'bg-amber-400',
 }
 
@@ -513,6 +515,12 @@ export default function CompliancePage() {
                     <span className="text-status-fail">Failed</span>
                     <span className="font-medium text-status-fail">{summary.failed || 0}</span>
                   </div>
+                  {(summary.manual || 0) > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-purple-600">Manual</span>
+                      <span className="font-medium text-purple-600">{summary.manual}</span>
+                    </div>
+                  )}
                   {(summary.not_evaluated || 0) > 0 && (
                     <div className="flex justify-between text-xs">
                       <span className="text-amber-600">Not Evaluated</span>
@@ -549,7 +557,7 @@ export default function CompliancePage() {
 
           {/* Summary Stats Bar */}
           {controlsData?.summary && (
-            <div className="grid grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-6 gap-4 mb-6">
               <div className="bg-brand-gray-50 rounded-lg p-3 text-center">
                 <p className="text-2xl font-bold text-brand-navy">{controlsData.summary.total_checks}</p>
                 <p className="text-xs text-brand-gray-400">Total Checks</p>
@@ -566,6 +574,10 @@ export default function CompliancePage() {
                 <p className="text-2xl font-bold text-amber-600">{controlsData.summary.not_evaluated || 0}</p>
                 <p className="text-xs text-amber-600">Not Evaluated</p>
               </div>
+              <div className="bg-purple-50 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-purple-600">{controlsData.summary.manual || 0}</p>
+                <p className="text-xs text-purple-600">Manual</p>
+              </div>
               <div className="rounded-lg p-3 text-center" style={{ backgroundColor: `${getPassRateStroke(controlsData.summary.pass_rate)}10` }}>
                 <p className={`text-2xl font-bold ${getPassRateColor(controlsData.summary.pass_rate)}`}>{controlsData.summary.pass_rate}%</p>
                 <p className="text-xs text-brand-gray-500">Pass Rate</p>
@@ -577,7 +589,7 @@ export default function CompliancePage() {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-brand-gray-700">Filter:</label>
-              {['all', 'PASS', 'FAIL', 'NOT_EVALUATED'].map((s) => (
+              {['all', 'PASS', 'FAIL', 'MANUAL', 'NOT_EVALUATED'].map((s) => (
                 <button
                   key={s}
                   onClick={() => setControlStatusFilter(s)}
@@ -585,12 +597,13 @@ export default function CompliancePage() {
                     controlStatusFilter === s
                       ? s === 'PASS' ? 'bg-green-100 text-green-800'
                       : s === 'FAIL' ? 'bg-red-100 text-red-800'
+                      : s === 'MANUAL' ? 'bg-purple-100 text-purple-700'
                       : s === 'NOT_EVALUATED' ? 'bg-amber-100 text-amber-700'
                       : 'bg-brand-green text-white'
                       : 'border border-brand-gray-300 text-brand-gray-500 hover:bg-brand-gray-50'
                   }`}
                 >
-                  {s === 'all' ? 'All' : s === 'NOT_EVALUATED' ? 'Not Evaluated' : s === 'PASS' ? 'Passed' : 'Failed'}
+                  {s === 'all' ? 'All' : s === 'NOT_EVALUATED' ? 'Not Evaluated' : s === 'MANUAL' ? 'Manual' : s === 'PASS' ? 'Passed' : 'Failed'}
                   {controlsData?.controls && (
                     <span className="ml-1.5 opacity-70">
                       ({s === 'all'
@@ -791,10 +804,34 @@ export default function CompliancePage() {
                               <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_COLORS[ctrl.status] || 'bg-gray-100 text-gray-500'}`}>
                                 {ctrl.status === 'NOT_EVALUATED' ? 'NOT EVALUATED' : ctrl.status}
                               </span>
-                              {ctrl.status !== 'NOT_EVALUATED' && (
+                              {ctrl.assessment_type && (
+                                <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${
+                                  ctrl.assessment_type === 'automated' ? 'bg-blue-50 text-blue-600' :
+                                  ctrl.assessment_type === 'manual' ? 'bg-purple-50 text-purple-600' :
+                                  'bg-gray-50 text-gray-500'
+                                }`}>
+                                  {ctrl.assessment_type}
+                                </span>
+                              )}
+                              {ctrl.cis_level && (
+                                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                                  {ctrl.cis_level}
+                                </span>
+                              )}
+                              {ctrl.severity && (
+                                <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${SEVERITY_COLORS[ctrl.severity] || 'bg-gray-100 text-gray-500'}`}>
+                                  {ctrl.severity}
+                                </span>
+                              )}
+                              {(ctrl.status === 'PASS' || ctrl.status === 'FAIL') && (
                                 <span className="text-[10px] text-brand-gray-400">
                                   {ctrl.passed} passed, {ctrl.failed} failed
                                   {ctrl.not_evaluated > 0 && `, ${ctrl.not_evaluated} not evaluated`}
+                                </span>
+                              )}
+                              {ctrl.status === 'MANUAL' && (
+                                <span className="text-[10px] text-purple-500">
+                                  Manual verification required — this control cannot be fully automated
                                 </span>
                               )}
                               {ctrl.status === 'NOT_EVALUATED' && (
@@ -827,6 +864,52 @@ export default function CompliancePage() {
                               <p className="text-xs text-brand-gray-600">{ctrl.description}</p>
                             </div>
 
+                            {/* Rich metadata sections */}
+                            {ctrl.rationale && (
+                              <div className="mb-3">
+                                <h4 className="text-xs font-semibold text-brand-navy mb-1">Risk / Rationale</h4>
+                                <div className="bg-red-50/50 border border-red-100 rounded-lg p-3">
+                                  <p className="text-xs text-brand-gray-600 whitespace-pre-line">{ctrl.rationale}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {ctrl.remediation_guide && (
+                              <div className="mb-3">
+                                <h4 className="text-xs font-semibold text-brand-navy mb-1">Remediation Guide</h4>
+                                <div className="bg-green-50/50 border border-green-100 rounded-lg p-3">
+                                  <p className="text-xs text-brand-gray-600 whitespace-pre-line">{ctrl.remediation_guide}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {ctrl.audit && (
+                              <div className="mb-3">
+                                <h4 className="text-xs font-semibold text-brand-navy mb-1">Audit Procedure</h4>
+                                <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3">
+                                  <p className="text-xs text-brand-gray-600 whitespace-pre-line">{ctrl.audit}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {ctrl.impact && (
+                              <div className="mb-3">
+                                <h4 className="text-xs font-semibold text-brand-navy mb-1">Impact</h4>
+                                <div className="bg-amber-50/50 border border-amber-100 rounded-lg p-3">
+                                  <p className="text-xs text-brand-gray-600 whitespace-pre-line">{ctrl.impact}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {ctrl.default_value && (
+                              <div className="mb-3">
+                                <h4 className="text-xs font-semibold text-brand-navy mb-1">Default Value</h4>
+                                <div className="bg-brand-gray-50 rounded-lg p-3">
+                                  <p className="text-xs text-brand-gray-600">{ctrl.default_value}</p>
+                                </div>
+                              </div>
+                            )}
+
                             {/* Checks per provider with evaluation results */}
                             {providerKeys.map((provider: string) => (
                               <div key={provider} className="mb-3">
@@ -851,6 +934,8 @@ export default function CompliancePage() {
                                           ? 'border-green-200 bg-green-50/50'
                                           : check.status === 'FAIL'
                                           ? 'border-red-200 bg-red-50/50'
+                                          : check.status === 'MANUAL'
+                                          ? 'border-purple-200 bg-purple-50/30'
                                           : 'border-amber-200 bg-amber-50/30'
                                       }`}
                                     >
@@ -861,7 +946,7 @@ export default function CompliancePage() {
                                         </span>
                                         <div className="flex-1 min-w-0">
                                           <p className="text-xs text-brand-gray-700">{check.description}</p>
-                                          {check.status !== 'NOT_EVALUATED' && (
+                                          {(check.status === 'PASS' || check.status === 'FAIL') && (
                                             <p className="text-[10px] mt-1">
                                               <span className={check.status === 'PASS' ? 'text-green-600' : 'text-red-600'}>
                                                 {check.status}
@@ -870,6 +955,11 @@ export default function CompliancePage() {
                                                 {check.finding_count} finding{check.finding_count !== 1 ? 's' : ''}
                                                 {check.fail_count > 0 && ` (${check.fail_count} failed)`}
                                               </span>
+                                            </p>
+                                          )}
+                                          {check.status === 'MANUAL' && (
+                                            <p className="text-[10px] text-purple-600 mt-1 italic">
+                                              Manual verification required — this check requires manual audit procedures that cannot be fully automated. Refer to the audit procedure above.
                                             </p>
                                           )}
                                           {check.status === 'NOT_EVALUATED' && (

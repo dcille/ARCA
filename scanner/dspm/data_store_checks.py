@@ -300,20 +300,33 @@ PROVIDER_DATA_CHECK_MAPPING: dict[str, dict] = {
     "opensearch_logging": {"category": "logging", "data_store": "elasticsearch", "provider": "aws"},
 
     # ── Azure Data Checks ───────────────────────────────────────
-    # Storage
-    "azure_storage_encryption": {"category": "encryption", "data_store": "azure_blob", "provider": "azure"},
+    # Storage — actual scanner check_ids from azure_scanner.py
     "azure_storage_https_only": {"category": "encryption", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_tls_12": {"category": "encryption", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_no_public_access": {"category": "access", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_infrastructure_encryption": {"category": "encryption", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_cmk_encryption": {"category": "encryption", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_network_default_deny": {"category": "access", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_soft_delete_blobs": {"category": "backup", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_shared_key_disabled": {"category": "access", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_key_rotation": {"category": "encryption", "data_store": "azure_blob", "provider": "azure"},
+    "azure_storage_soft_delete_files": {"category": "backup", "data_store": "azure_blob", "provider": "azure"},
+    # Storage — registry check_ids from azure_checks.py (aliases for broader matching)
+    "azure_storage_encryption": {"category": "encryption", "data_store": "azure_blob", "provider": "azure"},
     "azure_storage_public_access": {"category": "access", "data_store": "azure_blob", "provider": "azure"},
     "azure_storage_blob_public_access": {"category": "access", "data_store": "azure_blob", "provider": "azure"},
-    "azure_storage_soft_delete": {"category": "backup", "data_store": "azure_blob", "provider": "azure"},
     "azure_storage_logging": {"category": "logging", "data_store": "azure_blob", "provider": "azure"},
-    "azure_storage_cmk": {"category": "encryption", "data_store": "azure_blob", "provider": "azure"},
-    "azure_storage_network_rules": {"category": "access", "data_store": "azure_blob", "provider": "azure"},
-    "azure_storage_min_tls": {"category": "encryption", "data_store": "azure_blob", "provider": "azure"},
     "azure_storage_private_endpoint": {"category": "access", "data_store": "azure_blob", "provider": "azure"},
     "azure_storage_immutable_blob": {"category": "retention", "data_store": "azure_blob", "provider": "azure"},
-    # SQL
+    # SQL — actual scanner check_ids from azure_scanner.py
+    "azure_sql_auditing_enabled": {"category": "logging", "data_store": "azure_sql", "provider": "azure"},
+    "azure_sql_tls_12": {"category": "encryption", "data_store": "azure_sql", "provider": "azure"},
+    "azure_sql_public_access_disabled": {"category": "access", "data_store": "azure_sql", "provider": "azure"},
+    "azure_sql_atp_enabled": {"category": "logging", "data_store": "azure_sql", "provider": "azure"},
+    "azure_sql_vulnerability_assessment": {"category": "logging", "data_store": "azure_sql", "provider": "azure"},
     "azure_sql_tde_enabled": {"category": "encryption", "data_store": "azure_sql", "provider": "azure"},
+    "azure_sql_ad_admin_configured": {"category": "access", "data_store": "azure_sql", "provider": "azure"},
+    # SQL — aliases for backward compatibility
     "azure_sql_auditing": {"category": "logging", "data_store": "azure_sql", "provider": "azure"},
     "azure_sql_threat_detection": {"category": "logging", "data_store": "azure_sql", "provider": "azure"},
     "azure_sql_public_access": {"category": "access", "data_store": "azure_sql", "provider": "azure"},
@@ -323,14 +336,22 @@ PROVIDER_DATA_CHECK_MAPPING: dict[str, dict] = {
     "azure_sql_cmk": {"category": "encryption", "data_store": "azure_sql", "provider": "azure"},
     "azure_sql_va_enabled": {"category": "logging", "data_store": "azure_sql", "provider": "azure"},
     "azure_sql_geo_backup": {"category": "backup", "data_store": "azure_sql", "provider": "azure"},
+    # PostgreSQL — actual scanner check_ids
+    "azure_postgresql_public_access": {"category": "access", "data_store": "azure_sql", "provider": "azure"},
     # Cosmos DB
     "azure_cosmosdb_encryption": {"category": "encryption", "data_store": "cosmosdb", "provider": "azure"},
     "azure_cosmosdb_firewall": {"category": "access", "data_store": "cosmosdb", "provider": "azure"},
     "azure_cosmosdb_private_endpoint": {"category": "access", "data_store": "cosmosdb", "provider": "azure"},
     "azure_cosmosdb_backup": {"category": "backup", "data_store": "cosmosdb", "provider": "azure"},
-    # Key Vault
+    # Key Vault — actual scanner check_ids from azure_scanner.py
     "azure_keyvault_soft_delete": {"category": "backup", "data_store": "keyvault", "provider": "azure"},
     "azure_keyvault_purge_protection": {"category": "backup", "data_store": "keyvault", "provider": "azure"},
+    "azure_keyvault_rbac_authorization": {"category": "access", "data_store": "keyvault", "provider": "azure"},
+    "azure_keyvault_network_acls": {"category": "access", "data_store": "keyvault", "provider": "azure"},
+    "azure_keyvault_key_expiration": {"category": "encryption", "data_store": "keyvault", "provider": "azure"},
+    "azure_keyvault_secret_expiration": {"category": "access", "data_store": "keyvault", "provider": "azure"},
+    "azure_keyvault_certificate_validity": {"category": "encryption", "data_store": "keyvault", "provider": "azure"},
+    # Key Vault — aliases for backward compatibility
     "azure_keyvault_private_endpoint": {"category": "access", "data_store": "keyvault", "provider": "azure"},
     "azure_keyvault_logging": {"category": "logging", "data_store": "keyvault", "provider": "azure"},
     "azure_keyvault_rbac": {"category": "access", "data_store": "keyvault", "provider": "azure"},

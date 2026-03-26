@@ -54,9 +54,10 @@ async def _per_check_summary(
     For each unique check_id in the framework:
     - If ANY finding with that check_id has status=FAIL → check is FAIL
     - If ALL findings with that check_id have status=PASS → check is PASS
+    - If findings exist but only MANUAL/ERROR → MANUAL
     - If no findings exist → NOT_EVALUATED
 
-    Pass rate = passed_checks / (passed_checks + failed_checks), excluding NOT_EVALUATED.
+    Pass rate = passed_checks / (passed_checks + failed_checks), excluding NOT_EVALUATED and MANUAL.
     Total checks = number of unique check_ids the framework defines.
     """
     # When filtering by provider_type, only use that provider's checks
@@ -65,13 +66,14 @@ async def _per_check_summary(
     else:
         all_check_ids = get_all_checks_for_framework(framework_id)
 
-    # Query: for each check_id, get fail_count
+    # Query: for each check_id, get fail_count, pass_count, manual_count
     fw_filter = _build_fw_filter(framework_id)
     query = (
         select(
             Finding.check_id,
             func.sum(case((Finding.status == "FAIL", 1), else_=0)).label("fail_count"),
             func.sum(case((Finding.status == "PASS", 1), else_=0)).label("pass_count"),
+            func.sum(case((Finding.status == "MANUAL", 1), else_=0)).label("manual_count"),
         )
         .join(Scan, Finding.scan_id == Scan.id)
         .where(Scan.user_id == user_id)
@@ -84,23 +86,26 @@ async def _per_check_summary(
     query = query.group_by(Finding.check_id)
 
     result = await db.execute(query)
-    rows = {row.check_id: (row.fail_count or 0, row.pass_count or 0) for row in result.all()}
+    rows = {row.check_id: (row.fail_count or 0, row.pass_count or 0, row.manual_count or 0) for row in result.all()}
 
     # Calculate per-check status
     total_defined = len(all_check_ids) if all_check_ids else len(rows)
     passed_checks = 0
     failed_checks = 0
+    manual_checks = 0
     not_evaluated = 0
 
     check_ids_to_evaluate = all_check_ids if all_check_ids else sorted(rows.keys())
 
     for cid in check_ids_to_evaluate:
         if cid in rows:
-            fail_count, pass_count = rows[cid]
+            fail_count, pass_count, manual_count = rows[cid]
             if fail_count > 0:
                 failed_checks += 1
             elif pass_count > 0:
                 passed_checks += 1
+            elif manual_count > 0:
+                manual_checks += 1
             else:
                 not_evaluated += 1
         else:
@@ -113,6 +118,7 @@ async def _per_check_summary(
         "total_checks": total_defined,
         "passed": passed_checks,
         "failed": failed_checks,
+        "manual": manual_checks,
         "not_evaluated": not_evaluated,
         "pass_rate": round(pass_rate, 1),
     }
@@ -446,6 +452,15 @@ async def framework_check_library(
             "title": ctrl.get("title", ""),
             "description": ctrl.get("description", ""),
             "checks": provider_checks,
+            "rationale": ctrl.get("rationale", ""),
+            "impact": ctrl.get("impact", ""),
+            "remediation_guide": ctrl.get("remediation_guide", ""),
+            "audit": ctrl.get("audit", ""),
+            "default_value": ctrl.get("default_value", ""),
+            "cis_level": ctrl.get("cis_level", ""),
+            "assessment_type": ctrl.get("assessment_type", ""),
+            "severity": ctrl.get("severity", ""),
+            "service": ctrl.get("service", ""),
         })
 
     return {
@@ -494,15 +509,18 @@ async def framework_controls_with_results(
     for f in all_findings:
         findings_by_check.setdefault(f.check_id, []).append(f)
 
-    # Build per-check status: PASS/FAIL/NOT_EVALUATED
+    # Build per-check status: PASS/FAIL/MANUAL/NOT_EVALUATED
     check_statuses: dict = {}
     for cid, findings_list in findings_by_check.items():
         has_fail = any(f.status == "FAIL" for f in findings_list)
         has_pass = any(f.status == "PASS" for f in findings_list)
+        has_manual = any(f.status == "MANUAL" for f in findings_list)
         if has_fail:
             check_statuses[cid] = "FAIL"
         elif has_pass:
             check_statuses[cid] = "PASS"
+        elif has_manual:
+            check_statuses[cid] = "MANUAL"
         else:
             check_statuses[cid] = "NOT_EVALUATED"
 
@@ -514,6 +532,7 @@ async def framework_controls_with_results(
         provider_checks = {}
         ctrl_passed = 0
         ctrl_failed = 0
+        ctrl_manual = 0
         ctrl_not_evaluated = 0
 
         if isinstance(checks_map, dict):
@@ -528,6 +547,8 @@ async def framework_controls_with_results(
                         ctrl_passed += 1
                     elif status == "FAIL":
                         ctrl_failed += 1
+                    elif status == "MANUAL":
+                        ctrl_manual += 1
                     else:
                         ctrl_not_evaluated += 1
 
@@ -548,6 +569,8 @@ async def framework_controls_with_results(
             ctrl_status = "FAIL"
         elif ctrl_passed > 0:
             ctrl_status = "PASS"
+        elif ctrl_manual > 0:
+            ctrl_status = "MANUAL"
         else:
             ctrl_status = "NOT_EVALUATED"
 
@@ -562,8 +585,19 @@ async def framework_controls_with_results(
             "status": ctrl_status,
             "passed": ctrl_passed,
             "failed": ctrl_failed,
+            "manual": ctrl_manual,
             "not_evaluated": ctrl_not_evaluated,
             "checks": provider_checks,
+            # Rich metadata from framework definition
+            "rationale": ctrl.get("rationale", ""),
+            "impact": ctrl.get("impact", ""),
+            "remediation_guide": ctrl.get("remediation_guide", ""),
+            "audit": ctrl.get("audit", ""),
+            "default_value": ctrl.get("default_value", ""),
+            "cis_level": ctrl.get("cis_level", ""),
+            "assessment_type": ctrl.get("assessment_type", ""),
+            "severity": ctrl.get("severity", ""),
+            "service": ctrl.get("service", ""),
         })
 
     return {
