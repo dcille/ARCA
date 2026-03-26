@@ -95,13 +95,17 @@ async def _gather_report_data(
     scans_q = select(func.count(Scan.id)).where(Scan.user_id == user.id)
     scans_count = (await db.execute(scans_q)).scalar() or 0
 
+    from api.models.saas_connection import SaaSConnection
+    saas_q = select(func.count(SaaSConnection.id)).where(SaaSConnection.user_id == user.id)
+    saas_count = (await db.execute(saas_q)).scalar() or 0
+
     overview = {
         "total_findings": total,
         "pass_rate": round((passed / total * 100) if total > 0 else 0, 1),
         "severity_breakdown": severity_breakdown,
         "total_scans": scans_count,
-        "total_cloud_providers": len([p for p in providers if True]),
-        "total_saas_connections": 0,
+        "total_cloud_providers": len(providers),
+        "total_saas_connections": saas_count,
     }
 
     # ── Attack paths ───────────────────────────────────────────────
