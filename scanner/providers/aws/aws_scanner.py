@@ -3,9 +3,8 @@
 Implements 80+ security checks across AWS services following CIS AWS Foundations
 Benchmark v3.0, NIST 800-53, SOC 2, and CSA CCM v4.1 frameworks.
 
-Provides complete CIS AWS Foundations Benchmark v3.0 coverage: automated checks
-emit PASS/FAIL results, while uncovered controls are emitted as MANUAL results
-requiring human review.
+Additionally integrates the CIS Evaluator Engine (62 controls from CIS AWS v6.0)
+and the Custom Control Executor for user-defined framework controls.
 """
 import json
 import logging
@@ -22,12 +21,25 @@ logger = logging.getLogger(__name__)
 
 
 class AWSScanner:
-    """AWS cloud security scanner with comprehensive service checks and complete CIS coverage."""
+    """AWS cloud security scanner with comprehensive service checks and complete CIS coverage.
 
-    def __init__(self, credentials: dict, regions: Optional[list] = None, services: Optional[list] = None):
+    Supports three scan layers:
+      1. Service checks (80+ hardcoded boto3 checks)
+      2. CIS Evaluator Engine (62 CIS AWS v6.0 controls)
+      3. Custom Framework Controls (user-defined with CLI/Python evaluation)
+    """
+
+    def __init__(
+        self,
+        credentials: dict,
+        regions: Optional[list] = None,
+        services: Optional[list] = None,
+        custom_controls: Optional[list[dict]] = None,
+    ):
         self.credentials = credentials
         self.regions = regions or ["us-east-1"]
         self.services = services
+        self.custom_controls = custom_controls or []
         self._session = None
 
     def _get_session(self) -> boto3.Session:
@@ -2130,10 +2142,73 @@ class AWSScanner:
         return manual_results
 
     def run_all_checks(self) -> list[dict]:
-        """Run all AWS security checks including complete CIS benchmark coverage."""
+        """Run all AWS security checks including complete CIS benchmark coverage.
+
+        Combines three sources:
+          1. Service checks (this scanner's hardcoded boto3 methods)
+          2. CIS Evaluator Engine (62 CIS v6.0 controls via dedicated evaluators)
+          3. Custom framework controls (user-defined CLI/Python evaluation)
+        """
+        # Phase 1: Service checks
         results = self.scan()
 
-        # Add MANUAL results for any CIS controls not covered by automated checks
-        results.extend(self._emit_cis_coverage(results))
+        # Phase 2: CIS Evaluator Engine (62 controls) + Custom controls
+        try:
+            from .aws_cis_evaluator_engine import AWSCISEvaluatorEngine
+            engine = AWSCISEvaluatorEngine(
+                credentials=self.credentials,
+                regions=self.regions,
+                services=self.services,
+            )
+            cis_results = engine.evaluate_all()
+
+            # Deduplicate: CIS evaluator results take precedence
+            existing_check_ids = {r.get("check_id") for r in results if r.get("check_id")}
+            for r in cis_results:
+                cid = r.get("check_id", "")
+                if cid not in existing_check_ids:
+                    results.append(r)
+                    existing_check_ids.add(cid)
+
+            logger.info("CIS engine added %d results", len(cis_results))
+        except Exception as e:
+            logger.warning("CIS engine failed, falling back to CIS coverage gap-fill: %s", e)
+            results.extend(self._emit_cis_coverage(results))
+
+        # Phase 3: Custom framework controls
+        if self.custom_controls:
+            try:
+                from scanner.providers.azure.custom_control_executor import (
+                    CustomControl, CustomControlExecutor,
+                )
+                # Build executor — for AWS custom controls using CLI commands (aws cli)
+                # Python scripts get credential/subscription_id context
+                executor = CustomControlExecutor(
+                    credential=None,  # Not used for CLI-based AWS controls
+                    subscription_id="",
+                    tenant_id="",
+                )
+                for raw in self.custom_controls:
+                    try:
+                        ctrl = CustomControl(
+                            control_id=raw.get("control_id", ""),
+                            title=raw.get("title", ""),
+                            description=raw.get("description", ""),
+                            severity=raw.get("severity", "medium"),
+                            service=raw.get("service", "general"),
+                            framework_id=raw.get("framework_id", ""),
+                            remediation=raw.get("remediation", ""),
+                            compliance_frameworks=raw.get("compliance_frameworks", []),
+                            cli_command=raw.get("cli_command"),
+                            pass_condition=raw.get("pass_condition", "empty"),
+                            evaluation_script=raw.get("evaluation_script"),
+                        )
+                        custom_results = executor.execute(ctrl)
+                        results.extend(custom_results)
+                    except Exception as ce:
+                        logger.warning("Custom control %s failed: %s", raw.get("control_id"), ce)
+                logger.info("Custom controls: %d controls executed", len(self.custom_controls))
+            except Exception as e:
+                logger.warning("Custom control executor failed: %s", e)
 
         return results
