@@ -14,9 +14,10 @@ import {
   TrashIcon,
   PlusIcon,
   ClipboardDocumentIcon,
+  AdjustmentsHorizontalIcon,
 } from '@heroicons/react/24/outline'
 
-type Tab = 'profile' | 'organization' | 'api-keys'
+type Tab = 'profile' | 'organization' | 'api-keys' | 'frameworks'
 
 export default function SettingsPage() {
   const { user } = useAuthStore()
@@ -35,6 +36,12 @@ export default function SettingsPage() {
   const [showCreateKey, setShowCreateKey] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
   const [createdKey, setCreatedKey] = useState<string | null>(null)
+
+  // Frameworks state
+  const [frameworksList, setFrameworksList] = useState<any[]>([])
+  const [frameworkPrefs, setFrameworkPrefs] = useState<Record<string, boolean>>({})
+  const [frameworksLoading, setFrameworksLoading] = useState(false)
+  const [savingPrefs, setSavingPrefs] = useState(false)
 
   // Organization state
   const [org, setOrg] = useState<any>(null)
@@ -86,6 +93,22 @@ export default function SettingsPage() {
     }
   }
 
+  const loadFrameworks = async () => {
+    setFrameworksLoading(true)
+    try {
+      const [frameworks, prefs] = await Promise.all([
+        api.getComplianceFrameworks(),
+        api.getFrameworkPreferences(),
+      ])
+      setFrameworksList(frameworks)
+      setFrameworkPrefs(prefs)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setFrameworksLoading(false)
+    }
+  }
+
   const loadApiKeys = async () => {
     setApiKeysLoading(true)
     try {
@@ -128,6 +151,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (tab === 'organization') loadOrg()
     if (tab === 'api-keys') loadApiKeys()
+    if (tab === 'frameworks') loadFrameworks()
   }, [tab])
 
   const handleCreateOrg = async () => {
@@ -165,6 +189,18 @@ export default function SettingsPage() {
     }
   }
 
+  const handleSavePrefs = async () => {
+    setSavingPrefs(true)
+    try {
+      await api.updateFrameworkPreferences(frameworkPrefs)
+      toast.success('Framework preferences saved')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save preferences')
+    } finally {
+      setSavingPrefs(false)
+    }
+  }
+
   const handleChangeRole = async (userId: string, role: string) => {
     try {
       await api.updateMemberRole(userId, role)
@@ -196,6 +232,7 @@ export default function SettingsPage() {
           { id: 'profile' as Tab, label: 'Profile' },
           { id: 'organization' as Tab, label: 'Organization' },
           { id: 'api-keys' as Tab, label: 'API Keys' },
+          { id: 'frameworks' as Tab, label: 'Frameworks' },
         ]).map((t) => (
           <button
             key={t.id}
@@ -589,6 +626,70 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Frameworks Tab */}
+      {tab === 'frameworks' && (
+        <div className="space-y-6">
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h4 className="text-sm font-semibold text-brand-navy">Compliance Frameworks</h4>
+                <p className="text-xs text-brand-gray-400 mt-1">
+                  Enable or disable frameworks. Disabled frameworks will not appear in the Compliance view.
+                </p>
+              </div>
+              <button
+                onClick={handleSavePrefs}
+                disabled={savingPrefs}
+                className="btn-primary text-sm px-4 py-2"
+              >
+                {savingPrefs ? 'Saving...' : 'Save Preferences'}
+              </button>
+            </div>
+
+            {frameworksLoading ? (
+              <div className="animate-pulse"><div className="h-48 bg-brand-gray-100 rounded" /></div>
+            ) : (
+              <div className="space-y-2">
+                {frameworksList.map((fw) => {
+                  const isEnabled = frameworkPrefs[fw.id] !== false
+                  return (
+                    <div key={fw.id} className={`flex items-center justify-between py-3 px-4 rounded-lg border ${isEnabled ? 'border-brand-gray-200 bg-white' : 'border-brand-gray-100 bg-brand-gray-50 opacity-60'}`}>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setFrameworkPrefs(prev => ({ ...prev, [fw.id]: !isEnabled }))}
+                          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${isEnabled ? 'bg-brand-green' : 'bg-brand-gray-300'}`}
+                        >
+                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </button>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-brand-navy">{fw.name}</p>
+                            {fw.type === 'custom' && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium">CUSTOM</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-brand-gray-400 mt-0.5">{fw.description}</p>
+                          {fw.providers?.length > 0 && (
+                            <div className="flex gap-1 mt-1">
+                              {fw.providers.map((p: string) => (
+                                <span key={p} className="text-[8px] font-bold px-1 py-0.5 rounded bg-brand-gray-100 text-brand-gray-600">{p.toUpperCase()}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`text-xs font-medium ${isEnabled ? 'text-green-600' : 'text-brand-gray-400'}`}>
+                        {isEnabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

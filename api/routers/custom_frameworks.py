@@ -244,6 +244,98 @@ async def get_framework(
     return resp
 
 
+@router.get("/{fw_id}/evaluation")
+async def get_framework_evaluation(
+    fw_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get per-check evaluation status for a custom framework."""
+    from sqlalchemy import func, case
+    from api.models.finding import Finding
+    from api.models.scan import Scan
+
+    fw = await _get_framework(fw_id, current_user.id, db)
+    registry = get_default_registry()
+
+    # Collect all scanner_check_ids
+    all_scanner_ids: list[str] = []
+    check_scanner_map: dict[str, list[str]] = {}  # check_id -> [scanner_ids]
+
+    for sc in (fw.selected_checks or []):
+        check = registry.get_check(sc.registry_check_id)
+        if check:
+            sids = check.scanner_check_ids or [check.check_id]
+            check_scanner_map[check.check_id] = sids
+            all_scanner_ids.extend(sids)
+        else:
+            check_scanner_map[sc.registry_check_id] = [sc.registry_check_id]
+            all_scanner_ids.append(sc.registry_check_id)
+
+    for ctrl in (fw.custom_controls or []):
+        sids = _parse_json_list(ctrl.scanner_check_ids)
+        if sids:
+            check_scanner_map[ctrl.check_id] = sids
+            all_scanner_ids.extend(sids)
+        else:
+            check_scanner_map[ctrl.check_id] = [ctrl.check_id]
+            all_scanner_ids.append(ctrl.check_id)
+
+    if not all_scanner_ids:
+        return {"check_statuses": {}}
+
+    # Query findings grouped by check_id
+    query = (
+        select(
+            Finding.check_id,
+            func.sum(case((Finding.status == "FAIL", 1), else_=0)).label("fail_count"),
+            func.sum(case((Finding.status == "PASS", 1), else_=0)).label("pass_count"),
+            func.count(Finding.id).label("total"),
+        )
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id)
+        .where(Finding.check_id.in_(all_scanner_ids))
+        .group_by(Finding.check_id)
+    )
+    result = await db.execute(query)
+    findings_map = {
+        row.check_id: (row.fail_count or 0, row.pass_count or 0, row.total or 0)
+        for row in result.all()
+    }
+
+    # Build per-check status
+    check_statuses: dict[str, dict] = {}
+    for check_id, scanner_ids in check_scanner_map.items():
+        has_fail = False
+        has_pass = False
+        total_findings = 0
+        total_fails = 0
+        for sid in scanner_ids:
+            if sid in findings_map:
+                fc, pc, t = findings_map[sid]
+                if fc > 0:
+                    has_fail = True
+                    total_fails += fc
+                if pc > 0:
+                    has_pass = True
+                total_findings += t
+
+        if has_fail:
+            status = "FAIL"
+        elif has_pass:
+            status = "PASS"
+        else:
+            status = "NOT_EVALUATED"
+
+        check_statuses[check_id] = {
+            "status": status,
+            "findings": total_findings,
+            "fail_count": total_fails,
+        }
+
+    return {"check_statuses": check_statuses}
+
+
 @router.put("/{fw_id}")
 async def update_framework(
     fw_id: str,

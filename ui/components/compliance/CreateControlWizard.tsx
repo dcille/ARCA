@@ -38,11 +38,13 @@ export default function CreateControlWizard({ frameworkId, onClose, onCreated }:
     category: 'Compliance',
     risks: '',
     remediation: '',
+    audit_command: '',
+    audit_type: 'cli' as 'cli' | 'python',
     scanner_check_ids: '',
     tags: '',
   })
 
-  const assessmentType = form.scanner_check_ids.trim() ? 'automated' : 'manual'
+  const assessmentType = (form.audit_command.trim() || form.scanner_check_ids.trim()) ? 'automated' : 'manual'
 
   const update = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }))
 
@@ -72,6 +74,10 @@ export default function CreateControlWizard({ frameworkId, onClose, onCreated }:
         risks: form.risks.trim() || undefined,
         remediation: form.remediation.trim() || undefined,
         scanner_check_ids: scannerIds,
+        cli_commands: form.audit_command.trim() ? {
+          type: form.audit_type,
+          command: form.audit_command.trim(),
+        } : undefined,
         tags,
       })
 
@@ -183,8 +189,66 @@ export default function CreateControlWizard({ frameworkId, onClose, onCreated }:
 
           <div>
             <label className="block text-sm font-medium text-brand-gray-700 mb-1">
+              Audit Command
+              <span className="text-brand-gray-400 font-normal ml-1">(CLI or Python)</span>
+            </label>
+            <div className="flex gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => update('audit_type', 'cli')}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  form.audit_type === 'cli'
+                    ? 'bg-brand-green text-white'
+                    : 'border border-brand-gray-300 text-brand-gray-500 hover:bg-brand-gray-50'
+                }`}
+              >
+                CLI Command
+              </button>
+              <button
+                type="button"
+                onClick={() => update('audit_type', 'python')}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  form.audit_type === 'python'
+                    ? 'bg-brand-green text-white'
+                    : 'border border-brand-gray-300 text-brand-gray-500 hover:bg-brand-gray-50'
+                }`}
+              >
+                Python Script
+              </button>
+            </div>
+            <textarea
+              value={form.audit_command}
+              onChange={e => update('audit_command', e.target.value)}
+              rows={5}
+              placeholder={form.audit_type === 'cli'
+                ? 'e.g., az network vnet show --resource-group <resource-group> --name <vnet-name>\n\nFor multi-step audits:\naz databricks workspace list\naz databricks workspace show --resource-group <rg> --name <ws> --query privateEndpointConnections'
+                : 'import subprocess\nimport json\n\n# Example: Check private endpoints for Databricks\nresult = subprocess.run(["az", "databricks", "workspace", "list", "-o", "json"], capture_output=True, text=True)\nworkspaces = json.loads(result.stdout)\nfor ws in workspaces:\n    # Check each workspace...\n    pass'
+              }
+              className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-brand-green/40 focus:border-brand-green outline-none resize-none"
+            />
+            <div className="flex items-center gap-2 mt-1">
+              {form.audit_command.trim() ? (
+                <span className="flex items-center gap-1 text-xs text-green-600">
+                  <CogIcon className="w-3.5 h-3.5" /> Automated
+                  <span className="text-[11px] text-brand-gray-400 ml-1">
+                    This control will be evaluated by executing the {form.audit_type === 'cli' ? 'CLI command' : 'Python script'} against the cloud provider
+                  </span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-xs text-blue-600">
+                  <EyeIcon className="w-3.5 h-3.5" /> Manual Review
+                  <span className="text-[11px] text-brand-gray-400 ml-1">
+                    No audit command — this control requires manual assessment
+                  </span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-brand-gray-700 mb-1">
               Mapped Scanner Check IDs
-              <span className="text-brand-gray-400 font-normal ml-1">(comma-separated)</span>
+              <span className="text-brand-gray-400 font-normal ml-1">(optional, comma-separated — for linking to existing scanner results)</span>
             </label>
             <input
               value={form.scanner_check_ids}
@@ -192,22 +256,9 @@ export default function CreateControlWizard({ frameworkId, onClose, onCreated }:
               placeholder="e.g., aws_iam_mfa_enabled, azure_ad_mfa_status"
               className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green/40 focus:border-brand-green outline-none"
             />
-            <div className="flex items-center gap-2 mt-1">
-              {assessmentType === 'automated' ? (
-                <span className="flex items-center gap-1 text-xs text-green-600">
-                  <CogIcon className="w-3.5 h-3.5" /> Automated
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-xs text-blue-600">
-                  <EyeIcon className="w-3.5 h-3.5" /> Manual Review
-                </span>
-              )}
-              <span className="text-[11px] text-brand-gray-400">
-                {assessmentType === 'automated'
-                  ? 'This control will be evaluated automatically via scanner results'
-                  : 'No scanner mapping \u2014 this control requires manual assessment'}
-              </span>
-            </div>
+            <p className="text-[10px] text-brand-gray-400 mt-1">
+              Optional: map to existing scanner check IDs to also use scan results for evaluation
+            </p>
           </div>
 
           <div>

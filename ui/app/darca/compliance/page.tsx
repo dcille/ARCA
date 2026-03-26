@@ -104,12 +104,13 @@ export default function CompliancePage() {
       try {
         const providerType = selectedAccount?.provider_type || undefined
         const fws = await api.getComplianceFrameworks(providerType)
-        setFrameworks(fws)
-        setSelectedFrameworkIds(new Set(fws.map((fw: any) => fw.id)))
+        const activeFws = fws.filter((fw: any) => fw.is_enabled !== false)
+        setFrameworks(activeFws)
+        setSelectedFrameworkIds(new Set(activeFws.map((fw: any) => fw.id)))
 
         const providerId = selectedAccount?.id || undefined
         const sums: Record<string, any> = {}
-        for (const fw of fws) {
+        for (const fw of activeFws) {
           try {
             sums[fw.id] = await api.getComplianceSummary(fw.id, providerId, providerType)
           } catch {
@@ -796,6 +797,11 @@ export default function CompliancePage() {
                                   {ctrl.not_evaluated > 0 && `, ${ctrl.not_evaluated} not evaluated`}
                                 </span>
                               )}
+                              {ctrl.status === 'NOT_EVALUATED' && (
+                                <span className="text-[10px] text-amber-500">
+                                  No scan data — run a scan on the relevant cloud account to evaluate these checks
+                                </span>
+                              )}
                               <div className="flex gap-1 ml-auto">
                                 {providerKeys.map((p: string) => (
                                   <span
@@ -867,7 +873,9 @@ export default function CompliancePage() {
                                             </p>
                                           )}
                                           {check.status === 'NOT_EVALUATED' && (
-                                            <p className="text-[10px] text-amber-600 mt-1 italic">Not evaluated — no scan data</p>
+                                            <p className="text-[10px] text-amber-600 mt-1 italic">
+                                              Not evaluated — no scan has been executed for this provider yet, or the scanner does not cover this specific check. Run a scan on the corresponding cloud account to evaluate this control.
+                                            </p>
                                           )}
                                           {check.evidence_method && (
                                             <p className="text-[10px] text-brand-gray-400 mt-1">
