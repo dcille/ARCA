@@ -60,12 +60,22 @@ export default function CustomFrameworkDetailPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState('')
+  const [evaluationMap, setEvaluationMap] = useState<Record<string, { status: string; findings: number; fail_count: number }>>({})
 
   const fetchFramework = useCallback(async () => {
     try {
       const data = await api.getCustomFramework(fwId)
       setFramework(data)
       setNameValue(data.name)
+      // Fetch per-check evaluation status
+      try {
+        const evalData = await api.getCustomFrameworkEvaluation(fwId)
+        if (evalData?.check_statuses) {
+          setEvaluationMap(evalData.check_statuses)
+        }
+      } catch {
+        // Evaluation data not available
+      }
     } catch (err: any) {
       toast.error('Failed to load framework')
       router.push('/darca/compliance/custom')
@@ -302,6 +312,20 @@ export default function CustomFrameworkDetailPage() {
                         {item.severity || ''}
                       </span>
 
+                      {(() => {
+                        const evalStatus = evaluationMap[checkId]
+                        if (!evalStatus) return null
+                        return (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                            evalStatus.status === 'PASS' ? 'bg-green-100 text-green-700' :
+                            evalStatus.status === 'FAIL' ? 'bg-red-100 text-red-700' :
+                            'bg-amber-100 text-amber-600'
+                          }`}>
+                            {evalStatus.status === 'NOT_EVALUATED' ? 'NOT EVAL' : evalStatus.status}
+                          </span>
+                        )
+                      })()}
+
                       {item.assessment_type === 'automated' ? (
                         <CogIcon className="w-4 h-4 text-green-500 flex-shrink-0" title="Automated" />
                       ) : (
@@ -379,6 +403,50 @@ export default function CustomFrameworkDetailPage() {
                               <p className="text-brand-gray-700 font-mono text-xs">{item.scanner_check_ids.join(', ')}</p>
                             </div>
                           )}
+                          {isCustom && item.cli_commands && (
+                            <div className="col-span-2">
+                              <p className="text-xs font-medium text-brand-gray-500 mb-0.5">Audit Command</p>
+                              <div className="bg-brand-gray-900 rounded-lg p-3 mt-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                                    item.cli_commands.type === 'python' ? 'bg-blue-500/20 text-blue-300' : 'bg-green-500/20 text-green-300'
+                                  }`}>
+                                    {item.cli_commands.type === 'python' ? 'Python' : 'CLI'}
+                                  </span>
+                                </div>
+                                <pre className="text-xs text-brand-gray-300 font-mono whitespace-pre-wrap overflow-x-auto">{item.cli_commands.command}</pre>
+                              </div>
+                            </div>
+                          )}
+                          {(() => {
+                            const evalStatus = evaluationMap[checkId]
+                            if (!evalStatus) return null
+                            return (
+                              <div className="col-span-2 mt-2 pt-2 border-t border-brand-gray-200">
+                                <p className="text-xs font-medium text-brand-gray-500 mb-1">Evaluation Result</p>
+                                <div className="flex items-center gap-3">
+                                  <span className={`text-sm font-bold ${
+                                    evalStatus.status === 'PASS' ? 'text-green-600' :
+                                    evalStatus.status === 'FAIL' ? 'text-red-600' :
+                                    'text-amber-500'
+                                  }`}>
+                                    {evalStatus.status}
+                                  </span>
+                                  {evalStatus.findings > 0 && (
+                                    <span className="text-xs text-brand-gray-500">
+                                      {evalStatus.findings} finding{evalStatus.findings !== 1 ? 's' : ''}
+                                      {evalStatus.fail_count > 0 && <span className="text-red-500 ml-1">({evalStatus.fail_count} failed)</span>}
+                                    </span>
+                                  )}
+                                  {evalStatus.status === 'NOT_EVALUATED' && (
+                                    <span className="text-xs text-amber-500 italic">
+                                      No scan data available — run a scan on the corresponding cloud account to evaluate this control
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })()}
                         </div>
                       </div>
                     )}

@@ -4,10 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, case, or_
 from typing import Optional
 
+from pydantic import BaseModel
+
 from api.database import get_db
 from api.models.user import User
 from api.models.finding import Finding
 from api.models.scan import Scan
+from api.models.framework_preference import FrameworkPreference
 from api.services.auth_service import get_current_user
 from api.models.provider import Provider
 from api.models.saas_connection import SaaSConnection
@@ -163,6 +166,13 @@ async def list_frameworks(
     current_user: User = Depends(get_current_user),
 ):
     """List built-in + custom frameworks, optionally filtering by provider_type."""
+    # Fetch user's framework preferences
+    pref_result = await db.execute(
+        select(FrameworkPreference.framework_id, FrameworkPreference.is_enabled)
+        .where(FrameworkPreference.user_id == current_user.id)
+    )
+    pref_map = {row.framework_id: row.is_enabled for row in pref_result.all()}
+
     results = []
     # Built-in frameworks
     for fw_id, fw in FRAMEWORKS.items():
@@ -183,6 +193,7 @@ async def list_frameworks(
             "total_controls": len(controls),
             "total_checks": total_checks,
             "type": "built_in",
+            "is_enabled": pref_map.get(fw_id, True),
         })
 
     # Custom frameworks
@@ -216,6 +227,7 @@ async def list_frameworks(
             "total_checks": total,
             "type": "custom",
             "version": cfw.version,
+            "is_enabled": pref_map.get(cfw.id, True),
         })
 
     return results
@@ -560,3 +572,66 @@ async def framework_controls_with_results(
         "total_controls": len(controls_out),
         "controls": controls_out,
     }
+
+
+# ---------------------------------------------------------------------------
+# Framework preferences
+# ---------------------------------------------------------------------------
+
+
+class FrameworkPreferencesBody(BaseModel):
+    preferences: dict[str, bool]
+
+
+@router.get("/framework-preferences")
+async def get_framework_preferences(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return a dict of framework_id -> is_enabled for the current user.
+
+    Frameworks without an explicit preference are assumed enabled (True).
+    """
+    result = await db.execute(
+        select(FrameworkPreference.framework_id, FrameworkPreference.is_enabled)
+        .where(FrameworkPreference.user_id == current_user.id)
+    )
+    prefs = {row.framework_id: row.is_enabled for row in result.all()}
+    return prefs
+
+
+@router.put("/framework-preferences")
+async def update_framework_preferences(
+    body: FrameworkPreferencesBody,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upsert framework preferences for the current user.
+
+    Body: {"preferences": {"CIS-AWS-6.0": false, "CIS-GCP-3.0": true}}
+    """
+    import uuid as _uuid
+    from datetime import datetime as _dt
+
+    # Fetch existing preferences for this user
+    result = await db.execute(
+        select(FrameworkPreference)
+        .where(FrameworkPreference.user_id == current_user.id)
+        .where(FrameworkPreference.framework_id.in_(list(body.preferences.keys())))
+    )
+    existing = {pref.framework_id: pref for pref in result.scalars().all()}
+
+    for fw_id, is_enabled in body.preferences.items():
+        if fw_id in existing:
+            existing[fw_id].is_enabled = is_enabled
+            existing[fw_id].updated_at = _dt.utcnow()
+        else:
+            db.add(FrameworkPreference(
+                id=str(_uuid.uuid4()),
+                user_id=current_user.id,
+                framework_id=fw_id,
+                is_enabled=is_enabled,
+            ))
+
+    await db.commit()
+    return {"status": "ok"}

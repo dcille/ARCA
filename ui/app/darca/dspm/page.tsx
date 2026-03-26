@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Header from '@/components/layout/Header'
 import { api } from '@/lib/api'
 
@@ -74,6 +74,7 @@ export default function DSPMPage() {
   const [findingsStatusFilter, setFindingsStatusFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabId>('inventory')
+  const [expandedFindingId, setExpandedFindingId] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -142,11 +143,11 @@ export default function DSPMPage() {
           <p className="text-xs text-brand-gray-400 uppercase font-semibold">Data Stores</p>
           <p className="text-2xl font-bold text-brand-navy">{summary.total_data_stores || 0}</p>
         </div>
-        <div className="card text-center">
+        <div className="card text-center cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setActiveTab('findings'); setFindingsStatusFilter('FAIL') }}>
           <p className="text-xs text-brand-gray-400 uppercase font-semibold">At Risk</p>
           <p className="text-2xl font-bold text-red-600">{summary.stores_at_risk || 0}</p>
         </div>
-        <div className="card text-center">
+        <div className="card text-center cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveTab('findings')}>
           <p className="text-xs text-brand-gray-400 uppercase font-semibold">Data Findings</p>
           <p className="text-2xl font-bold text-brand-navy">{summary.total_findings || 0}</p>
         </div>
@@ -329,42 +330,90 @@ export default function DSPMPage() {
                       .filter((f: any) => !findingsStatusFilter || f.status === findingsStatusFilter)
                       .map((f: any, idx: number) => {
                         const catInfo = CATEGORY_LABELS[f.dspm_category] || { label: f.dspm_category, color: 'bg-gray-100 text-gray-600' }
+                        const isExpanded = expandedFindingId === (f.id || String(idx))
                         return (
-                          <tr key={f.id || idx} className="hover:bg-brand-gray-50">
-                            <td className="px-4 py-3">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                                f.status === 'FAIL'
-                                  ? 'bg-red-100 text-red-700 border border-red-200'
-                                  : 'bg-green-100 text-green-700 border border-green-200'
-                              }`}>
-                                {f.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                SEVERITY_COLORS[f.severity] || 'bg-gray-100 text-gray-600 border-gray-200'
-                              }`}>
-                                {f.severity?.toUpperCase()}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-brand-navy font-medium max-w-xs truncate">
-                              {f.check_title}
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${catInfo.color}`}>
-                                {catInfo.label}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-xs text-brand-gray-600">
-                              {f.dspm_data_store || '-'}
-                            </td>
-                            <td className="px-4 py-3 text-xs text-brand-gray-600 max-w-[200px] truncate">
-                              {f.resource_name || f.resource_id || '-'}
-                            </td>
-                            <td className="px-4 py-3 text-xs text-brand-gray-500">
-                              {f.service}
-                            </td>
-                          </tr>
+                          <React.Fragment key={f.id || idx}>
+                            <tr
+                              className="hover:bg-brand-gray-50 cursor-pointer"
+                              onClick={() => setExpandedFindingId(isExpanded ? null : (f.id || String(idx)))}
+                            >
+                              <td className="px-4 py-3">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                  f.status === 'FAIL'
+                                    ? 'bg-red-100 text-red-700 border border-red-200'
+                                    : 'bg-green-100 text-green-700 border border-green-200'
+                                }`}>
+                                  {f.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                  SEVERITY_COLORS[f.severity] || 'bg-gray-100 text-gray-600 border-gray-200'
+                                }`}>
+                                  {f.severity?.toUpperCase()}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-brand-navy font-medium max-w-xs truncate">
+                                {f.check_title}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${catInfo.color}`}>
+                                  {catInfo.label}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-brand-gray-600">
+                                {f.dspm_data_store || '-'}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-brand-gray-600 max-w-[200px] truncate">
+                                {f.resource_name || f.resource_id || '-'}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-brand-gray-500">
+                                {f.service}
+                              </td>
+                            </tr>
+                            {isExpanded && (
+                              <tr>
+                                <td colSpan={7} className="px-4 py-4 bg-brand-gray-50 border-t border-brand-gray-100">
+                                  <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <p className="text-xs font-semibold text-brand-gray-500 mb-1">Check ID</p>
+                                      <p className="text-xs font-mono text-brand-gray-700">{f.check_id}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-semibold text-brand-gray-500 mb-1">Resource</p>
+                                      <p className="text-xs text-brand-gray-700">{f.resource_name || f.resource_id || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-semibold text-brand-gray-500 mb-1">Data Store</p>
+                                      <p className="text-xs text-brand-gray-700">{f.dspm_data_store || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-semibold text-brand-gray-500 mb-1">Provider</p>
+                                      <p className="text-xs text-brand-gray-700">{f.dspm_provider || 'N/A'}</p>
+                                    </div>
+                                    {f.remediation && (
+                                      <div className="col-span-2">
+                                        <p className="text-xs font-semibold text-brand-gray-500 mb-1">Remediation</p>
+                                        <p className="text-xs text-brand-gray-700">{f.remediation}</p>
+                                      </div>
+                                    )}
+                                    {!f.remediation && f.status === 'PASS' && (
+                                      <div className="col-span-2">
+                                        <p className="text-xs font-semibold text-brand-gray-500 mb-1">Status Detail</p>
+                                        <p className="text-xs text-green-600">This check passed — the data store meets the security requirement for {catInfo.label.toLowerCase()}.</p>
+                                      </div>
+                                    )}
+                                    {!f.remediation && f.status === 'FAIL' && (
+                                      <div className="col-span-2">
+                                        <p className="text-xs font-semibold text-brand-gray-500 mb-1">Status Detail</p>
+                                        <p className="text-xs text-red-600">This check failed — the data store does not meet the security requirement. Review and apply the recommended remediation.</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
                         )
                       })
                   )}

@@ -194,6 +194,14 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/compliance/summary', undefined, { params: Object.keys(params).length ? params : undefined })
   }
 
+  async getFrameworkPreferences() {
+    return this.request<Record<string, boolean>>('GET', '/api/v1/compliance/framework-preferences')
+  }
+
+  async updateFrameworkPreferences(preferences: Record<string, boolean>) {
+    return this.request<any>('PUT', '/api/v1/compliance/framework-preferences', { preferences })
+  }
+
   async getComplianceFrameworkChecks(frameworkId: string, params?: Record<string, string>) {
     return this.request<any>('GET', `/api/v1/compliance/frameworks/${frameworkId}/checks`, undefined, { params })
   }
@@ -635,6 +643,10 @@ class ApiClient {
 
   async getCustomFramework(id: string) {
     return this.request<any>('GET', `/api/v1/custom-frameworks/${id}`)
+  }
+
+  async getCustomFrameworkEvaluation(fwId: string) {
+    return this.request<any>('GET', `/api/v1/custom-frameworks/${fwId}/evaluation`)
   }
 
   async updateCustomFramework(id: string, data: any) {
