@@ -422,4 +422,39 @@ def load_all_cis_checks() -> list[CheckDefinition]:
     all_checks.extend(supplementary)
     logger.debug("Loaded %d supplementary scanner checks", len(supplementary))
 
+    # -- Add supplementary checks from definitions modules --
+    # These provide enriched check definitions (remediation, compliance_mappings,
+    # DSPM/RR metadata) for checks not covered by CIS controls or scanner files.
+    existing_ids = {chk.check_id for chk in all_checks}
+    definitions_loaded = 0
+    definition_modules = [
+        "scanner.registry.definitions.m365_checks",
+        "scanner.registry.definitions.aws_checks",
+        "scanner.registry.definitions.azure_checks",
+        "scanner.registry.definitions.gcp_checks",
+        "scanner.registry.definitions.github_checks",
+        "scanner.registry.definitions.google_workspace_checks",
+        "scanner.registry.definitions.salesforce_checks",
+        "scanner.registry.definitions.servicenow_checks",
+        "scanner.registry.definitions.snowflake_checks",
+        "scanner.registry.definitions.cloudflare_checks",
+        "scanner.registry.definitions.openstack_checks",
+        "scanner.registry.definitions.oci_checks",
+        "scanner.registry.definitions.alibaba_checks",
+        "scanner.registry.definitions.ibm_cloud_checks",
+        "scanner.registry.definitions.kubernetes_checks",
+    ]
+    for mod_path in definition_modules:
+        try:
+            mod = __import__(mod_path, fromlist=["get_checks"])
+            for chk in mod.get_checks():
+                if chk.check_id not in existing_ids:
+                    all_checks.append(chk)
+                    existing_ids.add(chk.check_id)
+                    definitions_loaded += 1
+        except Exception as e:
+            logger.debug("Could not load definitions from %s: %s", mod_path, e)
+    if definitions_loaded:
+        logger.debug("Loaded %d additional checks from definition modules", definitions_loaded)
+
     return all_checks

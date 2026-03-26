@@ -599,16 +599,46 @@ Point-in-time configuration drift detection and change tracking (697 lines).
 | **Drift Scoring**     | Classify drift severity based on security impact          |
 | **Remediation**       | Recommendations to restore compliant state                |
 
-### Check Library
+### Centralized Check Registry
 
-Centralized registry of all security checks across all providers (701 lines).
+CIS-based centralized security check registry — the single source of truth for all 2,092 checks across 15 providers.
 
-| Feature               | Description                                               |
-|-----------------------|-----------------------------------------------------------|
-| **Check Registry**    | Central catalog of all security checks                    |
-| **Search & Filter**   | Find checks by provider, service, severity, framework     |
-| **Compliance Mapping** | Per-check compliance framework associations              |
-| **Remediation Guidance** | Step-by-step remediation for each check                |
+| Feature                  | Description                                                                  |
+|--------------------------|------------------------------------------------------------------------------|
+| **CIS-based Catalog**    | 1,672 CIS Benchmark controls from 9 benchmarks as primary entries            |
+| **Supplementary Checks** | 420 additional scanner checks not covered by CIS                             |
+| **Scanner Mapping**      | `scanner_check_ids` bridge links CIS controls to scanner implementations     |
+| **Cross-reference**      | MITRE ATT&CK (233 refs, 100%) and RR (309 refs, 100%) fully resolved        |
+| **Search & Filter**      | By provider, service, severity, category, tags, compliance framework         |
+| **Provider Registry**    | `SCANNER_PROVIDERS` maps all 15 providers to scanner classes dynamically     |
+| **Custom Checks**        | Register/unregister custom checks at runtime                                 |
+| **Integrity Reports**    | Full cross-reference validation with coverage metrics                        |
+
+**Resolution chain:**
+```
+CIS Control (canonical) ←→ scanner_check_ids ←→ MITRE / Ransomware Readiness references
+```
+
+**Registry by provider:**
+
+| Provider          | Checks | Source      |
+|-------------------|--------|-------------|
+| AWS               | 256    | CIS + scanner |
+| Azure             | 282    | CIS + scanner |
+| GCP               | 240    | CIS + scanner |
+| Kubernetes        | 146    | CIS + scanner |
+| OCI               | 117    | CIS + scanner |
+| Alibaba Cloud     | 142    | CIS + scanner |
+| IBM Cloud         | 81     | CIS + scanner |
+| M365              | 244    | CIS + scanner |
+| Google Workspace  | 197    | CIS + scanner |
+| GitHub            | 64     | scanner     |
+| Salesforce        | 59     | scanner     |
+| ServiceNow        | 55     | scanner     |
+| Snowflake         | 96     | CIS + scanner |
+| Cloudflare        | 56     | scanner     |
+| OpenStack         | 57     | scanner     |
+| **Total**         | **2,092** |          |
 
 ---
 
@@ -983,9 +1013,9 @@ D-ARCA maps security checks to compliance frameworks at the **control level** �
 | CIS-K8s-1.8        | CIS Kubernetes Benchmark v1.8                                  | 14       | Kubernetes    |
 | CIS-M365-3.0       | CIS Microsoft 365 Foundations Benchmark v3.0                   | 21       | Microsoft 365 |
 
-### CIS Control Library (781 Controls)
+### CIS Control Library (1,672 Controls + 420 Supplementary)
 
-D-ARCA includes a complete CIS control library with full metadata (descriptions, audit procedures, detection commands, remediation guidance) for each control. Controls are classified as automated or manual, and tagged for DSPM and Ransomware Readiness relevance.
+D-ARCA includes a complete CIS control library with full metadata (descriptions, audit procedures, detection commands, remediation guidance) for each control. Controls are classified as automated or manual, and tagged for DSPM and Ransomware Readiness relevance. The centralized registry resolves all cross-references with 100% coverage for both MITRE ATT&CK (233 references) and Ransomware Readiness (309 references).
 
 | Platform           | Benchmark                                        | Total | Automated | Manual | DSPM | RR  |
 |--------------------|--------------------------------------------------|-------|-----------|--------|------|-----|
@@ -1161,11 +1191,46 @@ ARCA/
 │   │   ├── content_sampler.py        # Data content sampling
 │   │   ├── data_classifier.py        # Sensitivity classification
 │   │   └── native_integrations.py    # Cloud-native data connectors
-│   ├── check_library.py              # Centralized check registry (701 lines)
+│   ├── registry/                     # Centralized check registry (CIS-based, 2,092 checks)
+│   │   ├── __init__.py               # Public API: CheckRegistry, CheckDefinition, get_default_registry
+│   │   ├── registry.py               # CheckRegistry class: register, lookup, filter, validate, report
+│   │   ├── models.py                 # CheckDefinition, ProviderType, Severity, SCANNER_PROVIDERS
+│   │   ├── cis_loader.py             # Load CIS controls + supplementary scanner checks
+│   │   ├── cross_references.py       # Cross-reference validation (MITRE + RR → registry)
+│   │   └── definitions/              # Per-provider check definitions (15 modules)
+│   │       ├── aws_checks.py         # AWS check definitions (256 checks)
+│   │       ├── azure_checks.py       # Azure check definitions (282 checks)
+│   │       ├── gcp_checks.py         # GCP check definitions (240 checks)
+│   │       ├── kubernetes_checks.py  # Kubernetes check definitions (146 checks)
+│   │       ├── oci_checks.py         # OCI check definitions (117 checks)
+│   │       ├── alibaba_checks.py     # Alibaba check definitions (142 checks)
+│   │       ├── ibm_cloud_checks.py   # IBM Cloud check definitions (81 checks)
+│   │       ├── m365_checks.py        # Microsoft 365 check definitions (244 checks)
+│   │       ├── google_workspace_checks.py  # Google Workspace definitions (197 checks)
+│   │       ├── github_checks.py      # GitHub check definitions (64 checks)
+│   │       ├── salesforce_checks.py  # Salesforce check definitions (59 checks)
+│   │       ├── servicenow_checks.py  # ServiceNow check definitions (55 checks)
+│   │       ├── snowflake_checks.py   # Snowflake check definitions (96 checks)
+│   │       ├── cloudflare_checks.py  # Cloudflare check definitions (56 checks)
+│   │       └── openstack_checks.py   # OpenStack check definitions (57 checks)
+│   ├── cis_controls/                 # CIS Benchmark control definitions (9 benchmarks)
+│   │   ├── aws_cis_controls.py       # AWS CIS Foundations Benchmark v3.0
+│   │   ├── azure_cis_controls.py     # Azure CIS Foundations Benchmark v5.0
+│   │   ├── gcp_cis_controls.py       # GCP CIS Platform Benchmark v3.0
+│   │   ├── oci_cis_controls.py       # OCI CIS Foundations Benchmark v3.1
+│   │   ├── alibaba_cis_controls.py   # Alibaba CIS Benchmark v2.0
+│   │   ├── ibm_cloud_cis_controls.py # IBM Cloud CIS Benchmark v1.1
+│   │   ├── kubernetes_cis_controls.py# Kubernetes CIS Benchmark v1.8
+│   │   ├── m365_cis_controls.py      # M365 CIS Benchmark v6.0.1
+│   │   ├── google_workspace_cis_controls.py # Google Workspace CIS v1.3
+│   │   └── snowflake_cis_controls.py # Snowflake CIS Benchmark v1.0
+│   ├── check_library.py              # Backward-compatible facade over scanner.registry
 │   ├── drift_detection.py            # Configuration drift detection (697 lines)
-│   └── ransomware/                   # Ransomware readiness module
-│       ├── rules.py                  # 105 ransomware readiness rules
-│       └── scoring.py                # Scoring engine with domain weights
+│   └── ransomware_readiness/         # Ransomware readiness module (105 rules, 7 domains)
+│       ├── framework.py              # RR rule definitions and domain structure
+│       ├── evaluator.py              # CHECK_ID_ALIASES and rule evaluation
+│       ├── scoring.py                # Scoring engine with domain weights
+│       └── rules_d1..d7_*.py         # Domain-specific rules (D1-D7)
 │
 ├── ui/                               # Frontend (Next.js 14 / React 18 / Tailwind)
 │   ├── app/
