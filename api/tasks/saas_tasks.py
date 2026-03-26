@@ -1,4 +1,5 @@
 """SaaS scan Celery tasks."""
+import json
 import logging
 from datetime import datetime
 
@@ -25,6 +26,8 @@ def run_saas_scan(self, scan_id: str, connection_id: str):
     from api.models.saas_connection import SaaSConnection
     from api.models.saas_finding import SaaSFinding
     from api.services.auth_service import decrypt_credentials
+    from scanner.mitre.attack_mapping import CHECK_TO_MITRE
+    from scanner.compliance.frameworks import get_frameworks_for_check
 
     session = get_sync_session()
     try:
@@ -54,11 +57,21 @@ def run_saas_scan(self, scan_id: str, connection_id: str):
         failed = 0
 
         for result in results:
+            check_id = result["check_id"]
+
+            # Enrich with MITRE techniques
+            mitre_techs = CHECK_TO_MITRE.get(check_id, [])
+
+            # Enrich with compliance framework mappings
+            fw_from_result = result.get("compliance_frameworks", [])
+            fw_from_registry = get_frameworks_for_check(check_id)
+            all_frameworks = list(set(fw_from_result + fw_from_registry))
+
             finding = SaaSFinding(
                 scan_id=scan_id,
                 connection_id=connection_id,
                 provider_type=connection.provider_type,
-                check_id=result["check_id"],
+                check_id=check_id,
                 check_title=result["check_title"],
                 service_area=result["service_area"],
                 severity=result["severity"],
@@ -68,7 +81,8 @@ def run_saas_scan(self, scan_id: str, connection_id: str):
                 description=result.get("description"),
                 remediation=result.get("remediation"),
                 remediation_url=result.get("remediation_url"),
-                compliance_frameworks=str(result.get("compliance_frameworks", [])),
+                compliance_frameworks=json.dumps(all_frameworks),
+                mitre_techniques=json.dumps(mitre_techs) if mitre_techs else None,
             )
             session.add(finding)
             total += 1
@@ -103,6 +117,17 @@ def run_saas_scan(self, scan_id: str, connection_id: str):
             session.commit()
         except Exception as notify_err:
             logger.warning(f"Notification dispatch failed: {notify_err}")
+
+        # Trigger Ransomware Readiness evaluation
+        try:
+            celery_app.send_task(
+                "api.tasks.rr_tasks.evaluate_ransomware_readiness",
+                args=[scan.user_id],
+                kwargs={"scan_id": scan_id},
+            )
+            logger.info(f"RR evaluation triggered for SaaS scan {scan_id}")
+        except Exception as rr_err:
+            logger.warning(f"RR evaluation trigger failed: {rr_err}")
 
         logger.info(f"SaaS scan {scan_id} completed: {total} checks, {passed} passed, {failed} failed")
 

@@ -560,4 +560,17 @@ def get_checks() -> list[CheckDefinition]:
             category="Compliance",
             tags=["zero_trust", "email"],
         ),
+        # --- Supplementary: MITRE orphan resolution ---
+        CheckDefinition(
+            check_id="cloudflare_bot_management",
+            title="Bot management is enabled and configured",
+            description="Bot management is enabled and configured.",
+            severity="medium",
+            provider="cloudflare",
+            service="security",
+            category="Networking",
+            scanner_check_ids=["cloudflare_bot_management"],
+            source="scanner",
+            tags=["security", "bot-management"],
+        ),
     ]

@@ -1708,4 +1708,17 @@ def get_checks() -> list[CheckDefinition]:
             source="scanner",
             tags=["identity", "governance"],
         ),
+        # --- Supplementary: MITRE orphan resolution ---
+        CheckDefinition(
+            check_id="m365_audit_log_enabled",
+            title="Microsoft 365 audit log is enabled",
+            description="Microsoft 365 audit log is enabled.",
+            severity="critical",
+            provider="m365",
+            service="admin_center",
+            category="Logging",
+            scanner_check_ids=["m365_audit_log_enabled"],
+            source="scanner",
+            tags=["logging", "audit"],
+        ),
     ]
