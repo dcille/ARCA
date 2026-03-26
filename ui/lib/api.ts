@@ -6,8 +6,6 @@
  * never needs to reach port 8080 directly — no CORS, no cross-origin issues.
  */
 
-const DEFAULT_TIMEOUT_MS = 300_000 // 5 minutes
-
 class ApiClient {
   private getToken(): string | null {
     if (typeof window === 'undefined') return null
@@ -27,7 +25,7 @@ class ApiClient {
     method: string,
     path: string,
     body?: unknown,
-    options?: { params?: Record<string, string>; timeoutMs?: number }
+    options?: { params?: Record<string, string> }
   ): Promise<T> {
     // path already starts with /api/v1/...
     const url = new URL(path, window.location.origin)
@@ -46,25 +44,11 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`
     }
 
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), options?.timeoutMs ?? DEFAULT_TIMEOUT_MS)
-
-    let response: Response
-    try {
-      response = await fetch(url.toString(), {
-        method,
-        headers,
-        body: body ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
-      })
-    } catch (err: any) {
-      clearTimeout(timer)
-      if (err.name === 'AbortError') {
-        throw new Error('Request timed out. Please try again.')
-      }
-      throw err
-    }
-    clearTimeout(timer)
+    const response = await fetch(url.toString(), {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    })
 
     if (response.status === 401) {
       if (typeof window !== 'undefined') {
