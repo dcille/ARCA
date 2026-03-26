@@ -23,13 +23,13 @@ import logging
 import time
 from typing import Optional
 
-from .evaluators.base import (
+from .evaluator.base import (
     AzureClientCache,
     EvalConfig,
     make_manual_result,
     safe_evaluate,
 )
-from .evaluators import EVALUATOR_REGISTRY, get_evaluator
+from .evaluator import EVALUATOR_REGISTRY, get_evaluator
 
 logger = logging.getLogger(__name__)
 

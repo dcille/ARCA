@@ -27,17 +27,23 @@ class CloudScanner:
         region: Optional[str] = None,
         services: Optional[list] = None,
         regions: Optional[list] = None,
+        custom_controls: Optional[list[dict]] = None,
     ):
         self.provider_type = provider_type
         self.credentials = credentials
         self.region = region
         self.services = services
         self.regions = regions
+        self.custom_controls = custom_controls or []
 
     def run_checks(self) -> list[dict]:
         """Run all applicable security checks for the configured provider."""
         scanner_cls = get_scanner_class(self.provider_type)
         scanner = self._instantiate_scanner(scanner_cls)
+
+        # Use run_all_checks if available (includes CIS engine + custom controls)
+        if hasattr(scanner, "run_all_checks"):
+            return scanner.run_all_checks()
         return scanner.scan()
 
     def _instantiate_scanner(self, scanner_cls):
@@ -51,6 +57,8 @@ class CloudScanner:
             kwargs["regions"] = self.regions
         if "services" in params and self.services is not None:
             kwargs["services"] = self.services
+        if "custom_controls" in params and self.custom_controls:
+            kwargs["custom_controls"] = self.custom_controls
 
         return scanner_cls(**kwargs)
 

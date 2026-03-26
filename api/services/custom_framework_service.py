@@ -30,12 +30,25 @@ def _to_json(value) -> Optional[str]:
     return json.dumps(value)
 
 
+def _generated_check_id(check_id: str) -> str:
+    """Generate the check_id that the custom control executor will use for findings."""
+    return f"custom_{check_id.lower().replace('-', '_').replace('.', '_')}"
+
+
 def _to_check_definition(ctrl: CustomControl) -> CheckDefinition:
     """Convert a CustomControl DB row to a CheckDefinition for the registry."""
     scanner_ids = _parse_json_list(ctrl.scanner_check_ids)
     tags = _parse_json_list(ctrl.tags)
     if "custom" not in tags:
         tags.append("custom")
+
+    # If this control has evaluation logic, include the generated check_id
+    # so the compliance system can find its findings
+    has_eval = bool(getattr(ctrl, "evaluation_script", None) or getattr(ctrl, "cli_command", None))
+    if has_eval:
+        gen_id = _generated_check_id(ctrl.check_id)
+        if gen_id not in scanner_ids:
+            scanner_ids.append(gen_id)
 
     return CheckDefinition(
         check_id=ctrl.check_id,
@@ -54,8 +67,10 @@ def _to_check_definition(ctrl: CustomControl) -> CheckDefinition:
     )
 
 
-def determine_assessment_type(scanner_check_ids: list[str]) -> str:
+def determine_assessment_type(scanner_check_ids: list[str], has_evaluation_logic: bool = False) -> str:
     """Determine assessment_type based on whether scanner_check_ids map to real scanners."""
+    if has_evaluation_logic:
+        return "automated"
     if not scanner_check_ids:
         return "manual"
     registry = get_default_registry()
@@ -101,6 +116,14 @@ def unregister_custom_control_from_registry(check_id: str) -> None:
 
 def format_custom_control_response(ctrl: CustomControl) -> dict:
     """Format a CustomControl row for API response."""
+    # Determine evaluation type
+    if getattr(ctrl, "evaluation_script", None):
+        eval_type = "python_script"
+    elif getattr(ctrl, "cli_command", None):
+        eval_type = "cli_command"
+    else:
+        eval_type = "manual"
+
     return {
         "id": ctrl.id,
         "check_id": ctrl.check_id,
@@ -118,6 +141,10 @@ def format_custom_control_response(ctrl: CustomControl) -> dict:
         "scanner_check_ids": _parse_json_list(ctrl.scanner_check_ids),
         "tags": _parse_json_list(ctrl.tags),
         "references": _parse_json_list(ctrl.references),
+        "evaluation_script": getattr(ctrl, "evaluation_script", None),
+        "cli_command": getattr(ctrl, "cli_command", None),
+        "pass_condition": getattr(ctrl, "pass_condition", None),
+        "evaluation_type": eval_type,
         "display_order": ctrl.display_order,
         "created_at": ctrl.created_at.isoformat() if ctrl.created_at else None,
     }

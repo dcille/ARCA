@@ -187,7 +187,7 @@ class CustomControlExecutor:
     def clients(self):
         """Lazy-load AzureClientCache if not provided."""
         if self._clients is None:
-            from .evaluators.base import AzureClientCache
+            from .evaluator.base import AzureClientCache
             self._clients = AzureClientCache(self.credential, self.subscription_id)
         return self._clients
 
@@ -229,7 +229,7 @@ class CustomControlExecutor:
             )]
 
         # Build the execution context
-        from .evaluators.base import EvalConfig
+        from .evaluator.base import EvalConfig
         exec_globals = {
             "__builtins__": __builtins__,
             "credential": self.credential,

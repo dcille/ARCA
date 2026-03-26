@@ -144,7 +144,7 @@ EXAMPLE_CONTROLS_CLI = [
         "severity": "medium",
         "service": "security",
         "remediation": "Review and remediate Defender for Cloud recommendations to improve secure score.",
-        "cli_command": "az security secure-score-controls list --subscription {subscription_id} --query \"[?score.percentage < `0.7`].{name:displayName, score:score.percentage}" -o json",
+        "cli_command": 'az security secure-score-controls list --subscription {subscription_id} --query "[?score.percentage < `0.7`].{name:displayName, score:score.percentage}" -o json',
         "pass_condition": "empty",
     },
 ]

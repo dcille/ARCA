@@ -91,6 +91,20 @@ app.include_router(ransomware_readiness.router, prefix="/api/v1/ransomware-readi
 app.include_router(audit_log.router, prefix="/api/v1/audit-log", tags=["Audit Log"])
 app.include_router(custom_frameworks.router, prefix="/api/v1/custom-frameworks", tags=["Custom Frameworks"])
 
+# CLI → SDK Transpiler endpoint
+try:
+    from scanner.providers.azure.cli_to_sdk_transpiler import create_transpiler_router
+    app.include_router(create_transpiler_router(), prefix="/api/v1", tags=["Transpiler"])
+except ImportError:
+    logger.warning("CLI-to-SDK transpiler not available")
+
+# Custom control examples endpoint
+try:
+    from scanner.providers.azure.custom_control_models import create_custom_controls_router
+    app.include_router(create_custom_controls_router(), prefix="/api/v1", tags=["Custom Controls"])
+except ImportError:
+    logger.warning("Custom control examples router not available")
+
 
 @app.get("/api/v1/health")
 async def health_check():
