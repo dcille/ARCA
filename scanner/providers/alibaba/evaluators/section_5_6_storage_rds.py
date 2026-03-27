@@ -1,238 +1,621 @@
-"""CIS Alibaba v2.0 Sections 5–6.
+"""CIS Alibaba Cloud v2.0 Sections 5-6: Storage (OSS) and RDS -- 18 controls.
 
-Section 5 — Storage/OSS (9 controls): 5.1/5.3/5.4/5.7 automated, rest manual
-Section 6 — Relational Database Services (9 controls): all automated
+Section 5: Storage / OSS (9 controls — 4 automated, 5 manual)
+Section 6: Relational Database Services (9 controls — 9 automated)
 """
-from __future__ import annotations
-from .base import (AlibabaClientCache, EvalConfig, make_result, make_manual_result, logger)
+
+import logging
+from .base import AlibabaClientCache, EvalConfig, make_result, make_manual_result
+
+logger = logging.getLogger(__name__)
+FW = ["CIS-Alibaba-2.0"]
 
 
-# ═════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════
 # Section 5: Storage (OSS)
-# ═════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════
 
-def evaluate_5_1(c: AlibabaClientCache, cfg: EvalConfig):
-    """OSS buckets not publicly accessible."""
+# ───────────────────────────────────────────────────────────────
+# 5.1 -- OSS bucket not anonymously/publicly accessible (automated)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_5_1(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
     import oss2
     results = []
-    auth = c.oss_auth()
-    service = oss2.Service(auth, f"https://oss-{cfg.regions[0]}.aliyuncs.com")
-    for b in oss2.BucketIterator(service):
-        bucket = oss2.Bucket(auth, f"https://oss-{b.location}.aliyuncs.com", b.name)
+    try:
+        service = c.oss_service()
+        buckets = list(oss2.BucketIterator(service))
+    except Exception as e:
+        return [make_result(cis_id="5.1", check_id="ali_cis_5_1",
+            title="Ensure OSS bucket is not anonymously or publicly accessible",
+            service="storage", severity="critical", status="ERROR",
+            resource_id=cfg.account_id,
+            status_extended=f"Failed to list OSS buckets: {e}",
+            compliance_frameworks=FW)]
+
+    for b in buckets:
+        bucket_name = b.name
         try:
+            bucket = c.oss_bucket(bucket_name, endpoint=f"https://{b.extranet_endpoint}")
             acl = bucket.get_bucket_acl()
-            public = acl.acl in ("public-read", "public-read-write")
-        except Exception: public = False
-        results.append(make_result("5.1", "OSS bucket not publicly accessible",
-            b.name, b.name, not public, severity="critical", service="OSS",
-            remediation="Set bucket ACL to private"))
-    return results
+            acl_grant = acl.acl
+            is_public = acl_grant in ("public-read", "public-read-write")
+        except Exception as e:
+            logger.warning("Failed to check ACL for bucket %s: %s", bucket_name, e)
+            continue
 
-def evaluate_5_2(c, cfg): return [make_manual_result("5.2", "No publicly accessible objects in storage buckets", "OSS", "critical")]
+        results.append(make_result(
+            cis_id="5.1", check_id="ali_cis_5_1",
+            title="Ensure OSS bucket is not anonymously or publicly accessible",
+            service="storage", severity="critical",
+            status="FAIL" if is_public else "PASS",
+            resource_id=bucket_name, resource_name=bucket_name,
+            region=b.location if hasattr(b, "location") else "",
+            status_extended=f"OSS bucket '{bucket_name}': ACL={acl_grant}",
+            remediation="Set bucket ACL to private: ossutil set-acl oss://BUCKET private",
+            compliance_frameworks=FW,
+        ))
 
-def evaluate_5_3(c: AlibabaClientCache, cfg: EvalConfig):
-    """OSS bucket logging enabled."""
+    return results or [make_result(cis_id="5.1", check_id="ali_cis_5_1",
+        title="Ensure OSS bucket is not anonymously or publicly accessible",
+        service="storage", severity="critical", status="N/A",
+        resource_id=cfg.account_id,
+        status_extended="No OSS buckets found.",
+        compliance_frameworks=FW)]
+
+
+# ───────────────────────────────────────────────────────────────
+# 5.2 -- No publicly accessible objects in buckets (MANUAL)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_5_2(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
+    return [make_manual_result("5.2", "ali_cis_5_2",
+        "Ensure no publicly accessible objects in storage buckets",
+        "storage", "critical", cfg.account_id,
+        "Requires checking individual object ACLs within each OSS bucket.")]
+
+
+# ───────────────────────────────────────────────────────────────
+# 5.3 -- Logging enabled for OSS buckets (automated)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_5_3(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
     import oss2
     results = []
-    auth = c.oss_auth()
-    service = oss2.Service(auth, f"https://oss-{cfg.regions[0]}.aliyuncs.com")
-    for b in oss2.BucketIterator(service):
-        bucket = oss2.Bucket(auth, f"https://oss-{b.location}.aliyuncs.com", b.name)
-        try:
-            log_cfg = bucket.get_bucket_logging()
-            enabled = bool(log_cfg.target_bucket)
-        except Exception: enabled = False
-        results.append(make_result("5.3", "OSS bucket logging enabled",
-            b.name, b.name, enabled, severity="high", service="OSS",
-            remediation="Enable access logging for the bucket"))
-    return results
+    try:
+        service = c.oss_service()
+        buckets = list(oss2.BucketIterator(service))
+    except Exception:
+        return [make_result(cis_id="5.3", check_id="ali_cis_5_3",
+            title="Ensure logging is enabled for OSS buckets",
+            service="storage", severity="high", status="ERROR",
+            resource_id=cfg.account_id,
+            status_extended="Failed to list OSS buckets.",
+            compliance_frameworks=FW)]
 
-def evaluate_5_4(c: AlibabaClientCache, cfg: EvalConfig):
-    """Secure transfer required (HTTPS)."""
+    for b in buckets:
+        bucket_name = b.name
+        try:
+            bucket = c.oss_bucket(bucket_name, endpoint=f"https://{b.extranet_endpoint}")
+            logging_info = bucket.get_bucket_logging()
+            has_logging = bool(logging_info.target_bucket)
+        except Exception:
+            has_logging = False
+
+        results.append(make_result(
+            cis_id="5.3", check_id="ali_cis_5_3",
+            title="Ensure logging is enabled for OSS buckets",
+            service="storage", severity="high",
+            status="PASS" if has_logging else "FAIL",
+            resource_id=bucket_name, resource_name=bucket_name,
+            status_extended=f"OSS bucket '{bucket_name}': logging {'enabled' if has_logging else 'disabled'}",
+            remediation="Enable bucket logging: ossutil logging --method put oss://BUCKET oss://LOG-BUCKET prefix/",
+            compliance_frameworks=FW,
+        ))
+
+    return results or [make_result(cis_id="5.3", check_id="ali_cis_5_3",
+        title="Ensure logging is enabled for OSS buckets",
+        service="storage", severity="high", status="N/A",
+        resource_id=cfg.account_id,
+        status_extended="No OSS buckets found.",
+        compliance_frameworks=FW)]
+
+
+# ───────────────────────────────────────────────────────────────
+# 5.4 -- Secure transfer required (HTTPS only) (automated)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_5_4(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
     import oss2
     results = []
-    auth = c.oss_auth()
-    service = oss2.Service(auth, f"https://oss-{cfg.regions[0]}.aliyuncs.com")
-    for b in oss2.BucketIterator(service):
-        bucket = oss2.Bucket(auth, f"https://oss-{b.location}.aliyuncs.com", b.name)
+    try:
+        service = c.oss_service()
+        buckets = list(oss2.BucketIterator(service))
+    except Exception:
+        return [make_result(cis_id="5.4", check_id="ali_cis_5_4",
+            title="Ensure 'Secure transfer required' is set to 'Enabled'",
+            service="storage", severity="high", status="ERROR",
+            resource_id=cfg.account_id,
+            status_extended="Failed to list OSS buckets.",
+            compliance_frameworks=FW)]
+
+    for b in buckets:
+        bucket_name = b.name
         try:
-            policy = bucket.get_bucket_policy()
-            txt = policy.policy if hasattr(policy, 'policy') else str(policy)
-            https = "SecureTransport" in txt
-        except Exception: https = False
-        results.append(make_result("5.4", "Secure transfer required enabled",
-            b.name, b.name, https, severity="high", service="OSS",
-            remediation="Add bucket policy denying non-SSL requests"))
-    return results
+            bucket = c.oss_bucket(bucket_name, endpoint=f"https://{b.extranet_endpoint}")
+            policy_str = bucket.get_bucket_policy()
+            import json
+            policy = json.loads(policy_str) if isinstance(policy_str, str) else {}
+            statements = policy.get("Statement", [])
+            https_enforced = any(
+                s.get("Effect") == "Deny"
+                and s.get("Condition", {}).get("Bool", {}).get("acs:SecureTransport") == "false"
+                for s in statements
+            )
+        except Exception:
+            https_enforced = False
 
-def evaluate_5_5(c, cfg): return [make_manual_result("5.5", "Shared URL signature expires within an hour", "OSS", "medium")]
-def evaluate_5_6(c, cfg): return [make_manual_result("5.6", "URL signature allowed only over HTTPS", "OSS", "high")]
+        results.append(make_result(
+            cis_id="5.4", check_id="ali_cis_5_4",
+            title="Ensure 'Secure transfer required' is set to 'Enabled'",
+            service="storage", severity="high",
+            status="PASS" if https_enforced else "FAIL",
+            resource_id=bucket_name, resource_name=bucket_name,
+            status_extended=f"OSS bucket '{bucket_name}': HTTPS enforcement {'enabled' if https_enforced else 'not configured'}",
+            remediation="Add a bucket policy denying requests where acs:SecureTransport is false.",
+            compliance_frameworks=FW,
+        ))
 
-def evaluate_5_7(c: AlibabaClientCache, cfg: EvalConfig):
-    """Network access rule not publicly accessible."""
+    return results or [make_result(cis_id="5.4", check_id="ali_cis_5_4",
+        title="Ensure 'Secure transfer required' is set to 'Enabled'",
+        service="storage", severity="high", status="N/A",
+        resource_id=cfg.account_id,
+        status_extended="No OSS buckets found.",
+        compliance_frameworks=FW)]
+
+
+# ───────────────────────────────────────────────────────────────
+# 5.5 -- Shared URL signature expires within an hour (MANUAL)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_5_5(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
+    return [make_manual_result("5.5", "ali_cis_5_5",
+        "Ensure shared URL signature expires within an hour",
+        "storage", "medium", cfg.account_id,
+        "Requires reviewing application code to verify presigned URL expiration policies.")]
+
+
+# ───────────────────────────────────────────────────────────────
+# 5.6 -- URL signature allowed only over HTTPS (MANUAL)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_5_6(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
+    return [make_manual_result("5.6", "ali_cis_5_6",
+        "Ensure URL signature is allowed only over https",
+        "storage", "high", cfg.account_id,
+        "Requires verifying that all presigned URLs use HTTPS endpoints.")]
+
+
+# ───────────────────────────────────────────────────────────────
+# 5.7 -- Network access rule not publicly accessible (automated)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_5_7(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
     import oss2
     results = []
-    auth = c.oss_auth()
-    service = oss2.Service(auth, f"https://oss-{cfg.regions[0]}.aliyuncs.com")
-    for b in oss2.BucketIterator(service):
-        bucket = oss2.Bucket(auth, f"https://oss-{b.location}.aliyuncs.com", b.name)
+    try:
+        service = c.oss_service()
+        buckets = list(oss2.BucketIterator(service))
+    except Exception:
+        return [make_result(cis_id="5.7", check_id="ali_cis_5_7",
+            title="Ensure network access rule for storage bucket is not publicly accessible",
+            service="storage", severity="critical", status="ERROR",
+            resource_id=cfg.account_id,
+            status_extended="Failed to list OSS buckets.",
+            compliance_frameworks=FW)]
+
+    for b in buckets:
+        bucket_name = b.name
         try:
-            policy = bucket.get_bucket_policy()
-            txt = policy.policy if hasattr(policy, 'policy') else str(policy)
-            # Check for IP restrictions in policy
-            restricted = "IpAddress" in txt or "SourceVpc" in txt
-        except Exception: restricted = False
-        results.append(make_result("5.7", "OSS network access restricted to specific IPs",
-            b.name, b.name, restricted, severity="critical", service="OSS",
-            remediation="Add bucket policy restricting access to specific IP/VPC"))
-    return results
+            bucket = c.oss_bucket(bucket_name, endpoint=f"https://{b.extranet_endpoint}")
+            acl = bucket.get_bucket_acl()
+            acl_grant = acl.acl
+            is_public = acl_grant in ("public-read", "public-read-write")
+        except Exception:
+            is_public = None
 
-def evaluate_5_8(c, cfg): return [make_manual_result("5.8", "Server-side encryption set to Encrypt with Service Key", "OSS", "high")]
-def evaluate_5_9(c, cfg): return [make_manual_result("5.9", "Server-side encryption set to Encrypt with BYOK", "OSS", "high")]
+        if is_public is None:
+            continue
+
+        results.append(make_result(
+            cis_id="5.7", check_id="ali_cis_5_7",
+            title="Ensure network access rule for storage bucket is not publicly accessible",
+            service="storage", severity="critical",
+            status="FAIL" if is_public else "PASS",
+            resource_id=bucket_name, resource_name=bucket_name,
+            status_extended=f"OSS bucket '{bucket_name}': ACL={acl_grant}",
+            remediation="Restrict bucket access: set ACL to private and configure bucket policy.",
+            compliance_frameworks=FW,
+        ))
+
+    return results or [make_result(cis_id="5.7", check_id="ali_cis_5_7",
+        title="Ensure network access rule for storage bucket is not publicly accessible",
+        service="storage", severity="critical", status="N/A",
+        resource_id=cfg.account_id,
+        status_extended="No OSS buckets found.",
+        compliance_frameworks=FW)]
 
 
-# ═════════════════════════════════════════════════════════════════
-# Section 6: Relational Database Services (all automated)
-# ═════════════════════════════════════════════════════════════════
+# ───────────────────────────────────────────────────────────────
+# 5.8 -- Server-side encryption with Service Key (MANUAL)
+# ───────────────────────────────────────────────────────────────
 
-def evaluate_6_1(c: AlibabaClientCache, cfg: EvalConfig):
-    """RDS instance requires SSL connections."""
-    from alibabacloud_rds20140815 import models as m
-    results = []
+def evaluate_cis_5_8(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
+    return [make_manual_result("5.8", "ali_cis_5_8",
+        "Ensure server-side encryption is set to 'Encrypt with Service Key'",
+        "storage", "high", cfg.account_id,
+        "Requires verifying that OSS buckets have server-side encryption configured with SSE-OSS.")]
+
+
+# ───────────────────────────────────────────────────────────────
+# 5.9 -- Server-side encryption with BYOK (MANUAL)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_5_9(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
+    return [make_manual_result("5.9", "ali_cis_5_9",
+        "Ensure server-side encryption is set to 'Encrypt with BYOK'",
+        "storage", "high", cfg.account_id,
+        "Requires verifying that OSS buckets use SSE-KMS with customer-managed keys (BYOK).")]
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 6: Relational Database Services (9 controls — all automated)
+# ═══════════════════════════════════════════════════════════════════
+
+def _list_rds_instances(c: AlibabaClientCache, cfg: EvalConfig) -> list:
+    """List all RDS instances across configured regions."""
+    from alibabacloud_rds20140815 import models as rds_models
+    all_instances = []
     for region in cfg.regions:
-        client = c.rds(region)
-        dbs = client.describe_dbinstances(m.DescribeDBInstancesRequest(region_id=region, page_size=100)).body.items.dbinstance or []
-        for db in dbs:
-            try:
-                ssl = client.describe_dbinstance_ssl(m.DescribeDBInstanceSSLRequest(dbinstance_id=db.dbinstance_id))
-                enabled = bool(ssl.body.sslexpire_time)
-            except Exception: enabled = False
-            results.append(make_result("6.1", "RDS requires SSL connections",
-                db.dbinstance_id, db.dbinstance_description or db.dbinstance_id, enabled,
-                severity="high", service="RDS",
-                remediation="Enable SSL encryption for RDS connections"))
-    return results
+        try:
+            resp = c.rds(region).describe_dbinstances(rds_models.DescribeDBInstancesRequest(
+                region_id=region,
+            ))
+            items = resp.body.items
+            instances = items.dbinstance if items and items.dbinstance else []
+            for inst in instances:
+                inst._region = region
+            all_instances.extend(instances)
+        except Exception as e:
+            logger.warning("Failed to list RDS instances in %s: %s", region, e)
+    return all_instances
 
 
-def evaluate_6_2(c: AlibabaClientCache, cfg: EvalConfig):
-    """RDS not open to the world (whitelist)."""
-    from alibabacloud_rds20140815 import models as m
+# ───────────────────────────────────────────────────────────────
+# 6.1 -- RDS requires SSL (automated)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_6_1(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
+    from alibabacloud_rds20140815 import models as rds_models
     results = []
-    for region in cfg.regions:
-        client = c.rds(region)
-        dbs = client.describe_dbinstances(m.DescribeDBInstancesRequest(region_id=region, page_size=100)).body.items.dbinstance or []
-        for db in dbs:
-            try:
-                ip_resp = client.describe_dbinstance_iparray_list(m.DescribeDBInstanceIPArrayListRequest(dbinstance_id=db.dbinstance_id))
-                open_world = any("0.0.0.0/0" in (arr.security_iplist or "") or "0.0.0.0" in (arr.security_iplist or "").split(",")
-                    for arr in ip_resp.body.items.dbinstance_iparray or [])
-            except Exception: open_world = False
-            results.append(make_result("6.2", "RDS instances not open to the world",
-                db.dbinstance_id, db.dbinstance_description or db.dbinstance_id, not open_world,
-                severity="medium", service="RDS",
-                remediation="Remove 0.0.0.0/0 from RDS IP whitelist"))
-    return results
+    instances = _list_rds_instances(c, cfg)
+
+    for inst in instances:
+        db_id = inst.dbinstance_id
+        region = getattr(inst, "_region", cfg.regions[0])
+        try:
+            ssl_resp = c.rds(region).describe_dbinstance_sslaction(
+                rds_models.DescribeDBInstanceSSLActionRequest(dbinstance_id=db_id))
+            ssl_status = getattr(ssl_resp.body, "require_update", None)
+            ssl_enabled = getattr(ssl_resp.body, "sslstatus", "") == "Yes"
+        except Exception:
+            ssl_enabled = False
+
+        results.append(make_result(
+            cis_id="6.1", check_id="ali_cis_6_1",
+            title="Ensure RDS instance requires all incoming connections to use SSL",
+            service="database", severity="high",
+            status="PASS" if ssl_enabled else "FAIL",
+            resource_id=db_id, resource_name=db_id, region=region,
+            status_extended=f"RDS instance '{db_id}': SSL {'enabled' if ssl_enabled else 'not enabled'}",
+            remediation="Enable SSL: aliyun rds ModifyDBInstanceSSL --DBInstanceId ID --SSLEnabled 1",
+            compliance_frameworks=FW,
+        ))
+
+    return results or [make_result(cis_id="6.1", check_id="ali_cis_6_1",
+        title="Ensure RDS instance requires all incoming connections to use SSL",
+        service="database", severity="high", status="N/A",
+        resource_id=cfg.account_id,
+        status_extended="No RDS instances found.",
+        compliance_frameworks=FW)]
 
 
-def evaluate_6_3(c: AlibabaClientCache, cfg: EvalConfig):
-    """SQL auditing enabled."""
-    from alibabacloud_rds20140815 import models as m
+# ───────────────────────────────────────────────────────────────
+# 6.2 -- RDS instances not open to the world (automated)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_6_2(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
+    from alibabacloud_rds20140815 import models as rds_models
     results = []
-    for region in cfg.regions:
-        client = c.rds(region)
-        dbs = client.describe_dbinstances(m.DescribeDBInstancesRequest(region_id=region, page_size=100)).body.items.dbinstance or []
-        for db in dbs:
-            try:
-                audit = client.describe_sqlcollector_policy(m.DescribeSQLCollectorPolicyRequest(dbinstance_id=db.dbinstance_id))
-                enabled = audit.body.sqlcollector_status == "Enable"
-            except Exception: enabled = False
-            results.append(make_result("6.3", "Auditing is On for database instances",
-                db.dbinstance_id, db.dbinstance_description or db.dbinstance_id, enabled,
-                severity="high", service="RDS", remediation="Enable SQL Explorer/Auditing"))
-    return results
+    instances = _list_rds_instances(c, cfg)
+
+    for inst in instances:
+        db_id = inst.dbinstance_id
+        region = getattr(inst, "_region", cfg.regions[0])
+        try:
+            sec_resp = c.rds(region).describe_dbinstance_ip_array_list(
+                rds_models.DescribeDBInstanceIPArrayListRequest(dbinstance_id=db_id))
+            ip_arrays = sec_resp.body.items.dbinstance_iparray if (
+                sec_resp.body.items and sec_resp.body.items.dbinstance_iparray
+            ) else []
+            open_to_world = any(
+                "0.0.0.0/0" in (getattr(arr, "security_iplist", "") or "")
+                for arr in ip_arrays
+            )
+        except Exception:
+            open_to_world = False
+
+        results.append(make_result(
+            cis_id="6.2", check_id="ali_cis_6_2",
+            title="Ensure RDS Instances are not open to the world",
+            service="database", severity="medium",
+            status="FAIL" if open_to_world else "PASS",
+            resource_id=db_id, resource_name=db_id, region=region,
+            status_extended=f"RDS '{db_id}': {'open to 0.0.0.0/0' if open_to_world else 'restricted IP whitelist'}",
+            remediation="Remove 0.0.0.0/0 from IP whitelist: aliyun rds ModifySecurityIps",
+            compliance_frameworks=FW,
+        ))
+
+    return results or [make_result(cis_id="6.2", check_id="ali_cis_6_2",
+        title="Ensure RDS Instances are not open to the world",
+        service="database", severity="medium", status="N/A",
+        resource_id=cfg.account_id,
+        status_extended="No RDS instances found.",
+        compliance_frameworks=FW)]
 
 
-def evaluate_6_4(c: AlibabaClientCache, cfg: EvalConfig):
-    """Auditing retention > 6 months."""
-    from alibabacloud_rds20140815 import models as m
+# ───────────────────────────────────────────────────────────────
+# 6.3 -- Auditing is on (automated)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_6_3(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
+    from alibabacloud_rds20140815 import models as rds_models
     results = []
-    for region in cfg.regions:
-        client = c.rds(region)
-        dbs = client.describe_dbinstances(m.DescribeDBInstancesRequest(region_id=region, page_size=100)).body.items.dbinstance or []
-        for db in dbs:
-            try:
-                audit = client.describe_sqlcollector_retention(m.DescribeSQLCollectorRetentionRequest(dbinstance_id=db.dbinstance_id))
-                retention = int(getattr(audit.body, 'config_value', 0) or 0)
-                ok = retention >= 180
-            except Exception: ok = False
-            results.append(make_result("6.4", "Auditing retention > 6 months",
-                db.dbinstance_id, db.dbinstance_description or db.dbinstance_id, ok,
-                severity="high", service="RDS", remediation="Set SQL audit retention to 6+ months"))
-    return results
+    instances = _list_rds_instances(c, cfg)
+
+    for inst in instances:
+        db_id = inst.dbinstance_id
+        region = getattr(inst, "_region", cfg.regions[0])
+        try:
+            audit_resp = c.rds(region).describe_sqlcollector_policy(
+                rds_models.DescribeSQLCollectorPolicyRequest(dbinstance_id=db_id))
+            audit_on = getattr(audit_resp.body, "sqlcollector_status", "") == "Enable"
+        except Exception:
+            audit_on = False
+
+        results.append(make_result(
+            cis_id="6.3", check_id="ali_cis_6_3",
+            title="Ensure 'Auditing' is set to 'On' for applicable database instances",
+            service="database", severity="high",
+            status="PASS" if audit_on else "FAIL",
+            resource_id=db_id, resource_name=db_id, region=region,
+            status_extended=f"RDS '{db_id}': SQL audit {'enabled' if audit_on else 'disabled'}",
+            remediation="Enable SQL audit: aliyun rds ModifySQLCollectorPolicy --DBInstanceId ID --SQLCollectorStatus Enable",
+            compliance_frameworks=FW,
+        ))
+
+    return results or [make_result(cis_id="6.3", check_id="ali_cis_6_3",
+        title="Ensure 'Auditing' is set to 'On' for applicable database instances",
+        service="database", severity="high", status="N/A",
+        resource_id=cfg.account_id,
+        status_extended="No RDS instances found.",
+        compliance_frameworks=FW)]
 
 
-def evaluate_6_5(c: AlibabaClientCache, cfg: EvalConfig):
-    """TDE enabled."""
-    from alibabacloud_rds20140815 import models as m
+# ───────────────────────────────────────────────────────────────
+# 6.4 -- Audit retention > 6 months (automated)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_6_4(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
+    from alibabacloud_rds20140815 import models as rds_models
     results = []
-    for region in cfg.regions:
-        client = c.rds(region)
-        dbs = client.describe_dbinstances(m.DescribeDBInstancesRequest(region_id=region, page_size=100)).body.items.dbinstance or []
-        for db in dbs:
-            try:
-                tde = client.describe_dbinstance_tde(m.DescribeDBInstanceTDERequest(dbinstance_id=db.dbinstance_id))
-                enabled = tde.body.tdestatus == "Enabled"
-            except Exception: enabled = False
-            results.append(make_result("6.5", "TDE enabled on database instance",
-                db.dbinstance_id, db.dbinstance_description or db.dbinstance_id, enabled,
-                severity="high", service="RDS", remediation="Enable Transparent Data Encryption"))
-    return results
+    instances = _list_rds_instances(c, cfg)
+
+    for inst in instances:
+        db_id = inst.dbinstance_id
+        region = getattr(inst, "_region", cfg.regions[0])
+        try:
+            audit_resp = c.rds(region).describe_sqlcollector_retention(
+                rds_models.DescribeSQLCollectorRetentionRequest(dbinstance_id=db_id))
+            retention = getattr(audit_resp.body, "config_value", "0")
+            retention_days = int(retention) if retention else 0
+            sufficient = retention_days >= 180
+        except Exception:
+            retention_days = 0
+            sufficient = False
+
+        results.append(make_result(
+            cis_id="6.4", check_id="ali_cis_6_4",
+            title="Ensure 'Auditing' Retention is greater than 6 months",
+            service="database", severity="high",
+            status="PASS" if sufficient else "FAIL",
+            resource_id=db_id, resource_name=db_id, region=region,
+            status_extended=f"RDS '{db_id}': audit retention={retention_days} days (required >= 180)",
+            remediation="Increase SQL audit retention to at least 180 days.",
+            compliance_frameworks=FW,
+        ))
+
+    return results or [make_result(cis_id="6.4", check_id="ali_cis_6_4",
+        title="Ensure 'Auditing' Retention is greater than 6 months",
+        service="database", severity="high", status="N/A",
+        resource_id=cfg.account_id,
+        status_extended="No RDS instances found.",
+        compliance_frameworks=FW)]
 
 
-def evaluate_6_6(c: AlibabaClientCache, cfg: EvalConfig):
-    """TDE protector encrypted with BYOK."""
-    from alibabacloud_rds20140815 import models as m
+# ───────────────────────────────────────────────────────────────
+# 6.5 -- TDE enabled (automated)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_6_5(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
+    from alibabacloud_rds20140815 import models as rds_models
     results = []
-    for region in cfg.regions:
-        client = c.rds(region)
-        dbs = client.describe_dbinstances(m.DescribeDBInstancesRequest(region_id=region, page_size=100)).body.items.dbinstance or []
-        for db in dbs:
-            try:
-                tde = client.describe_dbinstance_tde(m.DescribeDBInstanceTDERequest(dbinstance_id=db.dbinstance_id))
-                byok = tde.body.tdestatus == "Enabled" and bool(getattr(tde.body, 'tdemethod', None))
-            except Exception: byok = False
-            results.append(make_result("6.6", "RDS TDE protector encrypted with BYOK",
-                db.dbinstance_id, db.dbinstance_description or db.dbinstance_id, byok,
-                severity="high", service="RDS", remediation="Enable TDE with customer-managed key"))
-    return results
+    instances = _list_rds_instances(c, cfg)
+    # TDE is applicable to MySQL and SQL Server
+    tde_engines = {"mysql", "mssql", "sqlserver"}
+
+    for inst in instances:
+        db_id = inst.dbinstance_id
+        engine = (getattr(inst, "engine", "") or "").lower()
+        region = getattr(inst, "_region", cfg.regions[0])
+
+        if engine not in tde_engines:
+            continue
+
+        try:
+            tde_resp = c.rds(region).describe_dbinstance_tde(
+                rds_models.DescribeDBInstanceTDERequest(dbinstance_id=db_id))
+            tde_status = getattr(tde_resp.body, "tdestatus", "") == "Enabled"
+        except Exception:
+            tde_status = False
+
+        results.append(make_result(
+            cis_id="6.5", check_id="ali_cis_6_5",
+            title="Ensure TDE is set to 'Enabled' on applicable database instances",
+            service="database", severity="high",
+            status="PASS" if tde_status else "FAIL",
+            resource_id=db_id, resource_name=db_id, region=region,
+            status_extended=f"RDS '{db_id}' ({engine}): TDE {'enabled' if tde_status else 'disabled'}",
+            remediation="Enable TDE: aliyun rds ModifyDBInstanceTDE --DBInstanceId ID --TDEStatus Enabled",
+            compliance_frameworks=FW,
+        ))
+
+    return results or [make_result(cis_id="6.5", check_id="ali_cis_6_5",
+        title="Ensure TDE is set to 'Enabled' on applicable database instances",
+        service="database", severity="high", status="N/A",
+        resource_id=cfg.account_id,
+        status_extended="No applicable RDS instances (MySQL/SQL Server) found.",
+        compliance_frameworks=FW)]
 
 
-def _eval_pg_param(c, cfg, param_name, cis_id, title):
-    from alibabacloud_rds20140815 import models as m
+# ───────────────────────────────────────────────────────────────
+# 6.6 -- TDE protector encrypted with BYOK (automated)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_6_6(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
+    from alibabacloud_rds20140815 import models as rds_models
     results = []
-    for region in cfg.regions:
-        client = c.rds(region)
-        dbs = client.describe_dbinstances(m.DescribeDBInstancesRequest(region_id=region, page_size=100)).body.items.dbinstance or []
-        for db in dbs:
-            if (getattr(db, 'engine', '') or '').lower() != 'postgresql': continue
-            try:
-                params = client.describe_parameters(m.DescribeParametersRequest(dbinstance_id=db.dbinstance_id))
-                val = "off"
-                for p in params.body.running_parameters.dbinstance_parameter or []:
-                    if p.parameter_name == param_name:
-                        val = p.parameter_value; break
-                ok = val.lower() == "on"
-            except Exception: ok = False
-            results.append(make_result(cis_id, title,
-                db.dbinstance_id, db.dbinstance_description or db.dbinstance_id, ok,
-                severity="medium", service="RDS",
-                remediation=f"Set {param_name} to ON in RDS parameters"))
-    return results
+    instances = _list_rds_instances(c, cfg)
+    tde_engines = {"mysql", "mssql", "sqlserver"}
 
-def evaluate_6_7(c, cfg): return _eval_pg_param(c, cfg, "log_connections", "6.7", "PostgreSQL log_connections is ON")
-def evaluate_6_8(c, cfg): return _eval_pg_param(c, cfg, "log_disconnections", "6.8", "PostgreSQL log_disconnections is ON")
-def evaluate_6_9(c, cfg): return _eval_pg_param(c, cfg, "log_duration", "6.9", "PostgreSQL log_duration is ON")
+    for inst in instances:
+        db_id = inst.dbinstance_id
+        engine = (getattr(inst, "engine", "") or "").lower()
+        region = getattr(inst, "_region", cfg.regions[0])
+
+        if engine not in tde_engines:
+            continue
+
+        try:
+            tde_resp = c.rds(region).describe_dbinstance_tde(
+                rds_models.DescribeDBInstanceTDERequest(dbinstance_id=db_id))
+            tde_status = getattr(tde_resp.body, "tdestatus", "") == "Enabled"
+            encryption_key = getattr(tde_resp.body, "tdekey", "") or ""
+            uses_byok = tde_status and bool(encryption_key)
+        except Exception:
+            uses_byok = False
+
+        results.append(make_result(
+            cis_id="6.6", check_id="ali_cis_6_6",
+            title="Ensure RDS instance TDE protector is encrypted with BYOK",
+            service="database", severity="high",
+            status="PASS" if uses_byok else "FAIL",
+            resource_id=db_id, resource_name=db_id, region=region,
+            status_extended=f"RDS '{db_id}': TDE BYOK {'configured' if uses_byok else 'not configured'}",
+            remediation="Enable TDE with customer-managed KMS key (BYOK).",
+            compliance_frameworks=FW,
+        ))
+
+    return results or [make_result(cis_id="6.6", check_id="ali_cis_6_6",
+        title="Ensure RDS instance TDE protector is encrypted with BYOK",
+        service="database", severity="high", status="N/A",
+        resource_id=cfg.account_id,
+        status_extended="No applicable RDS instances found.",
+        compliance_frameworks=FW)]
 
 
-SECTION_5_EVALUATORS = {f"5.{i}": globals()[f"evaluate_5_{i}"] for i in range(1, 10)}
-SECTION_6_EVALUATORS = {f"6.{i}": globals()[f"evaluate_6_{i}"] for i in range(1, 10)}
+# ───────────────────────────────────────────────────────────────
+# 6.7 -- PostgreSQL log_connections ON (automated)
+# ───────────────────────────────────────────────────────────────
+
+def _check_pg_parameter(c, cfg, cis_id, check_id, title, param_name, expected_value):
+    """Check a PostgreSQL RDS parameter."""
+    from alibabacloud_rds20140815 import models as rds_models
+    results = []
+    instances = _list_rds_instances(c, cfg)
+
+    for inst in instances:
+        engine = (getattr(inst, "engine", "") or "").lower()
+        if engine != "postgresql":
+            continue
+
+        db_id = inst.dbinstance_id
+        region = getattr(inst, "_region", cfg.regions[0])
+        try:
+            param_resp = c.rds(region).describe_parameters(
+                rds_models.DescribeParametersRequest(dbinstance_id=db_id))
+            running_params = param_resp.body.running_parameters
+            params = running_params.dbinstance_parameter if (
+                running_params and running_params.dbinstance_parameter
+            ) else []
+            actual = None
+            for p in params:
+                if p.parameter_name == param_name:
+                    actual = p.parameter_value
+                    break
+            passed = actual is not None and actual.lower() == expected_value.lower()
+        except Exception:
+            actual = None
+            passed = False
+
+        results.append(make_result(
+            cis_id=cis_id, check_id=check_id,
+            title=title, service="database", severity="medium",
+            status="PASS" if passed else "FAIL",
+            resource_id=db_id, resource_name=db_id, region=region,
+            status_extended=f"RDS PostgreSQL '{db_id}': {param_name}={actual} (expected {expected_value})",
+            remediation=f"Set parameter {param_name} to {expected_value} via RDS Console or API.",
+            compliance_frameworks=FW,
+        ))
+
+    return results or [make_result(cis_id=cis_id, check_id=check_id,
+        title=title, service="database", severity="medium", status="N/A",
+        resource_id=cfg.account_id,
+        status_extended="No PostgreSQL RDS instances found.",
+        compliance_frameworks=FW)]
+
+
+def evaluate_cis_6_7(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
+    return _check_pg_parameter(c, cfg, "6.7", "ali_cis_6_7",
+        "Ensure parameter 'log_connections' is set to 'ON' for PostgreSQL Database",
+        "log_connections", "on")
+
+
+# ───────────────────────────────────────────────────────────────
+# 6.8 -- PostgreSQL log_disconnections ON (automated)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_6_8(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
+    return _check_pg_parameter(c, cfg, "6.8", "ali_cis_6_8",
+        "Ensure parameter 'log_disconnections' is set to 'ON' for PostgreSQL Database",
+        "log_disconnections", "on")
+
+
+# ───────────────────────────────────────────────────────────────
+# 6.9 -- PostgreSQL log_duration ON (automated)
+# ───────────────────────────────────────────────────────────────
+
+def evaluate_cis_6_9(c: AlibabaClientCache, cfg: EvalConfig) -> list[dict]:
+    return _check_pg_parameter(c, cfg, "6.9", "ali_cis_6_9",
+        "Ensure parameter 'log_duration' is set to 'ON' for PostgreSQL Database Server",
+        "log_duration", "on")

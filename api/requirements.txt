@@ -61,6 +61,8 @@ alibabacloud-kms20160120>=2.4.0,<3.0
 alibabacloud-actiontrail20200706>=2.0.0,<3.0
 alibabacloud-oss20190517>=1.0.0,<2.0
 alibabacloud-cs20151215>=5.0.0,<6.0
+alibabacloud-sas20181203>=3.0.0,<4.0
+oss2>=2.18.0,<3.0
 
 # Kubernetes
 kubernetes>=29.0.0,<31.0
