@@ -14,6 +14,7 @@ import {
 } from '@heroicons/react/24/outline'
 
 const TACTIC_COLORS: Record<string, string> = {
+  'reconnaissance': 'border-t-pink-500',
   'initial-access': 'border-t-red-500',
   'execution': 'border-t-orange-500',
   'persistence': 'border-t-amber-500',
@@ -101,6 +102,9 @@ export default function MitreAttackPage() {
   const [selectedSource, setSelectedSource] = useState<{ type: 'provider' | 'saas', id: string } | null>(null)
   const [coverageGaps, setCoverageGaps] = useState<any>(null)
   const [showGaps, setShowGaps] = useState(false)
+  const [availableFrameworks, setAvailableFrameworks] = useState<{ id: string; label: string }[]>([])
+  const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([])
+  const [showFrameworkPicker, setShowFrameworkPicker] = useState(false)
   const phaseTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Persist analysis results in localStorage so they survive browser close
@@ -109,17 +113,15 @@ export default function MitreAttackPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [provData, saasData] = await Promise.all([
+        const [provData, saasData, fwData] = await Promise.all([
           api.getProviders(),
           api.getSaaSConnections().catch(() => []),
+          api.getMitreFrameworks().catch(() => ({ frameworks: [] })),
         ])
         setProviders(provData)
         setSaasConnections(saasData)
+        setAvailableFrameworks(fwData.frameworks || [])
       } catch {}
-
-      // Do NOT auto-restore cached analysis — require user to explicitly
-      // run analysis so stale data is never shown on page load.
-      // Users can click "Run Analysis" to generate fresh results.
     }
     loadData()
   }, [])
@@ -152,6 +154,7 @@ export default function MitreAttackPage() {
     try {
       const params: Record<string, string> = {}
       if (selectedProvider) params.provider_id = selectedProvider
+      if (selectedFrameworks.length > 0) params.frameworks = selectedFrameworks.join(',')
       const data = await api.getMitreMatrix(params)
 
       // Ensure we show all phases before revealing results
@@ -225,6 +228,7 @@ export default function MitreAttackPage() {
     try {
       const params: Record<string, string> = {}
       if (selectedProvider) params.provider_id = selectedProvider
+      if (selectedFrameworks.length > 0) params.frameworks = selectedFrameworks.join(',')
       const layer = await api.getMitreNavigatorLayer(params)
       const blob = new Blob([JSON.stringify(layer, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -243,6 +247,7 @@ export default function MitreAttackPage() {
     try {
       const params: Record<string, string> = {}
       if (selectedProvider) params.provider_id = selectedProvider
+      if (selectedFrameworks.length > 0) params.frameworks = selectedFrameworks.join(',')
       const gaps = await api.getMitreCoverageGaps(params)
       setCoverageGaps(gaps)
       setShowGaps(true)
@@ -298,6 +303,65 @@ export default function MitreAttackPage() {
                 </optgroup>
               )}
             </select>
+            {/* Framework filter */}
+            <div className="relative">
+              <button
+                onClick={() => setShowFrameworkPicker(!showFrameworkPicker)}
+                className={`inline-flex items-center gap-2 px-3 py-2 border text-sm rounded-lg transition-colors ${
+                  selectedFrameworks.length > 0
+                    ? 'bg-brand-blue/10 border-brand-blue/30 text-brand-blue'
+                    : 'border-brand-gray-200 text-brand-gray-600 hover:bg-brand-gray-50'
+                }`}
+              >
+                <FunnelIcon className="w-4 h-4" />
+                {selectedFrameworks.length > 0
+                  ? `${selectedFrameworks.length} Framework${selectedFrameworks.length > 1 ? 's' : ''}`
+                  : 'All Frameworks'}
+              </button>
+              {showFrameworkPicker && (
+                <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-brand-gray-200 rounded-lg shadow-lg z-50 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-brand-navy uppercase">Filter by Framework</span>
+                    {selectedFrameworks.length > 0 && (
+                      <button
+                        onClick={() => setSelectedFrameworks([])}
+                        className="text-[10px] text-brand-blue hover:underline"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-1 max-h-60 overflow-y-auto">
+                    {availableFrameworks.map((fw) => (
+                      <label
+                        key={fw.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-brand-gray-50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedFrameworks.includes(fw.label)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedFrameworks([...selectedFrameworks, fw.label])
+                            } else {
+                              setSelectedFrameworks(selectedFrameworks.filter((f) => f !== fw.label))
+                            }
+                          }}
+                          className="rounded border-brand-gray-300 text-brand-green focus:ring-brand-green"
+                        />
+                        <span className="text-xs text-brand-gray-700">{fw.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setShowFrameworkPicker(false)}
+                    className="mt-2 w-full text-center text-xs text-brand-gray-500 hover:text-brand-navy py-1"
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
+            </div>
             {lastAnalyzed && (
               <span className="text-xs text-brand-gray-400">
                 Last analyzed: {lastAnalyzed}

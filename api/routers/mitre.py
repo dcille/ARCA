@@ -1,20 +1,39 @@
-"""MITRE ATT&CK Matrix router."""
+"""MITRE ATT&CK Matrix router.
+
+Supports both cloud provider findings (Finding) and SaaS findings (SaaSFinding),
+with optional framework filtering to scope the matrix to selected benchmarks.
+"""
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from api.database import get_db
 from api.models.user import User
 from api.models.finding import Finding
+from api.models.saas_finding import SaaSFinding
 from api.models.scan import Scan
 from api.models.provider import Provider
+from api.models.saas_connection import SaaSConnection
 from api.models.attack_path import AttackPath
 from api.services.auth_service import get_current_user
 
 router = APIRouter()
+
+# Framework prefixes: CIS control id prefix -> framework label
+FRAMEWORK_PREFIXES = {
+    "azure_cis_": "CIS Azure v5.0",
+    "aws_cis_": "CIS AWS v6.0",
+    "gcp_cis_": "CIS GCP v4.0",
+    "oci_cis_": "CIS OCI v3.1",
+    "alibaba_cis_": "CIS Alibaba v2.0",
+    "ibm_cis_": "CIS IBM Cloud v2.0",
+    "m365_cis_": "CIS M365 v6.0.1",
+    "gws_cis_": "CIS Google Workspace v1.3.0",
+    "sf_cis_": "CIS Snowflake v1.0.0",
+}
 
 
 def _build_reverse_mapping(check_to_mitre: dict) -> dict[str, list[str]]:
@@ -26,43 +45,167 @@ def _build_reverse_mapping(check_to_mitre: dict) -> dict[str, list[str]]:
     return reverse
 
 
+def _filter_check_to_mitre(check_to_mitre: dict, frameworks: list[str] | None) -> dict:
+    """Filter CHECK_TO_MITRE to only include entries matching selected frameworks.
+
+    If frameworks is None or empty, returns all entries (no filtering).
+    """
+    if not frameworks:
+        return check_to_mitre
+
+    # Build set of allowed prefixes from selected framework labels
+    allowed_prefixes = set()
+    for prefix, label in FRAMEWORK_PREFIXES.items():
+        if label in frameworks:
+            allowed_prefixes.add(prefix)
+
+    if not allowed_prefixes:
+        return check_to_mitre
+
+    # Keep entries that match an allowed prefix OR are non-CIS check_ids
+    filtered = {}
+    for check_id, techs in check_to_mitre.items():
+        is_cis = any(check_id.startswith(p) for p in FRAMEWORK_PREFIXES)
+        if not is_cis:
+            # Non-CIS scanner check_ids (e.g. iam_root_mfa_enabled) — always include
+            filtered[check_id] = techs
+        elif any(check_id.startswith(p) for p in allowed_prefixes):
+            filtered[check_id] = techs
+    return filtered
+
+
+async def _collect_findings(
+    db: AsyncSession,
+    user_id: str,
+    provider_id: str | None = None,
+    connection_id: str | None = None,
+    scan_id: str | None = None,
+) -> list[dict]:
+    """Collect findings from both Finding and SaaSFinding tables into a uniform list."""
+    results: list[dict] = []
+
+    # 1. Cloud provider findings
+    cloud_query = (
+        select(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .where(Scan.user_id == user_id)
+    )
+    if provider_id:
+        cloud_query = cloud_query.where(Finding.provider_id == provider_id)
+    if scan_id:
+        cloud_query = cloud_query.where(Finding.scan_id == scan_id)
+
+    cloud_result = await db.execute(cloud_query)
+    for f in cloud_result.scalars().all():
+        techniques = []
+        if f.mitre_techniques:
+            try:
+                techniques = json.loads(f.mitre_techniques)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        results.append({
+            "id": f.id,
+            "check_id": f.check_id,
+            "check_title": f.check_title,
+            "status": f.status,
+            "severity": f.severity,
+            "resource_id": f.resource_id,
+            "resource_name": f.resource_name,
+            "service": getattr(f, "service", ""),
+            "region": getattr(f, "region", ""),
+            "mitre_techniques": techniques,
+            "source": "cloud",
+        })
+
+    # 2. SaaS findings
+    saas_query = (
+        select(SaaSFinding)
+        .join(Scan, SaaSFinding.scan_id == Scan.id)
+        .where(Scan.user_id == user_id)
+    )
+    if connection_id:
+        saas_query = saas_query.where(SaaSFinding.connection_id == connection_id)
+    if provider_id:
+        # If provider_id is actually a SaaS connection ID, filter by it
+        saas_query = saas_query.where(SaaSFinding.connection_id == provider_id)
+    if scan_id:
+        saas_query = saas_query.where(SaaSFinding.scan_id == scan_id)
+
+    saas_result = await db.execute(saas_query)
+    for sf in saas_result.scalars().all():
+        techniques = []
+        if sf.mitre_techniques:
+            try:
+                techniques = json.loads(sf.mitre_techniques)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        results.append({
+            "id": sf.id,
+            "check_id": sf.check_id,
+            "check_title": sf.check_title,
+            "status": sf.status,
+            "severity": sf.severity,
+            "resource_id": sf.resource_id or "",
+            "resource_name": sf.resource_name or "",
+            "service": sf.service_area,
+            "region": "",
+            "mitre_techniques": techniques,
+            "source": "saas",
+        })
+
+    return results
+
+
+@router.get("/frameworks")
+async def get_available_frameworks(
+    current_user: User = Depends(get_current_user),
+):
+    """List available frameworks that can be used to filter the MITRE matrix."""
+    return {
+        "frameworks": [
+            {"id": prefix.rstrip("_"), "label": label}
+            for prefix, label in sorted(FRAMEWORK_PREFIXES.items(), key=lambda x: x[1])
+        ]
+    }
+
+
 @router.get("/matrix")
 async def get_attack_matrix(
     provider_id: Optional[str] = None,
+    connection_id: Optional[str] = None,
     scan_id: Optional[str] = None,
+    frameworks: Optional[str] = Query(
+        None,
+        description="Comma-separated framework labels to filter, e.g. 'CIS AWS v6.0,CIS Azure v5.0'",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get MITRE ATT&CK matrix data with pass/fail coloring based on findings."""
+    """Get MITRE ATT&CK matrix data with pass/fail coloring based on findings.
+
+    Combines cloud and SaaS findings. Supports filtering by:
+    - provider_id / connection_id: scope to a single account
+    - frameworks: comma-separated list of framework labels to include
+    """
     from scanner.mitre.attack_mapping import MITRE_TECHNIQUES, CHECK_TO_MITRE
 
-    # Get all findings for this user (optionally filtered by provider/scan)
-    query = (
-        select(Finding)
-        .join(Scan, Finding.scan_id == Scan.id)
-        .where(Scan.user_id == current_user.id)
-    )
-    if provider_id:
-        query = query.where(Finding.provider_id == provider_id)
-    if scan_id:
-        query = query.where(Finding.scan_id == scan_id)
+    # Parse framework filter
+    fw_list = [f.strip() for f in frameworks.split(",") if f.strip()] if frameworks else None
+    active_mapping = _filter_check_to_mitre(CHECK_TO_MITRE, fw_list)
 
-    result = await db.execute(query)
-    findings = result.scalars().all()
+    # Collect all findings
+    findings = await _collect_findings(
+        db, current_user.id, provider_id=provider_id,
+        connection_id=connection_id, scan_id=scan_id,
+    )
 
     # Build a technique -> status mapping
-    technique_status = {}  # technique_id -> {"checks": [...], "pass_count": int, "fail_count": int}
+    technique_status: dict[str, dict] = {}
 
     for finding in findings:
-        # Get MITRE techniques from the finding itself or from the mapping
-        techniques = []
-        if finding.mitre_techniques:
-            try:
-                techniques = json.loads(finding.mitre_techniques)
-            except (json.JSONDecodeError, TypeError):
-                pass
+        techniques = finding["mitre_techniques"]
         if not techniques:
-            techniques = CHECK_TO_MITRE.get(finding.check_id, [])
+            techniques = active_mapping.get(finding["check_id"], [])
 
         for tech_id in techniques:
             if tech_id not in technique_status:
@@ -72,27 +215,28 @@ async def get_attack_matrix(
                     "fail_count": 0,
                 }
             technique_status[tech_id]["checks"].append({
-                "finding_id": finding.id,
-                "check_id": finding.check_id,
-                "check_title": finding.check_title,
-                "status": finding.status,
-                "severity": finding.severity,
-                "resource_id": finding.resource_id,
-                "resource_name": finding.resource_name,
+                "finding_id": finding["id"],
+                "check_id": finding["check_id"],
+                "check_title": finding["check_title"],
+                "status": finding["status"],
+                "severity": finding["severity"],
+                "resource_id": finding["resource_id"],
+                "resource_name": finding["resource_name"],
             })
-            if finding.status == "PASS":
+            if finding["status"] == "PASS":
                 technique_status[tech_id]["pass_count"] += 1
             else:
                 technique_status[tech_id]["fail_count"] += 1
 
     # Build matrix organized by tactic
     tactics_order = [
-        "initial-access", "execution", "persistence", "privilege-escalation",
-        "defense-evasion", "credential-access", "discovery",
-        "lateral-movement", "collection", "exfiltration", "impact",
+        "reconnaissance", "initial-access", "execution", "persistence",
+        "privilege-escalation", "defense-evasion", "credential-access",
+        "discovery", "lateral-movement", "collection", "exfiltration", "impact",
     ]
 
     tactic_labels = {
+        "reconnaissance": "Reconnaissance",
         "initial-access": "Initial Access",
         "execution": "Execution",
         "persistence": "Persistence",
@@ -110,7 +254,6 @@ async def get_attack_matrix(
     for tactic in tactics_order:
         tactic_techniques = []
         for tech_id, tech_info in MITRE_TECHNIQUES.items():
-            # Normalize tactic comparison: mapping uses "Initial Access", router uses "initial-access"
             tech_tactic = tech_info.get("tactic", "").lower().replace(" ", "-")
             if tech_tactic == tactic:
                 status_data = technique_status.get(tech_id, {})
@@ -118,7 +261,6 @@ async def get_attack_matrix(
                 fail_count = status_data.get("fail_count", 0)
                 total = pass_count + fail_count
 
-                # Determine color: red if any fail, green if all pass, gray if not assessed
                 if total == 0:
                     color = "gray"
                 elif fail_count > 0:
@@ -144,7 +286,6 @@ async def get_attack_matrix(
             "techniques": tactic_techniques,
         })
 
-    # Summary stats
     total_techniques = sum(len(t["techniques"]) for t in matrix)
     assessed = sum(1 for t in matrix for tech in t["techniques"] if tech["total_checks"] > 0)
     protected = sum(1 for t in matrix for tech in t["techniques"] if tech["color"] == "green")
@@ -160,6 +301,7 @@ async def get_attack_matrix(
             "not_assessed": total_techniques - assessed,
             "coverage_rate": round((assessed / total_techniques * 100) if total_techniques > 0 else 0, 1),
         },
+        "active_frameworks": fw_list or [],
     }
 
 
@@ -167,6 +309,7 @@ async def get_attack_matrix(
 async def get_technique_detail(
     technique_id: str,
     provider_id: Optional[str] = None,
+    connection_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -183,21 +326,20 @@ async def get_technique_detail(
         check_id for check_id, techs in CHECK_TO_MITRE.items() if technique_id in techs
     ]
 
-    # Get findings for those checks
-    query = (
+    # Get cloud findings
+    cloud_query = (
         select(Finding)
         .join(Scan, Finding.scan_id == Scan.id)
         .where(Scan.user_id == current_user.id)
         .where(Finding.check_id.in_(related_check_ids))
     )
     if provider_id:
-        query = query.where(Finding.provider_id == provider_id)
+        cloud_query = cloud_query.where(Finding.provider_id == provider_id)
 
-    result = await db.execute(query)
-    findings = result.scalars().all()
+    cloud_result = await db.execute(cloud_query)
 
     checks_detail = []
-    for f in findings:
+    for f in cloud_result.scalars().all():
         checks_detail.append({
             "finding_id": f.id,
             "check_id": f.check_id,
@@ -212,6 +354,38 @@ async def get_technique_detail(
             "remediation": f.remediation,
             "check_description": f.check_description or CHECK_DESCRIPTIONS.get(f.check_id, ""),
             "evidence_log": f.evidence_log or CHECK_EVIDENCE.get(f.check_id, ""),
+            "source": "cloud",
+        })
+
+    # Get SaaS findings
+    saas_query = (
+        select(SaaSFinding)
+        .join(Scan, SaaSFinding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id)
+        .where(SaaSFinding.check_id.in_(related_check_ids))
+    )
+    if connection_id:
+        saas_query = saas_query.where(SaaSFinding.connection_id == connection_id)
+    if provider_id:
+        saas_query = saas_query.where(SaaSFinding.connection_id == provider_id)
+
+    saas_result = await db.execute(saas_query)
+    for sf in saas_result.scalars().all():
+        checks_detail.append({
+            "finding_id": sf.id,
+            "check_id": sf.check_id,
+            "check_title": sf.check_title,
+            "status": sf.status,
+            "severity": sf.severity,
+            "service": sf.service_area,
+            "region": "",
+            "resource_id": sf.resource_id or "",
+            "resource_name": sf.resource_name or "",
+            "status_extended": "",
+            "remediation": sf.remediation or "",
+            "check_description": sf.description or CHECK_DESCRIPTIONS.get(sf.check_id, ""),
+            "evidence_log": "",
+            "source": "saas",
         })
 
     pass_count = sum(1 for c in checks_detail if c["status"] == "PASS")
@@ -250,22 +424,38 @@ async def get_technique_checks(
     reverse = _build_reverse_mapping(CHECK_TO_MITRE)
     check_ids = reverse.get(technique_id, [])
 
-    # Get latest finding status for each check
-    query = (
+    # Cloud findings
+    cloud_query = (
         select(Finding)
         .join(Scan, Finding.scan_id == Scan.id)
         .where(Scan.user_id == current_user.id)
         .where(Finding.check_id.in_(check_ids))
     )
-    result = await db.execute(query)
-    findings = result.scalars().all()
+    cloud_result = await db.execute(cloud_query)
 
     check_status: dict[str, dict] = {}
-    for f in findings:
+    for f in cloud_result.scalars().all():
         cid = f.check_id
         if cid not in check_status:
             check_status[cid] = {"check_id": cid, "check_title": f.check_title, "pass": 0, "fail": 0, "service": f.service}
         if f.status == "PASS":
+            check_status[cid]["pass"] += 1
+        else:
+            check_status[cid]["fail"] += 1
+
+    # SaaS findings
+    saas_query = (
+        select(SaaSFinding)
+        .join(Scan, SaaSFinding.scan_id == Scan.id)
+        .where(Scan.user_id == current_user.id)
+        .where(SaaSFinding.check_id.in_(check_ids))
+    )
+    saas_result = await db.execute(saas_query)
+    for sf in saas_result.scalars().all():
+        cid = sf.check_id
+        if cid not in check_status:
+            check_status[cid] = {"check_id": cid, "check_title": sf.check_title, "pass": 0, "fail": 0, "service": sf.service_area}
+        if sf.status == "PASS":
             check_status[cid]["pass"] += 1
         else:
             check_status[cid]["fail"] += 1
@@ -284,31 +474,28 @@ async def get_technique_checks(
 @router.get("/coverage-gaps")
 async def get_coverage_gaps(
     provider_id: Optional[str] = None,
+    connection_id: Optional[str] = None,
+    frameworks: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Analyze MITRE technique coverage gaps: which techniques are covered, at risk, or not assessed."""
+    """Analyze MITRE technique coverage gaps."""
     from scanner.mitre.attack_mapping import MITRE_TECHNIQUES, CHECK_TO_MITRE
 
-    query = (
-        select(Finding)
-        .join(Scan, Finding.scan_id == Scan.id)
-        .where(Scan.user_id == current_user.id)
+    fw_list = [f.strip() for f in frameworks.split(",") if f.strip()] if frameworks else None
+    active_mapping = _filter_check_to_mitre(CHECK_TO_MITRE, fw_list)
+
+    findings = await _collect_findings(
+        db, current_user.id, provider_id=provider_id, connection_id=connection_id,
     )
-    if provider_id:
-        query = query.where(Finding.provider_id == provider_id)
 
-    result = await db.execute(query)
-    findings = result.scalars().all()
-
-    # Build technique status from findings
     tech_pass: dict[str, int] = {}
     tech_fail: dict[str, int] = {}
 
     for f in findings:
-        techs = CHECK_TO_MITRE.get(f.check_id, [])
+        techs = f["mitre_techniques"] or active_mapping.get(f["check_id"], [])
         for tid in techs:
-            if f.status == "PASS":
+            if f["status"] == "PASS":
                 tech_pass[tid] = tech_pass.get(tid, 0) + 1
             else:
                 tech_fail[tid] = tech_fail.get(tid, 0) + 1
@@ -319,17 +506,17 @@ async def get_coverage_gaps(
 
     for tid, info in MITRE_TECHNIQUES.items():
         p = tech_pass.get(tid, 0)
-        f = tech_fail.get(tid, 0)
+        f_count = tech_fail.get(tid, 0)
         entry = {
             "id": tid,
             "name": info["name"],
             "tactic": info.get("tactic", ""),
             "pass_count": p,
-            "fail_count": f,
+            "fail_count": f_count,
         }
-        if p + f == 0:
+        if p + f_count == 0:
             not_covered.append(entry)
-        elif f > 0:
+        elif f_count > 0:
             covered_failing.append(entry)
         else:
             covered_passing.append(entry)
@@ -353,58 +540,58 @@ async def get_coverage_gaps(
 @router.get("/navigator-layer")
 async def export_navigator_layer(
     provider_id: Optional[str] = None,
+    connection_id: Optional[str] = None,
+    frameworks: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Export MITRE ATT&CK Navigator layer (JSON format compatible with ATT&CK Navigator v4.4)."""
+    """Export MITRE ATT&CK Navigator layer (JSON v4.4)."""
     from scanner.mitre.attack_mapping import MITRE_TECHNIQUES, CHECK_TO_MITRE
 
-    query = (
-        select(Finding)
-        .join(Scan, Finding.scan_id == Scan.id)
-        .where(Scan.user_id == current_user.id)
-    )
-    if provider_id:
-        query = query.where(Finding.provider_id == provider_id)
+    fw_list = [f.strip() for f in frameworks.split(",") if f.strip()] if frameworks else None
+    active_mapping = _filter_check_to_mitre(CHECK_TO_MITRE, fw_list)
 
-    result = await db.execute(query)
-    findings = result.scalars().all()
+    findings = await _collect_findings(
+        db, current_user.id, provider_id=provider_id, connection_id=connection_id,
+    )
 
     tech_pass: dict[str, int] = {}
     tech_fail: dict[str, int] = {}
     tech_checks: dict[str, list[str]] = {}
 
     for f in findings:
-        techs = CHECK_TO_MITRE.get(f.check_id, [])
+        techs = f["mitre_techniques"] or active_mapping.get(f["check_id"], [])
         for tid in techs:
-            if f.status == "PASS":
+            if f["status"] == "PASS":
                 tech_pass[tid] = tech_pass.get(tid, 0) + 1
             else:
                 tech_fail[tid] = tech_fail.get(tid, 0) + 1
             tech_checks.setdefault(tid, [])
-            if f.check_id not in tech_checks[tid]:
-                tech_checks[tid].append(f.check_id)
+            if f["check_id"] not in tech_checks[tid]:
+                tech_checks[tid].append(f["check_id"])
+
+    fail_check_ids = {f["check_id"] for f in findings if f["status"] == "FAIL"}
 
     techniques_layer = []
     for tid, info in MITRE_TECHNIQUES.items():
         p = tech_pass.get(tid, 0)
-        f = tech_fail.get(tid, 0)
-        total = p + f
+        f_count = tech_fail.get(tid, 0)
+        total = p + f_count
 
         if total == 0:
             score = 0
-            color = ""  # Not assessed — no color
-        elif f > 0:
+            color = ""
+        elif f_count > 0:
             score = 2
-            color = "#ff6666"  # Red — at risk
+            color = "#ff6666"
         else:
             score = 1
-            color = "#83d353"  # Green — protected
+            color = "#83d353"
 
-        fail_checks = [c for c in tech_checks.get(tid, []) if c in [ff.check_id for ff in findings if ff.status == "FAIL"]]
-        comment = f"{p} pass, {f} fail" if total > 0 else "Not assessed"
-        if fail_checks:
-            comment += f". Failing: {', '.join(fail_checks[:5])}"
+        failing = [c for c in tech_checks.get(tid, []) if c in fail_check_ids]
+        comment = f"{p} pass, {f_count} fail" if total > 0 else "Not assessed"
+        if failing:
+            comment += f". Failing: {', '.join(failing[:5])}"
 
         entry = {
             "techniqueID": tid,
@@ -460,7 +647,6 @@ async def get_mitre_attack_paths_coverage(
     """Show which MITRE techniques are covered by discovered attack paths."""
     from scanner.mitre.attack_mapping import MITRE_TECHNIQUES
 
-    # Get all attack paths for this user
     result = await db.execute(
         select(AttackPath).where(AttackPath.user_id == current_user.id)
     )

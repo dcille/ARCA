@@ -600,6 +600,10 @@ class ApiClient {
     return this.request<any>('GET', `/api/v1/mitre/technique/${techniqueId}`, undefined, { params })
   }
 
+  async getMitreFrameworks() {
+    return this.request<any>('GET', '/api/v1/mitre/frameworks')
+  }
+
   // Organizations
   async createOrganization(data: { name: string; slug: string }) {
     return this.request<any>('POST', '/api/v1/organizations', data)
