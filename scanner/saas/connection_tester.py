@@ -204,16 +204,27 @@ async def _test_google_workspace(credentials: dict) -> tuple[bool, str]:
     import httpx
     import json
     import time
-    import hashlib
-    import base64
 
     try:
-        sa_info = json.loads(credentials["service_account_json"])
+        sa_raw = credentials["service_account_key"]
+        if isinstance(sa_raw, dict):
+            sa_info = sa_raw
+        else:
+            sa_info = json.loads(sa_raw)
+
         # Validate required fields are present in the service account JSON
         required_fields = ["client_email", "token_uri", "private_key"]
         for field in required_fields:
             if field not in sa_info:
                 return False, f"Service account JSON missing required field: {field}"
+
+        admin_email = credentials.get("admin_email", "")
+        if not admin_email:
+            return False, "Admin email (Super Admin) is required for domain-wide delegation"
+
+        domain = credentials.get("domain", "")
+        if not domain:
+            return False, "Primary Google Workspace domain is required"
 
         # Use Google OAuth2 token endpoint to verify credentials
         async with httpx.AsyncClient(timeout=15) as client:
@@ -223,7 +234,7 @@ async def _test_google_workspace(credentials: dict) -> tuple[bool, str]:
             now = int(time.time())
             payload = {
                 "iss": sa_info["client_email"],
-                "sub": credentials["delegated_admin_email"],
+                "sub": admin_email,
                 "scope": "https://www.googleapis.com/auth/admin.directory.user.readonly",
                 "aud": sa_info["token_uri"],
                 "iat": now,
@@ -238,10 +249,21 @@ async def _test_google_workspace(credentials: dict) -> tuple[bool, str]:
                 },
             )
         if response.status_code == 200 and "access_token" in response.json():
-            return True, "Successfully authenticated with Google Workspace"
-        return False, f"Google Workspace authentication failed: {response.status_code}"
+            return True, f"Successfully connected to Google Workspace domain '{domain}'"
+        error_detail = ""
+        try:
+            error_detail = response.json().get("error_description", "")
+        except Exception:
+            pass
+        hints = []
+        if "unauthorized_client" in error_detail.lower():
+            hints.append("Verify the service account has domain-wide delegation enabled in Admin Console > API controls")
+        if "invalid_grant" in error_detail.lower():
+            hints.append("Check that the admin email is a Super Admin and domain-wide delegation scopes are authorized")
+        hint_text = ". ".join(hints) if hints else error_detail
+        return False, f"Google Workspace authentication failed ({response.status_code}). {hint_text}"
     except json.JSONDecodeError:
-        return False, "Invalid service account JSON format"
+        return False, "Invalid service account JSON format. Paste the full contents of the JSON key file."
     except ImportError:
         return False, "PyJWT library required for Google Workspace authentication"
     except Exception as e:

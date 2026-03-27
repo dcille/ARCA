@@ -54,12 +54,15 @@ class GoogleWorkspaceScanner(BaseSaaSScanner):
         "https://www.googleapis.com/auth/admin.directory.rolemanagement.readonly",
         "https://www.googleapis.com/auth/admin.reports.audit.readonly",
         "https://www.googleapis.com/auth/apps.groups.settings",
+        "https://www.googleapis.com/auth/cloud-identity.policies.readonly",
+        "https://www.googleapis.com/auth/cloud-platform",
     ]
 
     def __init__(self, credentials: dict):
         super().__init__(credentials)
         self.admin_email = credentials["admin_email"]
         self.domain = credentials["domain"]
+        self.customer_id = credentials.get("customer_id", "my_customer") or "my_customer"
         service_account_key = credentials["service_account_key"]
         if isinstance(service_account_key, str):
             self._sa_info = json.loads(service_account_key)
