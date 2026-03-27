@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Header from '@/components/layout/Header'
 import { api } from '@/lib/api'
 import { formatPercent, getPassRateColor, getPassRateStroke } from '@/lib/utils'
-import { XMarkIcon, ChevronDownIcon, ChevronRightIcon, BookOpenIcon, FunnelIcon, CheckIcon, CloudIcon, ServerIcon, PlusIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, ChevronDownIcon, ChevronRightIcon, BookOpenIcon, FunnelIcon, CheckIcon, CloudIcon, ServerIcon, PlusIcon, WrenchScrewdriverIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -221,6 +221,93 @@ export default function CompliancePage() {
     setExpandedControls(new Set())
     setShowLibrary(false)
     setLibraryData(null)
+  }
+
+  const exportFrameworkCSV = () => {
+    if (!controlsData?.controls?.length) return
+
+    const frameworkName = controlsData.framework?.name || 'framework'
+    const rows: string[][] = []
+
+    // Header row
+    rows.push([
+      'Control ID',
+      'Control Title',
+      'Control Status',
+      'Severity',
+      'Assessment Type',
+      'CIS Level',
+      'Provider',
+      'Check ID',
+      'Check Description',
+      'Check Status',
+      'Findings',
+      'Failed',
+      'Passed',
+      'Error Detail',
+    ])
+
+    for (const ctrl of controlsData.controls) {
+      const providerKeys = Object.keys(ctrl.checks || {})
+      if (providerKeys.length === 0) {
+        // Control with no checks — emit one row
+        rows.push([
+          ctrl.id,
+          ctrl.title,
+          ctrl.status,
+          ctrl.severity || '',
+          ctrl.assessment_type || '',
+          ctrl.cis_level || '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+        ])
+      } else {
+        for (const provider of providerKeys) {
+          for (const check of ctrl.checks[provider] || []) {
+            rows.push([
+              ctrl.id,
+              ctrl.title,
+              ctrl.status,
+              ctrl.severity || '',
+              ctrl.assessment_type || '',
+              ctrl.cis_level || '',
+              provider,
+              check.check_id,
+              check.description || '',
+              check.status,
+              String(check.finding_count ?? ''),
+              String(check.fail_count ?? ''),
+              String(check.pass_count ?? ''),
+              check.error_detail || check.status_extended || '',
+            ])
+          }
+        }
+      }
+    }
+
+    // Build CSV string with proper escaping
+    const csvContent = rows
+      .map((row) =>
+        row.map((cell) => {
+          const val = String(cell).replace(/"/g, '""')
+          return /[",\n\r]/.test(val) ? `"${val}"` : val
+        }).join(',')
+      )
+      .join('\n')
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${frameworkName.replace(/[^a-zA-Z0-9_.-]/g, '_')}_controls.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const openOverrideModal = (checkId: string, checkTitle: string, controlId: string) => {
@@ -696,17 +783,27 @@ export default function CompliancePage() {
                 )
               })}
             </div>
-            <button
-              onClick={toggleLibrary}
-              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                showLibrary
-                  ? 'bg-brand-green text-white'
-                  : 'border border-brand-gray-300 text-brand-gray-700 hover:bg-brand-gray-50'
-              }`}
-            >
-              <BookOpenIcon className="w-4 h-4" />
-              Check Library
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={exportFrameworkCSV}
+                disabled={!controlsData?.controls?.length}
+                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors border border-brand-gray-300 text-brand-gray-700 hover:bg-brand-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ArrowDownTrayIcon className="w-4 h-4" />
+                Export CSV
+              </button>
+              <button
+                onClick={toggleLibrary}
+                className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  showLibrary
+                    ? 'bg-brand-green text-white'
+                    : 'border border-brand-gray-300 text-brand-gray-700 hover:bg-brand-gray-50'
+                }`}
+              >
+                <BookOpenIcon className="w-4 h-4" />
+                Check Library
+              </button>
+            </div>
           </div>
 
           {/* Check Library Panel */}
@@ -1098,6 +1195,21 @@ export default function CompliancePage() {
                                             <p className="text-[10px] text-amber-600 mt-1 italic">
                                               Not evaluated — no scan has been executed for this provider yet, or the scanner does not cover this specific check. Run a scan on the corresponding cloud account to evaluate this control.
                                             </p>
+                                          )}
+                                          {check.status === 'ERROR' && (
+                                            <div className="mt-1">
+                                              <p className="text-[10px] text-orange-600 italic">
+                                                Evaluation error — the check could not be completed.
+                                              </p>
+                                              {(check.error_detail || check.status_extended) && (
+                                                <div className="mt-1 bg-orange-50 border border-orange-200 rounded px-2 py-1.5">
+                                                  <p className="text-[10px] font-medium text-orange-700 mb-0.5">SDK / API Response:</p>
+                                                  <p className="text-[10px] text-orange-800 font-mono break-all">
+                                                    {check.error_detail || check.status_extended}
+                                                  </p>
+                                                </div>
+                                              )}
+                                            </div>
                                           )}
                                           {check.evidence_method && (
                                             <p className="text-[10px] text-brand-gray-400 mt-1">

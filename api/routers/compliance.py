@@ -630,7 +630,7 @@ async def framework_controls_with_results(
 
                     # Get one representative finding for details
                     check_findings = findings_by_check.get(cid, [])
-                    provider_checks[provider].append({
+                    check_entry: dict = {
                         "check_id": cid,
                         "status": status,
                         "description": CHECK_DESCRIPTIONS.get(cid, f"Security check: {cid.replace('_', ' ')}"),
@@ -638,7 +638,14 @@ async def framework_controls_with_results(
                         "finding_count": len(check_findings),
                         "fail_count": sum(1 for f in check_findings if f.status == "FAIL"),
                         "pass_count": sum(1 for f in check_findings if f.status == "PASS"),
-                    })
+                    }
+                    # For ERROR status, include the real error detail from the provider SDK/API
+                    if status == "ERROR" and check_findings:
+                        error_finding = next((f for f in check_findings if f.status == "ERROR"), None)
+                        if error_finding:
+                            check_entry["status_extended"] = error_finding.status_extended or ""
+                            check_entry["error_detail"] = error_finding.status_extended or ""
+                    provider_checks[provider].append(check_entry)
 
         # Control-level status
         if ctrl_failed > 0:
