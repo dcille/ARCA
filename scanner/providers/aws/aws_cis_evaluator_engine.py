@@ -22,10 +22,11 @@ logger = logging.getLogger(__name__)
 class AWSCISEvaluatorEngine:
     """Orchestrates CIS AWS benchmark evaluation across all 62 controls."""
 
-    def __init__(self, credentials: dict, regions: Optional[list[str]] = None, services: Optional[list[str]] = None):
+    def __init__(self, credentials: dict, regions: Optional[list[str]] = None, services: Optional[list[str]] = None, scan_logger=None):
         self.credentials = credentials
         self.regions = regions or ["us-east-1"]
         self.services = services
+        self._scan_logger = scan_logger
         self._clients: Optional[AWSClientCache] = None
         self._config: Optional[EvalConfig] = None
         self._cis_controls = None
@@ -74,6 +75,7 @@ class AWSCISEvaluatorEngine:
         clients = self._get_clients()
         config = self._get_config()
         all_results, evaluated, manual = [], 0, 0
+        slog = self._scan_logger
 
         start = time.monotonic()
         logger.info("Starting AWS CIS evaluation: %d controls, %d evaluators",
@@ -86,11 +88,24 @@ class AWSCISEvaluatorEngine:
 
             evaluator = get_evaluator(cis_id)
             if evaluator:
+                module_name = f"evaluator::aws_cis_{cis_id}"
+                if slog:
+                    slog.log_module_start(
+                        module_name,
+                        f"Evaluating CIS {cis_id}: {ctrl['title']}",
+                    )
                 results = safe_evaluate(evaluator, clients, config, cis_id,
                     f"aws_cis_{cis_id.replace('.', '_')}", ctrl["title"],
                     ctrl.get("service_area", "general"), ctrl["severity"])
                 all_results.extend(results)
                 evaluated += 1
+                has_error = any(r.get("status") == "ERROR" for r in results)
+                if slog:
+                    slog.log_module_end(
+                        module_name,
+                        result_count=len(results),
+                        status="error" if has_error else "success",
+                    )
             else:
                 all_results.append(make_manual_result(cis_id,
                     f"aws_cis_{cis_id.replace('.', '_')}", ctrl["title"],

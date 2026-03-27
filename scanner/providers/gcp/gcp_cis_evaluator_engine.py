@@ -21,11 +21,12 @@ logger = logging.getLogger(__name__)
 class GCPCISEvaluatorEngine:
     """Orchestrates CIS GCP benchmark evaluation across all 84 controls."""
 
-    def __init__(self, credentials: dict, services=None, regions=None):
+    def __init__(self, credentials: dict, services=None, regions=None, scan_logger=None):
         self.credentials = credentials
         self.project_id = credentials.get("project_id", "")
         self.services = services
         self.regions = regions or ["us-central1"]
+        self._scan_logger = scan_logger
         self._clients: Optional[GCPClientCache] = None
         self._config: Optional[EvalConfig] = None
         self._cis_controls = None
@@ -79,6 +80,7 @@ class GCPCISEvaluatorEngine:
         clients = self._get_clients()
         config = self._get_config()
         all_results, evaluated, manual = [], 0, 0
+        slog = self._scan_logger
 
         start = time.monotonic()
         logger.info("Starting GCP CIS evaluation: %d controls, %d evaluators",
@@ -91,6 +93,12 @@ class GCPCISEvaluatorEngine:
 
             evaluator = get_evaluator(cis_id)
             if evaluator:
+                module_name = f"evaluator::gcp_cis_{cis_id}"
+                if slog:
+                    slog.log_module_start(
+                        module_name,
+                        f"Evaluating CIS {cis_id}: {ctrl['title']}",
+                    )
                 results = safe_evaluate(
                     evaluator, clients, config, cis_id,
                     f"gcp_cis_{cis_id.replace('.', '_')}",
@@ -100,6 +108,13 @@ class GCPCISEvaluatorEngine:
                 )
                 all_results.extend(results)
                 evaluated += 1
+                has_error = any(r.get("status") == "ERROR" for r in results)
+                if slog:
+                    slog.log_module_end(
+                        module_name,
+                        result_count=len(results),
+                        status="error" if has_error else "success",
+                    )
             else:
                 all_results.append(make_manual_result(
                     cis_id,

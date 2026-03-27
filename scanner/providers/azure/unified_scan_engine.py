@@ -40,11 +40,13 @@ class UnifiedScanEngine:
         services: Optional[list[str]] = None,
         resource_groups: Optional[list[str]] = None,
         custom_controls: Optional[list[dict]] = None,
+        scan_logger=None,
     ):
         self.credentials = credentials
         self.services = services
         self.resource_groups = resource_groups
         self._raw_custom_controls = custom_controls or []
+        self._scan_logger = scan_logger
 
     def _build_custom_controls(self) -> list[CustomControl]:
         """Convert raw control dicts (from DB) into CustomControl objects."""
@@ -79,6 +81,7 @@ class UnifiedScanEngine:
             credentials=self.credentials,
             services=self.services,
             resource_groups=self.resource_groups,
+            scan_logger=self._scan_logger,
         )
         cis_results = cis_engine.evaluate_all()
         all_results.extend(cis_results)

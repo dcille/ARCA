@@ -2183,6 +2183,7 @@ class AWSScanner:
                 credentials=self.credentials,
                 regions=self.regions,
                 services=self.services,
+                scan_logger=slog,
             )
             cis_results = engine.evaluate_all()
 

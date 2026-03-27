@@ -42,12 +42,14 @@ class CISEvaluatorEngine:
         credentials: dict,
         services: Optional[list[str]] = None,
         resource_groups: Optional[list[str]] = None,
+        scan_logger=None,
     ):
         self.credentials = credentials
         self.subscription_id = credentials.get("subscription_id", "")
         self.tenant_id = credentials.get("tenant_id", "")
         self.services = services
         self.resource_groups = resource_groups
+        self._scan_logger = scan_logger
 
         # Lazy-init
         self._clients: Optional[AzureClientCache] = None
@@ -139,6 +141,8 @@ class CISEvaluatorEngine:
             len(controls), len(EVALUATOR_REGISTRY),
         )
 
+        slog = self._scan_logger
+
         for ctrl in controls:
             cis_id = ctrl["cis_id"]
 
@@ -147,35 +151,52 @@ class CISEvaluatorEngine:
                 continue
 
             evaluator = get_evaluator(cis_id)
+            check_id = f"azure_cis_{cis_id.replace('.', '_')}"
+            service = ctrl.get("service_area", "general")
 
             if evaluator:
                 # ── Automated evaluation ──
+                module_name = f"evaluator::azure_cis_{cis_id}"
+                if slog:
+                    slog.log_module_start(
+                        module_name,
+                        f"Evaluating CIS {cis_id}: {ctrl['title']}",
+                    )
                 results = safe_evaluate(
                     evaluator=evaluator,
                     clients=clients,
                     config=config,
                     cis_id=cis_id,
-                    check_id=f"azure_cis_{cis_id.replace('.', '_')}",
+                    check_id=check_id,
                     title=ctrl["title"],
-                    service=ctrl.get("service_area", "general"),
+                    service=service,
                     severity=ctrl["severity"],
                 )
                 all_results.extend(results)
                 evaluated_count += 1
 
                 # Count errors
+                has_error = False
                 for r in results:
                     if r.get("status") == "ERROR":
                         error_count += 1
+                        has_error = True
+
+                if slog:
+                    slog.log_module_end(
+                        module_name,
+                        result_count=len(results),
+                        status="error" if has_error else "success",
+                    )
 
             else:
                 # ── No evaluator → MANUAL ──
                 reason = self._classify_manual_reason(ctrl)
                 all_results.append(make_manual_result(
                     cis_id=cis_id,
-                    check_id=f"azure_cis_{cis_id.replace('.', '_')}",
+                    check_id=check_id,
                     title=ctrl["title"],
-                    service=ctrl.get("service_area", "general"),
+                    service=service,
                     severity=ctrl["severity"],
                     subscription_id=config.subscription_id,
                     reason=reason,

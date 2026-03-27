@@ -2581,6 +2581,7 @@ class GCPScanner:
             engine = GCPCISEvaluatorEngine(
                 credentials=self.credentials,
                 services=self.services,
+                scan_logger=slog,
             )
             cis_results = engine.evaluate_all()
 
