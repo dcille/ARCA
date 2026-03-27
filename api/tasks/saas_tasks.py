@@ -49,8 +49,24 @@ def run_saas_scan(self, scan_id: str, connection_id: str):
         credentials = decrypt_credentials(connection.credentials_encrypted)
 
         from scanner.saas.saas_scanner import SaaSScannerFactory
+        from scanner.scan_logger import ScanLogger
+        saas_scan_logger = ScanLogger()
+
         scanner = SaaSScannerFactory.create(connection.provider_type, credentials)
+        scanner._scan_logger = saas_scan_logger
+
+        saas_scan_logger.log_phase_start("saas_scan", f"{connection.provider_type}_scanner.py")
         results = scanner.run_all_checks()
+        saas_scan_logger.log_phase_end(
+            "saas_scan", f"{connection.provider_type}_scanner.py", result_count=len(results)
+        )
+
+        # Save scan execution log
+        try:
+            scan.scan_log = saas_scan_logger.to_json()
+            session.commit()
+        except Exception as log_err:
+            logger.warning("Failed to save scan log: %s", log_err)
 
         total = 0
         passed = 0

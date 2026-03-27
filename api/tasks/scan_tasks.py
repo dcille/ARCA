@@ -121,6 +121,13 @@ def run_cloud_scan(self, scan_id: str, provider_id: str, services=None, regions=
 
         results = scanner.run_checks()
 
+        # Save scan execution log
+        try:
+            scan.scan_log = scanner.scan_logger.to_json()
+            session.commit()
+        except Exception as log_err:
+            logger.warning("Failed to save scan log: %s", log_err)
+
         total = 0
         passed = 0
         failed = 0

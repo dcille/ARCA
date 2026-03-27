@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, DateTime, Integer, ForeignKey, Float
+from sqlalchemy import String, DateTime, Integer, ForeignKey, Float, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from api.database import Base
@@ -22,6 +22,7 @@ class Scan(Base):
     passed_checks: Mapped[int] = mapped_column(Integer, default=0)
     failed_checks: Mapped[int] = mapped_column(Integer, default=0)
     task_id: Mapped[str] = mapped_column(String(255), nullable=True)
+    scan_log: Mapped[str] = mapped_column(Text, nullable=True)  # JSON execution log
     started_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

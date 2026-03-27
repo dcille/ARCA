@@ -58,13 +58,28 @@ class GCPScanner:
             "secretmanager": self._check_secret_manager,
         }
 
+        slog = getattr(self, "_scan_logger", None)
+
         for service_name, check_fn in check_methods.items():
             if self.services and service_name not in self.services:
                 continue
+            if slog:
+                slog.log_module_start(
+                    f"gcp_scanner.py::_check_{service_name}",
+                    f"Checking GCP service: {service_name}",
+                )
             try:
-                results.extend(check_fn())
+                service_results = check_fn()
+                results.extend(service_results)
+                if slog:
+                    slog.log_module_end(
+                        f"gcp_scanner.py::_check_{service_name}",
+                        result_count=len(service_results),
+                    )
             except Exception as e:
                 logger.warning(f"GCP {service_name} checks failed: {e}")
+                if slog:
+                    slog.log_error(f"gcp_scanner.py::_check_{service_name}", str(e))
 
         return results
 
@@ -2549,10 +2564,18 @@ class GCPScanner:
           2. CIS Evaluator Engine (84 controls — CIS GCP v4.0.0)
           3. Fallback: _emit_cis_coverage() if engine fails
         """
+        slog = getattr(self, "_scan_logger", None)
+
         # Phase 1: Service checks
+        if slog:
+            slog.log_phase_start("service_checks", "gcp_scanner.py")
         results = self.scan()
+        if slog:
+            slog.log_phase_end("service_checks", "gcp_scanner.py", result_count=len(results))
 
         # Phase 2: CIS Evaluator Engine (84 controls)
+        if slog:
+            slog.log_phase_start("cis_evaluator_engine", "gcp_cis_evaluator_engine.py")
         try:
             from .gcp_cis_evaluator_engine import GCPCISEvaluatorEngine
             engine = GCPCISEvaluatorEngine(
@@ -2563,15 +2586,22 @@ class GCPScanner:
 
             # Deduplicate: CIS evaluator results take precedence
             existing_check_ids = {r.get("check_id") for r in results if r.get("check_id")}
+            added = 0
             for r in cis_results:
                 cid = r.get("check_id", "")
                 if cid not in existing_check_ids:
                     results.append(r)
                     existing_check_ids.add(cid)
+                    added += 1
 
             logger.info("GCP CIS engine added %d results", len(cis_results))
+            if slog:
+                slog.log_phase_end("cis_evaluator_engine", "gcp_cis_evaluator_engine.py", result_count=added)
         except Exception as e:
             logger.warning("GCP CIS engine failed, falling back to CIS coverage gap-fill: %s", e)
+            if slog:
+                slog.log_error("gcp_cis_evaluator_engine.py", f"CIS engine failed: {e}")
+                slog.log_phase_end("cis_evaluator_engine", "gcp_cis_evaluator_engine.py", status="error")
             results.extend(self._emit_cis_coverage(results))
 
         return results

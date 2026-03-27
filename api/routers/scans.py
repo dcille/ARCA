@@ -1,4 +1,6 @@
 """Scans router."""
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -6,7 +8,7 @@ from sqlalchemy import select
 from api.database import get_db
 from api.models.user import User
 from api.models.scan import Scan
-from api.schemas.scan import ScanCreate, ScanResponse
+from api.schemas.scan import ScanCreate, ScanResponse, ScanLogResponse
 from api.services.auth_service import get_current_user
 
 router = APIRouter()
@@ -78,3 +80,35 @@ async def get_scan(
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
     return ScanResponse.model_validate(scan)
+
+
+@router.get("/{scan_id}/logs", response_model=ScanLogResponse)
+async def get_scan_logs(
+    scan_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the execution log for a completed scan.
+
+    Shows step-by-step which Python modules were executed and what
+    cloud API calls were made during the scan.
+    """
+    result = await db.execute(
+        select(Scan).where(Scan.id == scan_id, Scan.user_id == current_user.id)
+    )
+    scan = result.scalar_one_or_none()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    scan_log = None
+    if scan.scan_log:
+        try:
+            scan_log = json.loads(scan.scan_log)
+        except (json.JSONDecodeError, TypeError):
+            scan_log = {"raw": scan.scan_log}
+
+    return ScanLogResponse(
+        scan_id=scan.id,
+        status=scan.status,
+        scan_log=scan_log,
+    )
