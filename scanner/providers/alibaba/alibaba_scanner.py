@@ -66,13 +66,28 @@ class AlibabaScanner:
             "sls": self._check_sls,
         }
 
+        slog = getattr(self, "_scan_logger", None)
+
         for service_name, check_fn in check_methods.items():
             if self.services and service_name not in self.services:
                 continue
+            if slog:
+                slog.log_module_start(
+                    f"alibaba_scanner.py::_check_{service_name}",
+                    f"Checking Alibaba service: {service_name}",
+                )
             try:
-                results.extend(check_fn())
+                service_results = check_fn()
+                results.extend(service_results)
+                if slog:
+                    slog.log_module_end(
+                        f"alibaba_scanner.py::_check_{service_name}",
+                        result_count=len(service_results),
+                    )
             except Exception as e:
                 logger.warning(f"Alibaba {service_name} checks failed: {e}")
+                if slog:
+                    slog.log_error(f"alibaba_scanner.py::_check_{service_name}", str(e))
 
         return results
 
@@ -1661,6 +1676,20 @@ class AlibabaScanner:
 
     def run_all_checks(self) -> list[dict]:
         """Run all Alibaba Cloud security checks including complete CIS benchmark coverage."""
+        slog = getattr(self, "_scan_logger", None)
+
+        # Phase 1: Service checks
+        if slog:
+            slog.log_phase_start("service_checks", "alibaba_scanner.py")
         results = self.scan()
+        if slog:
+            slog.log_phase_end("service_checks", "alibaba_scanner.py", result_count=len(results))
+
+        # Phase 2: CIS coverage
+        if slog:
+            slog.log_phase_start("cis_coverage", "alibaba_scanner.py")
         results.extend(self._emit_cis_coverage(results))
+        if slog:
+            slog.log_phase_end("cis_coverage", "alibaba_scanner.py", result_count=len(results))
+
         return results

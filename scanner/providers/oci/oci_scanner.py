@@ -61,16 +61,32 @@ class OCIScanner:
             "events": self._check_events,
         }
 
+        slog = getattr(self, "_scan_logger", None)
+
         for service_name, check_fn in check_methods.items():
             if self.services and service_name not in self.services:
                 continue
+            if slog:
+                slog.log_module_start(
+                    f"oci_scanner.py::_check_{service_name}",
+                    f"Checking OCI service: {service_name}",
+                )
             try:
                 service_results = check_fn()
                 results.extend(service_results)
+                if slog:
+                    slog.log_module_end(
+                        f"oci_scanner.py::_check_{service_name}",
+                        result_count=len(service_results),
+                    )
             except ImportError:
                 logger.warning(f"OCI SDK not available for {service_name} checks")
+                if slog:
+                    slog.log_error(f"oci_scanner.py::_check_{service_name}", f"OCI SDK not available for {service_name} checks")
             except Exception as e:
                 logger.error(f"OCI {service_name} check failed: {e}")
+                if slog:
+                    slog.log_error(f"oci_scanner.py::_check_{service_name}", str(e))
 
         return results
 
@@ -1939,6 +1955,20 @@ class OCIScanner:
 
     def run_all_checks(self) -> list[dict]:
         """Run all OCI security checks including complete CIS benchmark coverage."""
+        slog = getattr(self, "_scan_logger", None)
+
+        # Phase 1: Service checks
+        if slog:
+            slog.log_phase_start("service_checks", "oci_scanner.py")
         results = self.scan()
+        if slog:
+            slog.log_phase_end("service_checks", "oci_scanner.py", result_count=len(results))
+
+        # Phase 2: CIS coverage
+        if slog:
+            slog.log_phase_start("cis_coverage", "oci_scanner.py")
         results.extend(self._emit_cis_coverage(results))
+        if slog:
+            slog.log_phase_end("cis_coverage", "oci_scanner.py", result_count=len(results))
+
         return results

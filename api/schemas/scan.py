@@ -26,3 +26,12 @@ class ScanResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ScanLogResponse(BaseModel):
+    scan_id: str
+    status: str
+    scan_log: Optional[dict] = None
+
+    class Config:
+        from_attributes = True

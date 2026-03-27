@@ -86,13 +86,28 @@ class AzureScanner:
             "entra": self._check_entra,
         }
 
+        slog = getattr(self, "_scan_logger", None)
+
         for service_name, check_fn in check_methods.items():
             if self.services and service_name not in self.services:
                 continue
+            if slog:
+                slog.log_module_start(
+                    f"azure_scanner.py::_check_{service_name}",
+                    f"Checking Azure service: {service_name}",
+                )
             try:
-                results.extend(check_fn())
+                service_results = check_fn()
+                results.extend(service_results)
+                if slog:
+                    slog.log_module_end(
+                        f"azure_scanner.py::_check_{service_name}",
+                        result_count=len(service_results),
+                    )
             except Exception as e:
                 logger.warning(f"Azure {service_name} checks failed: {e}")
+                if slog:
+                    slog.log_error(f"azure_scanner.py::_check_{service_name}", str(e))
 
         return results
 
@@ -2750,10 +2765,18 @@ class AzureScanner:
           2. CIS Evaluator Engine (155 CIS v5.0 controls via dedicated evaluators)
           3. Custom framework controls (user-defined CLI/Python evaluation)
         """
+        slog = getattr(self, "_scan_logger", None)
+
         # Phase 1: MCSB service checks
+        if slog:
+            slog.log_phase_start("service_checks", "azure_scanner.py")
         results = self.scan()
+        if slog:
+            slog.log_phase_end("service_checks", "azure_scanner.py", result_count=len(results))
 
         # Phase 2: CIS Evaluator Engine (155 controls)
+        if slog:
+            slog.log_phase_start("cis_evaluator_engine", "unified_scan_engine.py")
         try:
             from .unified_scan_engine import UnifiedScanEngine
             engine = UnifiedScanEngine(
@@ -2766,15 +2789,22 @@ class AzureScanner:
             # Deduplicate: CIS evaluator results take precedence over MCSB checks
             # by check_id. Collect existing check_ids from MCSB results.
             existing_check_ids = {r.get("check_id") for r in results if r.get("check_id")}
+            added = 0
             for r in unified_results:
                 cid = r.get("check_id", "")
                 if cid not in existing_check_ids:
                     results.append(r)
                     existing_check_ids.add(cid)
+                    added += 1
 
             logger.info("Unified engine added %d results (CIS + custom)", len(unified_results))
+            if slog:
+                slog.log_phase_end("cis_evaluator_engine", "unified_scan_engine.py", result_count=added)
         except Exception as e:
             logger.warning("Unified engine failed, falling back to CIS coverage gap-fill: %s", e)
+            if slog:
+                slog.log_error("unified_scan_engine.py", f"CIS engine failed: {e}")
+                slog.log_phase_end("cis_evaluator_engine", "unified_scan_engine.py", status="error")
             results.extend(self._emit_cis_coverage(results))
 
         return results

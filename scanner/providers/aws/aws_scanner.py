@@ -88,16 +88,32 @@ class AWSScanner:
             "securityhub": self._check_securityhub,
         }
 
+        slog = getattr(self, "_scan_logger", None)
+
         for service_name, check_fn in check_methods.items():
             if self.services and service_name not in self.services:
                 continue
+            if slog:
+                slog.log_module_start(
+                    f"aws_scanner.py::_check_{service_name}",
+                    f"Checking AWS service: {service_name}",
+                )
             try:
                 service_results = check_fn()
                 results.extend(service_results)
+                if slog:
+                    slog.log_module_end(
+                        f"aws_scanner.py::_check_{service_name}",
+                        result_count=len(service_results),
+                    )
             except (ClientError, NoCredentialsError) as e:
                 logger.warning(f"AWS {service_name} check failed: {e}")
+                if slog:
+                    slog.log_error(f"aws_scanner.py::_check_{service_name}", str(e))
             except Exception as e:
                 logger.error(f"Unexpected error in AWS {service_name}: {e}")
+                if slog:
+                    slog.log_error(f"aws_scanner.py::_check_{service_name}", str(e))
 
         return results
 
@@ -2149,10 +2165,18 @@ class AWSScanner:
           2. CIS Evaluator Engine (62 CIS v6.0 controls via dedicated evaluators)
           3. Custom framework controls (user-defined CLI/Python evaluation)
         """
+        slog = getattr(self, "_scan_logger", None)
+
         # Phase 1: Service checks
+        if slog:
+            slog.log_phase_start("service_checks", "aws_scanner.py")
         results = self.scan()
+        if slog:
+            slog.log_phase_end("service_checks", "aws_scanner.py", result_count=len(results))
 
         # Phase 2: CIS Evaluator Engine (62 controls) + Custom controls
+        if slog:
+            slog.log_phase_start("cis_evaluator_engine", "aws_cis_evaluator_engine.py")
         try:
             from .aws_cis_evaluator_engine import AWSCISEvaluatorEngine
             engine = AWSCISEvaluatorEngine(
@@ -2164,19 +2188,28 @@ class AWSScanner:
 
             # Deduplicate: CIS evaluator results take precedence
             existing_check_ids = {r.get("check_id") for r in results if r.get("check_id")}
+            added = 0
             for r in cis_results:
                 cid = r.get("check_id", "")
                 if cid not in existing_check_ids:
                     results.append(r)
                     existing_check_ids.add(cid)
+                    added += 1
 
             logger.info("CIS engine added %d results", len(cis_results))
+            if slog:
+                slog.log_phase_end("cis_evaluator_engine", "aws_cis_evaluator_engine.py", result_count=added)
         except Exception as e:
             logger.warning("CIS engine failed, falling back to CIS coverage gap-fill: %s", e)
+            if slog:
+                slog.log_error("aws_cis_evaluator_engine.py", f"CIS engine failed: {e}")
+                slog.log_phase_end("cis_evaluator_engine", "aws_cis_evaluator_engine.py", status="error")
             results.extend(self._emit_cis_coverage(results))
 
         # Phase 3: Custom framework controls
         if self.custom_controls:
+            if slog:
+                slog.log_phase_start("custom_controls", "custom_control_executor.py")
             try:
                 from scanner.providers.azure.custom_control_executor import (
                     CustomControl, CustomControlExecutor,
@@ -2188,6 +2221,7 @@ class AWSScanner:
                     subscription_id="",
                     tenant_id="",
                 )
+                custom_count = 0
                 for raw in self.custom_controls:
                     try:
                         ctrl = CustomControl(
@@ -2205,10 +2239,27 @@ class AWSScanner:
                         )
                         custom_results = executor.execute(ctrl)
                         results.extend(custom_results)
+                        custom_count += len(custom_results)
+                        if slog:
+                            slog.log_module_start(
+                                f"custom_control::{raw.get('control_id', '')}",
+                                f"Custom control: {raw.get('title', '')}",
+                            )
+                            slog.log_module_end(
+                                f"custom_control::{raw.get('control_id', '')}",
+                                result_count=len(custom_results),
+                            )
                     except Exception as ce:
                         logger.warning("Custom control %s failed: %s", raw.get("control_id"), ce)
+                        if slog:
+                            slog.log_error(f"custom_control::{raw.get('control_id', '')}", str(ce))
                 logger.info("Custom controls: %d controls executed", len(self.custom_controls))
+                if slog:
+                    slog.log_phase_end("custom_controls", "custom_control_executor.py", result_count=custom_count)
             except Exception as e:
                 logger.warning("Custom control executor failed: %s", e)
+                if slog:
+                    slog.log_error("custom_control_executor.py", str(e))
+                    slog.log_phase_end("custom_controls", "custom_control_executor.py", status="error")
 
         return results
