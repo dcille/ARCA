@@ -1,9 +1,15 @@
 """Snowflake SaaS Security Scanner.
 
-Implements 32+ security checks across 3 auditor categories:
+Implements 32+ ad-hoc security checks plus CIS Snowflake Foundations Benchmark v1.0.0
+evaluation via the SnowflakeCISEvaluatorEngine (39 controls, 92.3% automated).
+
+Check categories:
 - Users: MFA, RSA keys, inactive users, admin roles, password rotation
 - Account: SSO/SCIM, session timeouts, network policies, password policies
 - Data & Operations: Warehouses, retention, masking, row access, stages, audit, sharing
+- CIS Evaluator: 39 CIS controls across 4 sections (IAM, Monitoring, Networking, Data)
+
+Supports both password and key-pair (RSA PKCS8 PEM) authentication.
 """
 import logging
 
@@ -11,6 +17,117 @@ from scanner.saas.base_saas_check import BaseSaaSScanner, SaaSCheckResult
 from scanner.cis_controls.snowflake_cis_controls import SNOWFLAKE_CIS_CONTROLS
 
 logger = logging.getLogger(__name__)
+
+
+# ── D-ARCA Connection Wizard Configuration ────────────────────────────────
+SNOWFLAKE_CONNECTOR_CONFIG: dict = {
+    "provider_type": "snowflake",
+    "display_name": "Snowflake",
+    "description": "Connect to Snowflake for CIS Snowflake Foundations Benchmark v1.0.0 evaluation",
+    "fields": [
+        {
+            "name": "account",
+            "label": "Account Identifier",
+            "type": "text",
+            "required": True,
+            "placeholder": "xy12345.us-east-1",
+            "help": "Snowflake account locator with region. Found in Snowsight URL or SHOW ACCOUNTS.",
+        },
+        {
+            "name": "username",
+            "label": "Username",
+            "type": "text",
+            "required": True,
+            "placeholder": "DARCA_SCANNER",
+            "help": "User with ACCOUNTADMIN, SECURITYADMIN, or custom DARCA_READER role.",
+        },
+        {
+            "name": "auth_method",
+            "label": "Authentication Method",
+            "type": "select",
+            "options": ["password", "key_pair"],
+            "default": "password",
+            "required": True,
+        },
+        {
+            "name": "password",
+            "label": "Password",
+            "type": "password",
+            "required": False,
+            "visible_when": "auth_method == 'password'",
+            "help": "Snowflake password for the scanner user.",
+        },
+        {
+            "name": "private_key",
+            "label": "Private Key (PEM)",
+            "type": "file_upload",
+            "accept": ".pem,.p8",
+            "required": False,
+            "visible_when": "auth_method == 'key_pair'",
+            "help": "RSA private key in PKCS8 PEM format.",
+        },
+        {
+            "name": "warehouse",
+            "label": "Warehouse",
+            "type": "text",
+            "required": False,
+            "placeholder": "DARCA_WH",
+            "default": "COMPUTE_WH",
+            "help": "Virtual warehouse for query execution. XSMALL is sufficient.",
+        },
+        {
+            "name": "role",
+            "label": "Role",
+            "type": "text",
+            "required": False,
+            "placeholder": "ACCOUNTADMIN",
+            "default": "ACCOUNTADMIN",
+            "help": "Role to assume. ACCOUNTADMIN or custom DARCA_READER role.",
+        },
+    ],
+    "test_connection": {
+        "method": "select_current_version",
+        "description": "Runs SELECT CURRENT_VERSION() to verify connectivity",
+        "success_message": "Connected to Snowflake account '{account}' (version {version})",
+        "failure_hints": [
+            "Verify account identifier includes region (e.g. xy12345.us-east-1)",
+            "Check username and password/key are correct",
+            "Ensure the user is not disabled or locked",
+            "Verify network connectivity to <account>.snowflakecomputing.com:443",
+            "If using key-pair: ensure private key is PKCS8 PEM format",
+            "If using custom role: ensure IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE is granted",
+        ],
+    },
+    "permissions_check": {
+        "checks": [
+            {"test": "SELECT COUNT(*) FROM SNOWFLAKE.ACCOUNT_USAGE.USERS", "scope": "ACCOUNT_USAGE"},
+            {"test": "SHOW SECURITY INTEGRATIONS", "scope": "SECURITY_VIEWER"},
+            {"test": "SHOW PARAMETERS LIKE 'PERIODIC_DATA_REKEYING' IN ACCOUNT", "scope": "SHOW PARAMETERS"},
+            {"test": "SHOW MASKING POLICIES IN ACCOUNT", "scope": "GOVERNANCE_VIEWER"},
+        ],
+    },
+    "network_requirements": {
+        "endpoints": [
+            {"host": "<account>.snowflakecomputing.com", "port": 443, "protocol": "HTTPS"},
+        ],
+        "note": "All traffic is HTTPS over port 443. Snowflake connector uses a single endpoint.",
+    },
+    "required_privileges": [
+        {"privilege": "IMPORTED PRIVILEGES on SNOWFLAKE", "scope": "Database", "purpose": "Read ACCOUNT_USAGE views", "controls": "All 39"},
+        {"privilege": "SECURITY_VIEWER", "scope": "Application role", "purpose": "Read security integrations, grants", "controls": "1.1, 1.2, 1.7, 1.13"},
+        {"privilege": "GOVERNANCE_VIEWER", "scope": "Application role", "purpose": "Read policies, tags", "controls": "1.5, 1.6, 1.9, 4.x"},
+        {"privilege": "USAGE on warehouse", "scope": "Warehouse", "purpose": "Execute queries", "controls": "All 39"},
+    ],
+    "setup_guide_url": "https://docs.darca.io/connectors/snowflake",
+    "security_notes": [
+        "Read-only: D-ARCA never modifies any Snowflake settings or data",
+        "No data access: Only ACCOUNT_USAGE metadata views are queried (no user data)",
+        "Audit trail: All queries appear in QUERY_HISTORY under the scanner user",
+        "Minimal warehouse: Uses XSMALL warehouse with auto-suspend for minimal cost",
+        "Key rotation: Rotate RSA key pair every 180 days (per CIS 1.7)",
+        "Least privilege: Custom role with only read access is recommended",
+    ],
+}
 
 
 class SnowflakeScanner(BaseSaaSScanner):
@@ -21,27 +138,49 @@ class SnowflakeScanner(BaseSaaSScanner):
     def __init__(self, credentials: dict):
         super().__init__(credentials)
         self.username = credentials["username"]
-        self.password = credentials["password"]
-        self.account_id = credentials["account_id"]
-        self.warehouse_name = credentials.get("warehouse_name", "")
+        # Resolve new vs legacy field names
+        self.account_id = credentials.get("account") or credentials.get("account_id", "")
+        self.warehouse_name = credentials.get("warehouse") or credentials.get("warehouse_name", "")
+        self.role = credentials.get("role", "ACCOUNTADMIN")
+        self.auth_method = credentials.get("auth_method", "password")
+        self.password = credentials.get("password", "")
+        self.private_key_pem = credentials.get("private_key")
         self.region = credentials.get("region", "")
         self.service_account_usernames = credentials.get("service_account_usernames", [])
         self._connection = None
 
     def _get_connection(self):
-        """Get Snowflake database connection."""
+        """Get Snowflake database connection (password or key-pair auth)."""
         if self._connection:
             return self._connection
 
         import snowflake.connector
-        self._connection = snowflake.connector.connect(
+        from typing import Any
+
+        params: dict[str, Any] = dict(
             user=self.username,
-            password=self.password,
             account=self.account_id,
-            warehouse=self.warehouse_name,
             database="SNOWFLAKE",
             schema="ACCOUNT_USAGE",
         )
+        if self.warehouse_name:
+            params["warehouse"] = self.warehouse_name
+        if self.role:
+            params["role"] = self.role
+
+        # Key-pair authentication
+        if self.auth_method == "key_pair" and self.private_key_pem:
+            from cryptography.hazmat.primitives.serialization import (
+                load_pem_private_key,
+            )
+            pem = self.private_key_pem
+            if isinstance(pem, str):
+                pem = pem.encode("utf-8")
+            params["private_key"] = load_pem_private_key(pem, password=None)
+        else:
+            params["password"] = self.password
+
+        self._connection = snowflake.connector.connect(**params)
         return self._connection
 
     def _execute_query(self, query: str) -> list[dict]:
@@ -69,7 +208,10 @@ class SnowflakeScanner(BaseSaaSScanner):
             except Exception as e:
                 logger.error(f"Snowflake check group failed: {e}")
 
-        # Add CIS coverage for uncovered controls
+        # Run CIS evaluator engine (39 controls, 92.3% automated)
+        results.extend(self._run_cis_evaluator())
+
+        # Add CIS coverage for any remaining uncovered controls
         results.extend(self._emit_cis_coverage(results))
 
         if self._connection:
@@ -79,6 +221,54 @@ class SnowflakeScanner(BaseSaaSScanner):
                 pass
 
         return results
+
+    def _run_cis_evaluator(self) -> list[dict]:
+        """Run the CIS Snowflake v1.0.0 evaluator engine (39 controls)."""
+        try:
+            from scanner.saas.snowflake.snowflake_cis_evaluator_engine import (
+                SnowflakeCISEvaluatorEngine,
+            )
+
+            engine = SnowflakeCISEvaluatorEngine(
+                account=self.account_id,
+                username=self.username,
+                password=self.password if self.auth_method != "key_pair" else None,
+                private_key=self.private_key_pem.encode("utf-8")
+                    if isinstance(self.private_key_pem, str) and self.private_key_pem
+                    else self.private_key_pem,
+                warehouse=self.warehouse_name or None,
+                role=self.role or None,
+            )
+            cis_results = engine.evaluate_all()
+            report = engine.coverage_report()
+            logger.info(
+                "CIS Snowflake evaluator: %d/%d automated (%.1f%%)",
+                report["automated"], report["total_controls"], report["automation_pct"],
+            )
+            engine.close()
+
+            # Convert CheckResult to SaaSCheckResult dicts
+            converted = []
+            fw = ["CIS-Snowflake-1.0.0", "SOC2", "ISO-27001"]
+            for cr in cis_results:
+                converted.append(SaaSCheckResult(
+                    check_id=f"sf_cis_{cr.cis_id.replace('.', '_')}",
+                    check_title=f"{cr.title} (CIS {cr.cis_id})",
+                    service_area="cis_evaluator",
+                    severity=cr.severity,
+                    status=cr.status,
+                    resource_id=cr.resource_id or self.account_id,
+                    description=cr.detail,
+                    remediation=cr.remediation,
+                    compliance_frameworks=fw,
+                    assessment_type=cr.assessment_type,
+                    cis_control_id=cr.cis_id,
+                    cis_level=f"L{cr.cis_level}",
+                ).to_dict())
+            return converted
+        except Exception as e:
+            logger.error(f"CIS evaluator engine failed: {e}")
+            return []
 
     def _emit_cis_coverage(self, existing_results: list[dict]) -> list[dict]:
         """Emit MANUAL results for CIS controls not covered by automated checks."""
@@ -655,12 +845,37 @@ class SnowflakeScanner(BaseSaaSScanner):
         return results
 
     def test_connection(self) -> tuple[bool, str]:
+        """Verify connectivity and required privileges.
+
+        Runs SELECT CURRENT_VERSION() plus permission spot-checks for
+        ACCOUNT_USAGE, SECURITY_VIEWER, SHOW PARAMETERS, and GOVERNANCE_VIEWER.
+        """
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT CURRENT_VERSION()")
             version = cursor.fetchone()[0]
             cursor.close()
-            return True, f"Connected to Snowflake version {version}"
+
+            # Permission spot-checks (non-blocking)
+            warnings: list[str] = []
+            permission_checks = [
+                ("SELECT COUNT(*) FROM SNOWFLAKE.ACCOUNT_USAGE.USERS", "ACCOUNT_USAGE"),
+                ("SHOW SECURITY INTEGRATIONS", "SECURITY_VIEWER"),
+                ("SHOW PARAMETERS LIKE 'PERIODIC_DATA_REKEYING' IN ACCOUNT", "SHOW PARAMETERS"),
+                ("SHOW MASKING POLICIES IN ACCOUNT", "GOVERNANCE_VIEWER"),
+            ]
+            for sql, scope in permission_checks:
+                try:
+                    cur = conn.cursor()
+                    cur.execute(sql)
+                    cur.close()
+                except Exception:
+                    warnings.append(f"{scope} not accessible")
+
+            msg = f"Connected to Snowflake account '{self.account_id}' (version {version})"
+            if warnings:
+                msg += f" | Permission warnings: {'; '.join(warnings)}"
+            return True, msg
         except Exception as e:
             return False, str(e)

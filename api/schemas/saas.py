@@ -31,11 +31,17 @@ class SalesforceCredentials(BaseModel):
 
 
 class SnowflakeCredentials(BaseModel):
-    username: str
-    password: str
-    account_id: str
-    warehouse_name: str
-    region: str
+    account: str  # Account identifier with region (e.g. xy12345.us-east-1)
+    username: str  # User with ACCOUNTADMIN, SECURITYADMIN, or custom DARCA_READER role
+    auth_method: str = "password"  # "password" or "key_pair"
+    password: Optional[str] = None  # Required when auth_method == "password"
+    private_key: Optional[str] = None  # RSA private key PEM (PKCS8) when auth_method == "key_pair"
+    warehouse: Optional[str] = "COMPUTE_WH"  # Virtual warehouse for query execution (XSMALL sufficient)
+    role: Optional[str] = "ACCOUNTADMIN"  # Role to assume (ACCOUNTADMIN or custom DARCA_READER)
+    # Legacy field aliases for backward compatibility
+    account_id: Optional[str] = None  # Deprecated: use 'account'
+    warehouse_name: Optional[str] = None  # Deprecated: use 'warehouse'
+    region: Optional[str] = None  # Deprecated: included in account identifier
     service_account_usernames: list[str] = []
 
 

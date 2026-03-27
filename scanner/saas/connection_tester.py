@@ -170,20 +170,62 @@ async def _test_salesforce(credentials: dict) -> tuple[bool, str]:
 
 
 async def _test_snowflake(credentials: dict) -> tuple[bool, str]:
+    """Test Snowflake connection: SELECT CURRENT_VERSION() to verify connectivity.
+
+    Supports both password and key-pair authentication.
+    Accepts both new field names (account, warehouse, role) and legacy aliases
+    (account_id, warehouse_name).
+    """
+    failure_hints = [
+        "Verify account identifier includes region (e.g. xy12345.us-east-1)",
+        "Check username and password/key are correct",
+        "Ensure the user is not disabled or locked",
+        "Verify network connectivity to <account>.snowflakecomputing.com:443",
+        "If using key-pair: ensure private key is PKCS8 PEM format",
+        "If using custom role: ensure IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE is granted",
+    ]
     try:
         import snowflake.connector
-        conn = snowflake.connector.connect(
+        from typing import Any
+
+        # Resolve field names (new names take priority over legacy aliases)
+        account = credentials.get("account") or credentials.get("account_id", "")
+        warehouse = credentials.get("warehouse") or credentials.get("warehouse_name")
+        role = credentials.get("role", "ACCOUNTADMIN")
+        auth_method = credentials.get("auth_method", "password")
+
+        params: dict[str, Any] = dict(
             user=credentials["username"],
-            password=credentials["password"],
-            account=credentials["account_id"],
-            warehouse=credentials.get("warehouse_name"),
-            role="PUBLIC",
+            account=account,
         )
-        conn.cursor().execute("SELECT CURRENT_VERSION()")
+        if warehouse:
+            params["warehouse"] = warehouse
+        if role:
+            params["role"] = role
+
+        # Authentication
+        if auth_method == "key_pair" and credentials.get("private_key"):
+            from cryptography.hazmat.primitives.serialization import (
+                load_pem_private_key,
+            )
+            private_key_pem = credentials["private_key"]
+            if isinstance(private_key_pem, str):
+                private_key_pem = private_key_pem.encode("utf-8")
+            p_key = load_pem_private_key(private_key_pem, password=None)
+            params["private_key"] = p_key
+        else:
+            params["password"] = credentials.get("password", "")
+
+        conn = snowflake.connector.connect(**params)
+        cur = conn.cursor()
+        cur.execute("SELECT CURRENT_VERSION()")
+        version = cur.fetchone()[0]
+        cur.close()
         conn.close()
-        return True, "Successfully connected to Snowflake"
+        return True, f"Connected to Snowflake account '{account}' (version {version})"
     except Exception as e:
-        return False, f"Snowflake connection failed: {str(e)}"
+        hint_text = " | Hints: " + "; ".join(failure_hints[:3])
+        return False, f"Snowflake connection failed: {str(e)}{hint_text}"
 
 
 async def _test_github(credentials: dict) -> tuple[bool, str]:
