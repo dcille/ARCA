@@ -52,7 +52,7 @@ class GWSCISEvaluatorEngine:
         return {"benchmark":"CIS Google Workspace v1.3.0",
                 "total_controls":len(EVALUATOR_REGISTRY),"automated":auto,"manual":manual,
                 "automation_pct":round(auto/len(EVALUATOR_REGISTRY)*100,1),
-                "sections":{s:{"name":self.SECTION_MAP.get(s,""),...c} for s,c in sorted(by_sec.items())}}
+                "sections":{s:{"name":self.SECTION_MAP.get(s,""), **c} for s,c in sorted(by_sec.items())}}
 
     @staticmethod
     def _sort_key(cid): return [int(p) for p in cid.split(".")]

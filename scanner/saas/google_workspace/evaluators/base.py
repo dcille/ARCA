@@ -101,7 +101,7 @@ class GWSMultiClient:
           'groups_for_business' → groups settings
           'sites' → sites settings
         """
-        import httpx
+        import requests as _requests
         try:
             creds = self._get_creds()
             import google.auth.transport.requests
@@ -110,8 +110,8 @@ class GWSMultiClient:
             # Cloud Identity Policy API endpoint
             url = (f"https://cloudidentity.googleapis.com/v1beta1/"
                    f"customers/{self._cfg.customer_id}/policies")
-            r = httpx.get(url, headers={"Authorization": f"Bearer {token}"},
-                         params={"filter": f"setting.type='{setting_path}'"}, timeout=30)
+            r = _requests.get(url, headers={"Authorization": f"Bearer {token}"},
+                              params={"filter": f"setting.type='{setting_path}'"}, timeout=30)
             return r.json() if r.status_code == 200 else {}
         except Exception as e:
             logger.debug(f"Policy API {setting_path}: {e}")
