@@ -61,7 +61,17 @@ const CLASSIFICATION_LEVEL_COLORS: Record<string, { bg: string; text: string; bo
   restricted: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-500' },
 }
 
-type TabId = 'inventory' | 'findings' | 'checks' | 'pii' | 'classification' | 'modules'
+const MODULE_LABELS: Record<string, { label: string; color: string }> = {
+  pii_scanner: { label: 'PII Scanner', color: 'bg-purple-100 text-purple-700' },
+  permission_analyzer: { label: 'Permission Analyzer', color: 'bg-red-100 text-red-700' },
+  shadow_detector: { label: 'Shadow Detector', color: 'bg-orange-100 text-orange-700' },
+  data_classifier: { label: 'Data Classifier', color: 'bg-blue-100 text-blue-700' },
+  content_sampler: { label: 'Content Sampler', color: 'bg-teal-100 text-teal-700' },
+  native_integrations: { label: 'Native Integrations', color: 'bg-amber-100 text-amber-700' },
+  data_store_checks: { label: 'Data Store Checks', color: 'bg-gray-100 text-gray-700' },
+}
+
+type TabId = 'inventory' | 'findings' | 'checks' | 'pii' | 'classification' | 'modules' | 'dspm-scans' | 'dspm-findings'
 
 export default function DSPMPage() {
   const [overview, setOverview] = useState<any>(null)
@@ -75,6 +85,17 @@ export default function DSPMPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabId>('inventory')
   const [expandedFindingId, setExpandedFindingId] = useState<string | null>(null)
+
+  // DSPM Scan state
+  const [scanning, setScanning] = useState(false)
+  const [scanProgress, setScanProgress] = useState<any>(null)
+  const [dspmScans, setDspmScans] = useState<any[]>([])
+  const [dspmFindings, setDspmFindings] = useState<any>(null)
+  const [dspmFindingsLoading, setDspmFindingsLoading] = useState(false)
+  const [dspmModuleFilter, setDspmModuleFilter] = useState('')
+  const [dspmSeverityFilter, setDspmSeverityFilter] = useState('')
+  const [selectedScanDetail, setSelectedScanDetail] = useState<any>(null)
+  const [enableContentScanning, setEnableContentScanning] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -114,6 +135,97 @@ export default function DSPMPage() {
     }
   }, [findingsCategoryFilter])
 
+  // Load DSPM scans when tab is active
+  useEffect(() => {
+    if (activeTab === 'dspm-scans') {
+      loadDSPMScans()
+    }
+  }, [activeTab])
+
+  // Load DSPM findings when tab is active
+  useEffect(() => {
+    if (activeTab === 'dspm-findings') {
+      loadDSPMFindings()
+    }
+  }, [activeTab, dspmModuleFilter, dspmSeverityFilter])
+
+  const loadDSPMScans = async () => {
+    try {
+      const data = await api.getDSPMScans(20)
+      setDspmScans(data || [])
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const loadDSPMFindings = async () => {
+    setDspmFindingsLoading(true)
+    try {
+      const params: Record<string, string> = {}
+      if (dspmModuleFilter) params.module = dspmModuleFilter
+      if (dspmSeverityFilter) params.severity = dspmSeverityFilter
+      const data = await api.getDSPMScanFindings(params)
+      setDspmFindings(data)
+    } catch (e) {
+      console.error(e)
+    }
+    setDspmFindingsLoading(false)
+  }
+
+  const triggerDSPMScan = async () => {
+    setScanning(true)
+    setScanProgress(null)
+    try {
+      const result = await api.triggerDSPMScan({
+        enable_content_scanning: enableContentScanning,
+      })
+      const scanId = result.scan_id || result.scans?.[0]?.scan_id
+      if (scanId) {
+        // Poll for status
+        const pollInterval = setInterval(async () => {
+          try {
+            const status = await api.getDSPMScanStatus(scanId)
+            setScanProgress(status)
+            if (status.status === 'completed' || status.status === 'failed') {
+              clearInterval(pollInterval)
+              setScanning(false)
+              loadDSPMScans()
+              loadDSPMFindings()
+              // Reload overview
+              api.getDSPMOverview().then(d => setOverview(d)).catch(() => {})
+            }
+          } catch {
+            clearInterval(pollInterval)
+            setScanning(false)
+          }
+        }, 3000)
+      } else {
+        setScanning(false)
+      }
+    } catch (e) {
+      console.error(e)
+      setScanning(false)
+    }
+  }
+
+  const viewScanDetail = async (scanId: string) => {
+    try {
+      const detail = await api.getDSPMScanDetail(scanId)
+      setSelectedScanDetail(detail)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const updateFindingStatus = async (findingId: string, newStatus: string) => {
+    try {
+      await api.updateDSPMFindingStatus(findingId, newStatus)
+      loadDSPMFindings()
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   if (loading) {
     return (
       <div>
@@ -136,6 +248,46 @@ export default function DSPMPage() {
   return (
     <div>
       <Header title="Data Security (DSPM)" subtitle="Data Security Posture Management — data store inventory, classification, and risk" breadcrumbs={[{ label: 'Assets', href: '/darca/inventory' }, { label: 'Data Security' }]} />
+
+      {/* Run DSPM Scan Controls */}
+      <div className="flex items-center gap-4 mb-6">
+        <button
+          onClick={triggerDSPMScan}
+          disabled={scanning}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors ${
+            scanning
+              ? 'bg-brand-gray-300 cursor-not-allowed'
+              : 'bg-brand-green hover:bg-brand-green/90'
+          }`}
+        >
+          {scanning ? 'Scanning...' : 'Run DSPM Scan'}
+        </button>
+        <label className="flex items-center gap-2 text-xs text-brand-gray-600">
+          <input
+            type="checkbox"
+            checked={enableContentScanning}
+            onChange={(e) => setEnableContentScanning(e.target.checked)}
+            className="rounded border-brand-gray-300"
+          />
+          Enable content scanning (PII detection)
+        </label>
+        {scanProgress && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className={`font-bold px-2 py-0.5 rounded ${
+              scanProgress.status === 'completed' ? 'bg-green-100 text-green-700' :
+              scanProgress.status === 'failed' ? 'bg-red-100 text-red-700' :
+              'bg-blue-100 text-blue-700'
+            }`}>
+              {scanProgress.status.toUpperCase()}
+            </span>
+            {scanProgress.status === 'completed' && (
+              <span className="text-brand-gray-500">
+                {scanProgress.total_findings} findings | Risk: {scanProgress.overall_risk_label} | {scanProgress.duration_seconds?.toFixed(1)}s
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
@@ -177,6 +329,8 @@ export default function DSPMPage() {
           { id: 'checks' as const, label: 'Security Checks' },
           { id: 'pii' as const, label: 'PII Detection' },
           { id: 'classification' as const, label: 'Data Classification' },
+          { id: 'dspm-scans' as const, label: 'DSPM Scans' },
+          { id: 'dspm-findings' as const, label: 'DSPM Findings' },
           { id: 'modules' as const, label: 'DSPM Modules' },
         ] as const).map((tab) => (
           <button
@@ -659,6 +813,291 @@ export default function DSPMPage() {
               Unable to load classification data. Ensure the DSPM API is available.
             </div>
           )}
+        </div>
+      )}
+
+      {/* DSPM Scans Tab */}
+      {activeTab === 'dspm-scans' && (
+        <div className="space-y-4">
+          {selectedScanDetail ? (
+            <div className="space-y-4">
+              <button
+                onClick={() => setSelectedScanDetail(null)}
+                className="text-xs text-brand-gray-500 hover:text-brand-navy flex items-center gap-1"
+              >
+                &larr; Back to scan list
+              </button>
+              <div className="card">
+                <div className="flex items-center gap-3 mb-4">
+                  <h3 className="text-sm font-bold text-brand-navy">DSPM Scan Detail</h3>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                    selectedScanDetail.status === 'completed' ? 'bg-green-100 text-green-700 border border-green-200' :
+                    selectedScanDetail.status === 'failed' ? 'bg-red-100 text-red-700 border border-red-200' :
+                    'bg-blue-100 text-blue-700 border border-blue-200'
+                  }`}>
+                    {selectedScanDetail.status?.toUpperCase()}
+                  </span>
+                  {selectedScanDetail.provider_type && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                      PROVIDER_COLORS[selectedScanDetail.provider_type] || 'bg-gray-100 text-gray-500 border-gray-200'
+                    }`}>
+                      {selectedScanDetail.provider_type?.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="text-center">
+                    <p className="text-xs text-brand-gray-400 uppercase">Findings</p>
+                    <p className="text-xl font-bold text-brand-navy">{selectedScanDetail.total_findings}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-brand-gray-400 uppercase">Risk</p>
+                    <p className={`text-xl font-bold ${
+                      selectedScanDetail.overall_risk_label === 'critical' ? 'text-red-600' :
+                      selectedScanDetail.overall_risk_label === 'high' ? 'text-orange-600' :
+                      selectedScanDetail.overall_risk_label === 'medium' ? 'text-yellow-600' :
+                      'text-green-600'
+                    }`}>{selectedScanDetail.overall_risk_label?.toUpperCase()} ({selectedScanDetail.overall_risk_score?.toFixed(1)})</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-brand-gray-400 uppercase">Modules Run</p>
+                    <p className="text-xl font-bold text-brand-navy">{selectedScanDetail.modules_run}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-brand-gray-400 uppercase">Duration</p>
+                    <p className="text-xl font-bold text-brand-navy">{selectedScanDetail.duration_seconds?.toFixed(1)}s</p>
+                  </div>
+                </div>
+                {/* Findings by severity */}
+                {selectedScanDetail.findings_by_severity && Object.keys(selectedScanDetail.findings_by_severity).length > 0 && (
+                  <div className="flex gap-2 mb-4">
+                    {Object.entries(selectedScanDetail.findings_by_severity).map(([sev, count]: [string, any]) => (
+                      <span key={sev} className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                        SEVERITY_COLORS[sev] || 'bg-gray-100 text-gray-600 border-gray-200'
+                      }`}>
+                        {sev.toUpperCase()}: {count}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Findings grouped by module */}
+              {selectedScanDetail.findings_by_module_detail && Object.entries(selectedScanDetail.findings_by_module_detail).map(([mod, findings]: [string, any]) => {
+                const modInfo = MODULE_LABELS[mod] || { label: mod, color: 'bg-gray-100 text-gray-600' }
+                return (
+                  <div key={mod}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`text-xs font-semibold px-2 py-1 rounded ${modInfo.color}`}>{modInfo.label}</span>
+                      <span className="text-xs text-brand-gray-400">{findings.length} finding{findings.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="card overflow-hidden p-0">
+                      <table className="min-w-full divide-y divide-brand-gray-200">
+                        <thead>
+                          <tr className="bg-brand-gray-50">
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Severity</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Title</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Resource</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Category</th>
+                            <th className="px-4 py-3 text-right text-xs font-semibold text-brand-gray-500 uppercase">Risk Score</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-brand-gray-100">
+                          {findings.map((f: any) => (
+                            <tr key={f.id} className="hover:bg-brand-gray-50">
+                              <td className="px-4 py-3">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                  SEVERITY_COLORS[f.severity] || 'bg-gray-100 text-gray-600 border-gray-200'
+                                }`}>{f.severity?.toUpperCase()}</span>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-brand-navy font-medium max-w-xs truncate">{f.title}</td>
+                              <td className="px-4 py-3 text-xs text-brand-gray-600 max-w-[200px] truncate">{f.resource_name || f.resource_id || '-'}</td>
+                              <td className="px-4 py-3 text-xs text-brand-gray-600">{f.category || '-'}</td>
+                              <td className="px-4 py-3 text-sm text-right font-medium">{f.risk_score?.toFixed(1)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="card overflow-hidden p-0">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-brand-gray-200">
+                  <thead>
+                    <tr className="bg-brand-gray-50">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Provider</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-brand-gray-500 uppercase">Findings</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-brand-gray-500 uppercase">Risk</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-brand-gray-500 uppercase">Modules</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-brand-gray-500 uppercase">Duration</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Content Scan</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Date</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-brand-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-brand-gray-100">
+                    {dspmScans.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="px-6 py-12 text-center text-brand-gray-400">
+                          No DSPM scans yet. Click &quot;Run DSPM Scan&quot; to start.
+                        </td>
+                      </tr>
+                    ) : (
+                      dspmScans.map((s: any) => (
+                        <tr key={s.scan_id} className="hover:bg-brand-gray-50">
+                          <td className="px-4 py-3">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                              s.status === 'completed' ? 'bg-green-100 text-green-700 border border-green-200' :
+                              s.status === 'failed' ? 'bg-red-100 text-red-700 border border-red-200' :
+                              s.status === 'running' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                              'bg-gray-100 text-gray-500 border border-gray-200'
+                            }`}>{s.status?.toUpperCase()}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {s.provider_type && (
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                                PROVIDER_COLORS[s.provider_type] || 'bg-gray-100 text-gray-500 border-gray-200'
+                              }`}>{s.provider_type?.toUpperCase()}</span>
+                            )}
+                            <span className="ml-2 text-xs text-brand-gray-600">{s.provider_alias}</span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-medium">{s.total_findings}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                              RISK_COLORS[s.overall_risk_label] || 'bg-gray-100 text-gray-500 border-gray-200'
+                            }`}>{s.overall_risk_label?.toUpperCase()}</span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right">{s.modules_run}</td>
+                          <td className="px-4 py-3 text-sm text-right text-brand-gray-500">{s.duration_seconds?.toFixed(1)}s</td>
+                          <td className="px-4 py-3 text-xs">
+                            {s.enable_content_scanning ? (
+                              <span className="text-[10px] font-semibold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">PII</span>
+                            ) : (
+                              <span className="text-[10px] text-brand-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-brand-gray-500">{s.created_at ? new Date(s.created_at).toLocaleDateString() : '-'}</td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => viewScanDetail(s.scan_id)}
+                              className="text-xs text-brand-green hover:underline font-medium"
+                            >View</button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* DSPM Findings Tab — unified view with Source column */}
+      {activeTab === 'dspm-findings' && (
+        <div className="space-y-4">
+          {/* Filters */}
+          <div className="flex gap-3 items-center flex-wrap">
+            <select
+              value={dspmModuleFilter}
+              onChange={(e) => setDspmModuleFilter(e.target.value)}
+              className="px-3 py-1.5 border border-brand-gray-200 rounded-lg text-sm"
+            >
+              <option value="">All Modules</option>
+              {Object.entries(MODULE_LABELS).map(([id, info]) => (
+                <option key={id} value={id}>{info.label}</option>
+              ))}
+            </select>
+            <select
+              value={dspmSeverityFilter}
+              onChange={(e) => setDspmSeverityFilter(e.target.value)}
+              className="px-3 py-1.5 border border-brand-gray-200 rounded-lg text-sm"
+            >
+              <option value="">All Severities</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <span className="text-xs text-brand-gray-400">
+              {dspmFindings?.total || 0} DSPM findings
+            </span>
+          </div>
+
+          {/* Findings table */}
+          <div className="card overflow-hidden p-0">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-brand-gray-200">
+                <thead>
+                  <tr className="bg-brand-gray-50">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Severity</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Title</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Module</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Category</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Resource</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Source</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-brand-gray-500 uppercase">Status</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-brand-gray-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-brand-gray-100">
+                  {dspmFindingsLoading ? (
+                    <tr><td colSpan={8} className="px-6 py-12 text-center text-brand-gray-400">Loading...</td></tr>
+                  ) : (!dspmFindings?.findings || dspmFindings.findings.length === 0) ? (
+                    <tr><td colSpan={8} className="px-6 py-12 text-center text-brand-gray-400">No DSPM findings found. Run a DSPM scan to discover data security issues.</td></tr>
+                  ) : (
+                    dspmFindings.findings.map((f: any) => {
+                      const modInfo = MODULE_LABELS[f.module] || { label: f.module, color: 'bg-gray-100 text-gray-600' }
+                      return (
+                        <tr key={f.id} className="hover:bg-brand-gray-50">
+                          <td className="px-4 py-3">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                              SEVERITY_COLORS[f.severity] || 'bg-gray-100 text-gray-600 border-gray-200'
+                            }`}>{f.severity?.toUpperCase()}</span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-brand-navy font-medium max-w-xs truncate" title={f.description}>{f.title}</td>
+                          <td className="px-4 py-3">
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${modInfo.color}`}>{modInfo.label}</span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-brand-gray-600">{f.category || '-'}</td>
+                          <td className="px-4 py-3 text-xs text-brand-gray-600 max-w-[200px] truncate">{f.resource_name || f.resource_id || '-'}</td>
+                          <td className="px-4 py-3">
+                            <span className="text-[10px] font-medium bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
+                              {f.source === 'dspm_engine' ? 'DSPM Engine' : 'Cloud Scanner'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                              f.status === 'open' ? 'bg-red-100 text-red-700' :
+                              f.status === 'resolved' ? 'bg-green-100 text-green-700' :
+                              'bg-gray-100 text-gray-500'
+                            }`}>{f.status?.toUpperCase()}</span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <select
+                              value={f.status}
+                              onChange={(e) => updateFindingStatus(f.id, e.target.value)}
+                              className="text-xs border border-brand-gray-200 rounded px-1 py-0.5"
+                            >
+                              <option value="open">Open</option>
+                              <option value="resolved">Resolved</option>
+                              <option value="ignored">Ignored</option>
+                            </select>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 

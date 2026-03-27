@@ -41,6 +41,23 @@ def check_and_run_scheduled_scans():
                     "api.tasks.saas_tasks.run_saas_scan",
                     args=[scan.id, schedule.connection_id],
                 )
+            elif schedule.scan_type == "dspm" and schedule.provider_id:
+                from api.models.dspm_scan import DSPMScan
+                dspm_scan = DSPMScan(
+                    user_id=schedule.user_id,
+                    provider_id=schedule.provider_id,
+                    status="pending",
+                )
+                db.add(dspm_scan)
+                db.flush()
+                celery_app.send_task(
+                    "api.tasks.dspm_tasks.run_dspm_scan",
+                    kwargs={
+                        "dspm_scan_id": dspm_scan.id,
+                        "provider_id": schedule.provider_id,
+                        "user_id": schedule.user_id,
+                    },
+                )
 
             # Update schedule timing
             from datetime import timedelta

@@ -535,6 +535,31 @@ class ApiClient {
     return this.request<any>('GET', '/api/v1/dspm/attack-paths')
   }
 
+  async triggerDSPMScan(data: { provider_id?: string; skip_modules?: string[]; enable_content_scanning?: boolean }) {
+    return this.request<any>('POST', '/api/v1/dspm/scan', data)
+  }
+
+  async getDSPMScanStatus(scanId: string) {
+    return this.request<any>('GET', `/api/v1/dspm/scan-status/${scanId}`)
+  }
+
+  async getDSPMScans(limit?: number) {
+    const params = limit ? { limit: String(limit) } : undefined
+    return this.request<any[]>('GET', '/api/v1/dspm/scans', undefined, { params })
+  }
+
+  async getDSPMScanDetail(scanId: string) {
+    return this.request<any>('GET', `/api/v1/dspm/scans/${scanId}`)
+  }
+
+  async getDSPMScanFindings(params?: Record<string, string>) {
+    return this.request<any>('GET', '/api/v1/dspm/scan-findings', undefined, { params })
+  }
+
+  async updateDSPMFindingStatus(findingId: string, status: string) {
+    return this.request<any>('PUT', `/api/v1/dspm/scan-findings/${findingId}/status`, { status })
+  }
+
   // Security Graph
   async getSecurityGraph(params?: Record<string, string>) {
     return this.request<any>('GET', '/api/v1/security-graph/graph', undefined, { params })

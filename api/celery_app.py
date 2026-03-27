@@ -11,6 +11,7 @@ celery_app = Celery(
         "api.tasks.saas_tasks",
         "api.tasks.schedule_tasks",
         "api.tasks.rr_tasks",
+        "api.tasks.dspm_tasks",
     ],
 )
 

@@ -1,7 +1,9 @@
 """DSPM router — Data Security Posture Management."""
-from fastapi import APIRouter, Depends, Query
+import json
+
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, desc
 from typing import Optional
 
 from api.database import get_db
@@ -9,7 +11,15 @@ from api.models.user import User
 from api.models.finding import Finding
 from api.models.scan import Scan
 from api.models.provider import Provider
+from api.models.dspm_scan import DSPMScan
+from api.models.dspm_finding import DSPMFinding
 from api.services.auth_service import get_current_user
+from api.schemas.dspm import (
+    DSPMScanRequest,
+    DSPMScanResponse,
+    DSPMScanStatusResponse,
+    DSPMFindingStatusUpdate,
+)
 from scanner.dspm.data_store_checks import (
     DSPM_CHECKS,
     DATA_STORE_TYPES,
@@ -418,6 +428,348 @@ async def dspm_classification_levels():
         "pii_category_map": PII_CATEGORY_MAP,
         "tag_conventions": TAG_MAPPING,
     }
+
+
+@router.post("/scan")
+async def dspm_scan(
+    request: DSPMScanRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Launch a DSPM scan. Runs DSPMOrchestrator via Celery in background.
+
+    One scan per provider. If provider_id is omitted, scans all providers.
+    Returns scan_id(s) for tracking.
+    """
+    from api.tasks.dspm_tasks import run_dspm_scan
+
+    # Get provider(s)
+    if request.provider_id:
+        prov_q = await db.execute(
+            select(Provider).where(
+                Provider.id == request.provider_id,
+                Provider.user_id == current_user.id,
+            )
+        )
+        provider = prov_q.scalar_one_or_none()
+        if not provider:
+            raise HTTPException(status_code=404, detail="Provider not found")
+        providers = [provider]
+    else:
+        prov_q = await db.execute(
+            select(Provider).where(Provider.user_id == current_user.id)
+        )
+        providers = prov_q.scalars().all()
+
+    if not providers:
+        raise HTTPException(status_code=400, detail="No providers configured. Add a cloud provider first.")
+
+    scans_created = []
+    for provider in providers:
+        dspm_scan_record = DSPMScan(
+            user_id=current_user.id,
+            provider_id=provider.id,
+            status="pending",
+            enable_content_scanning=request.enable_content_scanning,
+        )
+        db.add(dspm_scan_record)
+        await db.flush()
+
+        task = run_dspm_scan.delay(
+            dspm_scan_id=dspm_scan_record.id,
+            provider_id=provider.id,
+            user_id=current_user.id,
+            enable_content_scanning=request.enable_content_scanning,
+            skip_modules=request.skip_modules,
+        )
+
+        dspm_scan_record.task_id = task.id
+        scans_created.append({
+            "scan_id": dspm_scan_record.id,
+            "task_id": task.id,
+            "provider_id": provider.id,
+            "provider_type": provider.provider_type,
+            "provider_alias": provider.alias,
+        })
+
+    await db.commit()
+
+    if len(scans_created) == 1:
+        s = scans_created[0]
+        return DSPMScanResponse(
+            scan_id=s["scan_id"],
+            task_id=s["task_id"],
+            status="queued",
+            message=f"DSPM scan queued for {s['provider_type']} ({s['provider_alias']})",
+        )
+
+    return {
+        "status": "queued",
+        "message": f"DSPM scans queued for {len(scans_created)} providers",
+        "scans": scans_created,
+    }
+
+
+@router.get("/scan-status/{scan_id}")
+async def dspm_scan_status(
+    scan_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get the status of a DSPM scan."""
+    q = await db.execute(
+        select(DSPMScan).where(
+            DSPMScan.id == scan_id,
+            DSPMScan.user_id == current_user.id,
+        )
+    )
+    scan = q.scalar_one_or_none()
+    if not scan:
+        raise HTTPException(status_code=404, detail="DSPM scan not found")
+
+    return DSPMScanStatusResponse(
+        scan_id=scan.id,
+        task_id=scan.task_id or "",
+        status=scan.status,
+        total_findings=scan.total_findings,
+        overall_risk_score=scan.overall_risk_score,
+        overall_risk_label=scan.overall_risk_label,
+        modules_run=scan.modules_run,
+        modules_failed=scan.modules_failed,
+        findings_by_severity=json.loads(scan.findings_by_severity) if scan.findings_by_severity else None,
+        findings_by_module=json.loads(scan.findings_by_module) if scan.findings_by_module else None,
+        duration_seconds=scan.duration_seconds,
+        completed_at=scan.completed_at,
+    )
+
+
+@router.get("/scans")
+async def dspm_scans(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    limit: int = Query(20, ge=1, le=100),
+):
+    """List DSPM scans for the current user."""
+    q = await db.execute(
+        select(DSPMScan)
+        .where(DSPMScan.user_id == current_user.id)
+        .order_by(desc(DSPMScan.created_at))
+        .limit(limit)
+    )
+    scans = q.scalars().all()
+
+    # Fetch provider info
+    prov_q = await db.execute(
+        select(Provider).where(Provider.user_id == current_user.id)
+    )
+    providers_map = {p.id: p for p in prov_q.scalars().all()}
+
+    results = []
+    for s in scans:
+        prov = providers_map.get(s.provider_id)
+        results.append({
+            "scan_id": s.id,
+            "task_id": s.task_id,
+            "status": s.status,
+            "provider_id": s.provider_id,
+            "provider_type": prov.provider_type if prov else None,
+            "provider_alias": prov.alias if prov else None,
+            "total_findings": s.total_findings,
+            "overall_risk_score": s.overall_risk_score,
+            "overall_risk_label": s.overall_risk_label,
+            "modules_run": s.modules_run,
+            "duration_seconds": s.duration_seconds,
+            "enable_content_scanning": s.enable_content_scanning,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+            "completed_at": s.completed_at.isoformat() if s.completed_at else None,
+        })
+
+    return results
+
+
+@router.get("/scans/{scan_id}")
+async def dspm_scan_detail(
+    scan_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get detailed DSPM scan with all findings grouped by module."""
+    q = await db.execute(
+        select(DSPMScan).where(
+            DSPMScan.id == scan_id,
+            DSPMScan.user_id == current_user.id,
+        )
+    )
+    scan = q.scalar_one_or_none()
+    if not scan:
+        raise HTTPException(status_code=404, detail="DSPM scan not found")
+
+    # Get findings
+    findings_q = await db.execute(
+        select(DSPMFinding)
+        .where(DSPMFinding.scan_id == scan_id)
+        .order_by(desc(DSPMFinding.risk_score))
+    )
+    findings = findings_q.scalars().all()
+
+    # Group by module
+    by_module: dict[str, list[dict]] = {}
+    for f in findings:
+        entry = {
+            "id": f.id,
+            "module": f.module,
+            "title": f.title,
+            "severity": f.severity,
+            "confidence": f.confidence,
+            "description": f.description,
+            "resource_id": f.resource_id,
+            "resource_name": f.resource_name,
+            "category": f.category,
+            "remediation": f.remediation,
+            "risk_score": f.risk_score,
+            "evidence": json.loads(f.evidence) if f.evidence else None,
+            "status": f.status,
+            "source": "dspm_engine",
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+        }
+        by_module.setdefault(f.module, []).append(entry)
+
+    # Provider info
+    prov = None
+    if scan.provider_id:
+        prov_q = await db.execute(select(Provider).where(Provider.id == scan.provider_id))
+        prov = prov_q.scalar_one_or_none()
+
+    return {
+        "scan_id": scan.id,
+        "status": scan.status,
+        "provider_id": scan.provider_id,
+        "provider_type": prov.provider_type if prov else None,
+        "provider_alias": prov.alias if prov else None,
+        "total_findings": scan.total_findings,
+        "overall_risk_score": scan.overall_risk_score,
+        "overall_risk_label": scan.overall_risk_label,
+        "modules_run": scan.modules_run,
+        "modules_failed": scan.modules_failed,
+        "findings_by_severity": json.loads(scan.findings_by_severity) if scan.findings_by_severity else {},
+        "findings_by_module": json.loads(scan.findings_by_module) if scan.findings_by_module else {},
+        "duration_seconds": scan.duration_seconds,
+        "fingerprint": scan.fingerprint,
+        "enable_content_scanning": scan.enable_content_scanning,
+        "created_at": scan.created_at.isoformat() if scan.created_at else None,
+        "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
+        "findings_by_module_detail": by_module,
+        "all_findings": [e for findings_list in by_module.values() for e in findings_list],
+    }
+
+
+@router.get("/scan-findings")
+async def dspm_scan_findings(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    module: Optional[str] = None,
+    severity: Optional[str] = None,
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    scan_id: Optional[str] = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    """Get DSPM findings with filters. Returns both cloud scanner and DSPM engine findings."""
+    # DSPM engine findings
+    query = (
+        select(DSPMFinding)
+        .where(DSPMFinding.user_id == current_user.id)
+    )
+    if module:
+        query = query.where(DSPMFinding.module == module)
+    if severity:
+        query = query.where(DSPMFinding.severity == severity)
+    if category:
+        query = query.where(DSPMFinding.category == category)
+    if status:
+        query = query.where(DSPMFinding.status == status)
+    if scan_id:
+        query = query.where(DSPMFinding.scan_id == scan_id)
+
+    query = query.order_by(desc(DSPMFinding.risk_score)).offset(offset).limit(limit)
+
+    findings_q = await db.execute(query)
+    dspm_findings = findings_q.scalars().all()
+
+    # Count total
+    count_query = (
+        select(func.count(DSPMFinding.id))
+        .where(DSPMFinding.user_id == current_user.id)
+    )
+    if module:
+        count_query = count_query.where(DSPMFinding.module == module)
+    if severity:
+        count_query = count_query.where(DSPMFinding.severity == severity)
+    if category:
+        count_query = count_query.where(DSPMFinding.category == category)
+    if status:
+        count_query = count_query.where(DSPMFinding.status == status)
+    if scan_id:
+        count_query = count_query.where(DSPMFinding.scan_id == scan_id)
+
+    total_q = await db.execute(count_query)
+    total = total_q.scalar() or 0
+
+    results = []
+    for f in dspm_findings:
+        results.append({
+            "id": f.id,
+            "scan_id": f.scan_id,
+            "module": f.module,
+            "title": f.title,
+            "severity": f.severity,
+            "confidence": f.confidence,
+            "description": f.description,
+            "resource_id": f.resource_id,
+            "resource_name": f.resource_name,
+            "category": f.category,
+            "remediation": f.remediation,
+            "risk_score": f.risk_score,
+            "evidence": json.loads(f.evidence) if f.evidence else None,
+            "status": f.status,
+            "source": "dspm_engine",
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+        })
+
+    return {
+        "findings": results,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+    }
+
+
+@router.put("/scan-findings/{finding_id}/status")
+async def update_dspm_finding_status(
+    finding_id: str,
+    update: DSPMFindingStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update the status of a DSPM finding (open/resolved/ignored)."""
+    if update.status not in ("open", "resolved", "ignored"):
+        raise HTTPException(status_code=400, detail="Status must be one of: open, resolved, ignored")
+
+    q = await db.execute(
+        select(DSPMFinding).where(
+            DSPMFinding.id == finding_id,
+            DSPMFinding.user_id == current_user.id,
+        )
+    )
+    finding = q.scalar_one_or_none()
+    if not finding:
+        raise HTTPException(status_code=404, detail="DSPM finding not found")
+
+    finding.status = update.status
+    await db.commit()
+
+    return {"id": finding.id, "status": finding.status, "message": f"Finding status updated to '{update.status}'"}
 
 
 @router.get("/scan-capabilities")

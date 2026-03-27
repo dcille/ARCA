@@ -46,6 +46,8 @@ async def lifespan(app: FastAPI):
         logger.warning("Could not sync custom controls to registry: %s", exc)
 
     import api.models.framework_preference  # noqa: F401
+    import api.models.dspm_scan  # noqa: F401
+    import api.models.dspm_finding  # noqa: F401
 
     yield
 
