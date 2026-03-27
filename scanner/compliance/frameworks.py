@@ -11180,6 +11180,18 @@ FRAMEWORKS = {
                 "description": "Microsoft OneDrive allows users to sign in their cloud tenant account and begin syncing",
                 "checks": {"m365": ["m365_cis_7_3_2", "m365_cis_onedrive_sync_domain_joined", "m365_onedrive_sync_restricted"]},
             },
+            {
+                "id": "7.3.3",
+                "title": "Ensure custom script execution is restricted on personal sites",
+                "description": "Custom scripts can potentially be used to execute malicious code or exfiltrate data from SharePoint personal sites",
+                "checks": {"m365": ["m365_cis_7_3_3"]},
+            },
+            {
+                "id": "7.3.4",
+                "title": "Ensure custom script execution is restricted on self-service created sites",
+                "description": "Custom scripts on self-service site collections can introduce security vulnerabilities if not properly controlled",
+                "checks": {"m365": ["m365_cis_7_3_4"]},
+            },
             # ─── 8.x: Teams ───
             {
                 "id": "8.1.1",
