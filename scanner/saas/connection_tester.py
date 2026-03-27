@@ -43,21 +43,112 @@ async def _test_servicenow(credentials: dict) -> tuple[bool, str]:
 
 
 async def _test_m365(credentials: dict) -> tuple[bool, str]:
+    """Test M365 connection: Graph token + /organization call + Fabric token + permission spot-checks."""
     import httpx
-    token_url = f"https://login.microsoftonline.com/{credentials['tenant_id']}/oauth2/v2.0/token"
-    async with httpx.AsyncClient(timeout=15) as client:
-        response = await client.post(
+
+    tenant_id = credentials.get("tenant_id", "")
+    client_id = credentials.get("client_id", "")
+    client_secret = credentials.get("client_secret", "")
+
+    if not all([tenant_id, client_id, client_secret]):
+        return False, "Missing required credentials (tenant_id, client_id, client_secret)"
+
+    token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+    hints = [
+        "Verify Tenant ID is correct (Entra admin center > Overview)",
+        "Verify Client ID matches the registered app",
+        "Verify Client Secret is the Value (not Secret ID) and has not expired",
+        "Ensure admin consent has been granted for all API permissions",
+        "Check that the app registration is not disabled",
+        "If Fabric checks fail: ensure Power BI Tenant.Read.All is granted",
+    ]
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        # Step 1: Acquire Graph token
+        token_resp = await client.post(
             token_url,
             data={
-                "client_id": credentials["client_id"],
-                "client_secret": credentials["client_secret"],
+                "client_id": client_id,
+                "client_secret": client_secret,
                 "scope": "https://graph.microsoft.com/.default",
                 "grant_type": "client_credentials",
             },
         )
-    if response.status_code == 200 and "access_token" in response.json():
-        return True, "Successfully authenticated with Microsoft 365"
-    return False, f"M365 authentication failed: {response.status_code}"
+        if token_resp.status_code != 200 or "access_token" not in token_resp.json():
+            detail = token_resp.json().get("error_description", f"HTTP {token_resp.status_code}")
+            return False, f"Graph authentication failed: {detail}. Hints: {hints[0]}; {hints[1]}; {hints[2]}"
+
+        graph_token = token_resp.json()["access_token"]
+        headers = {"Authorization": f"Bearer {graph_token}"}
+
+        # Step 2: Verify Graph access by calling GET /organization
+        org_resp = await client.get(
+            "https://graph.microsoft.com/v1.0/organization", headers=headers
+        )
+        if org_resp.status_code != 200:
+            return False, (
+                f"Graph token acquired but GET /organization failed (HTTP {org_resp.status_code}). "
+                f"Ensure Directory.Read.All permission is granted with admin consent."
+            )
+
+        org_name = ""
+        org_data = org_resp.json().get("value", [])
+        if org_data:
+            org_name = org_data[0].get("displayName", tenant_id)
+
+        # Step 3: Spot-check key permissions (non-blocking — report warnings)
+        warnings: list[str] = []
+        permission_checks = [
+            ("identity/conditionalAccess/policies?$top=1", "Policy.Read.All", "Section 5"),
+            ("domains?$top=1", "Domain.Read.All", "Section 2"),
+        ]
+        for endpoint, scope_name, section in permission_checks:
+            try:
+                r = await client.get(
+                    f"https://graph.microsoft.com/v1.0/{endpoint}", headers=headers
+                )
+                if r.status_code == 403:
+                    warnings.append(f"{scope_name} not granted ({section})")
+            except Exception:
+                pass
+
+        # Step 4: Check beta SharePoint admin endpoint
+        try:
+            spo_resp = await client.get(
+                "https://graph.microsoft.com/beta/admin/sharepoint/settings", headers=headers
+            )
+            if spo_resp.status_code == 403:
+                warnings.append("SharePointTenantSettings.Read.All not granted (Section 7)")
+        except Exception:
+            pass
+
+        # Step 5: Try Fabric/Power BI token (separate scope)
+        fabric_ok = False
+        try:
+            fabric_resp = await client.post(
+                token_url,
+                data={
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "scope": "https://analysis.windows.net/powerbi/api/.default",
+                    "grant_type": "client_credentials",
+                },
+            )
+            if fabric_resp.status_code == 200 and "access_token" in fabric_resp.json():
+                fabric_ok = True
+            else:
+                warnings.append("Fabric/Power BI token failed — Tenant.Read.All may not be granted (Section 9)")
+        except Exception:
+            warnings.append("Fabric/Power BI token request failed (Section 9)")
+
+        # Build result message
+        msg = f"Connected to Microsoft 365 tenant: {org_name}"
+        if fabric_ok:
+            msg += " | Fabric API: OK"
+        if warnings:
+            msg += f" | Warnings: {'; '.join(warnings)}"
+
+        return True, msg
 
 
 async def _test_salesforce(credentials: dict) -> tuple[bool, str]:

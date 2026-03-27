@@ -85,7 +85,7 @@ export default function SaaSSecurityPage() {
 
   useEffect(() => { if (tab === 'findings') loadFindings() }, [filterProvider, filterSeverity])
 
-  const CREDENTIAL_FIELDS: Record<string, Array<{ key: string; label: string; type?: string }>> = {
+  const CREDENTIAL_FIELDS: Record<string, Array<{ key: string; label: string; type?: string; placeholder?: string; help?: string }>> = {
     servicenow: [
       { key: 'instance_name', label: 'Instance Name (e.g., dev12345)' },
       { key: 'username', label: 'Username' },
@@ -93,10 +93,10 @@ export default function SaaSSecurityPage() {
       { key: 'instance_region', label: 'Region (us/eu/ap)' },
     ],
     m365: [
-      { key: 'client_id', label: 'Application (Client) ID' },
-      { key: 'client_secret', label: 'Client Secret', type: 'password' },
-      { key: 'tenant_id', label: 'Directory (Tenant) ID' },
-      { key: 'tenant_location', label: 'Tenant Location (US/EU/AP)' },
+      { key: 'tenant_id', label: 'Tenant ID (Directory ID)', placeholder: '72f988bf-86f1-41af-91ab-2d7cd011db47', help: 'Entra admin center > Overview > Tenant ID' },
+      { key: 'client_id', label: 'Application (Client) ID', placeholder: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', help: 'App registrations > Your App > Application (client) ID' },
+      { key: 'client_secret', label: 'Client Secret Value', type: 'password', help: 'App registrations > Certificates and secrets > Value column (not the Secret ID)' },
+      { key: 'tenant_location', label: 'Tenant Location (US/EU/AP)', placeholder: 'US', help: 'Geographic region of your Microsoft 365 tenant' },
     ],
     salesforce: [
       { key: 'client_id', label: 'Connected App Client ID' },
@@ -509,10 +509,14 @@ export default function SaaSSecurityPage() {
                       </label>
                       <input
                         type={field.type || 'text'}
+                        placeholder={field.placeholder || ''}
                         value={credFields[field.key] || ''}
                         onChange={(e) => setCredFields({ ...credFields, [field.key]: e.target.value })}
                         className="w-full px-3 py-2 border border-brand-gray-300 rounded-lg text-sm"
                       />
+                      {field.help && (
+                        <p className="text-xs text-brand-gray-400 mt-1">{field.help}</p>
+                      )}
                     </div>
                   ))}
                 </div>
