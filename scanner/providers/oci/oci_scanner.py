@@ -1957,18 +1957,49 @@ class OCIScanner:
         """Run all OCI security checks including complete CIS benchmark coverage."""
         slog = getattr(self, "_scan_logger", None)
 
-        # Phase 1: Service checks
+        # Phase 1: Service checks (legacy monolithic scanner)
         if slog:
             slog.log_phase_start("service_checks", "oci_scanner.py")
         results = self.scan()
         if slog:
             slog.log_phase_end("service_checks", "oci_scanner.py", result_count=len(results))
 
-        # Phase 2: CIS coverage
+        # Phase 2: CIS v3.1.0 Evaluator Engine (54 controls)
         if slog:
-            slog.log_phase_start("cis_coverage", "oci_scanner.py")
-        results.extend(self._emit_cis_coverage(results))
-        if slog:
-            slog.log_phase_end("cis_coverage", "oci_scanner.py", result_count=len(results))
+            slog.log_phase_start("cis_evaluator_engine", "oci_cis_evaluator_engine.py")
+        try:
+            from scanner.providers.oci.oci_cis_evaluator_engine import OCICISEvaluatorEngine
+
+            oci_config = self._get_config()
+            tenancy_id = oci_config["tenancy"]
+            engine = OCICISEvaluatorEngine(
+                oci_config=oci_config,
+                tenancy_id=tenancy_id,
+                regions=self.regions,
+                services=self.services,
+                scan_logger=slog,
+            )
+            cis_results = engine.evaluate_all()
+
+            # Deduplicate: CIS engine results take precedence over legacy checks
+            existing_check_ids = {r.get("check_id") for r in results}
+            for r in cis_results:
+                if r.get("check_id") not in existing_check_ids:
+                    results.append(r)
+
+            if slog:
+                slog.log_phase_end("cis_evaluator_engine", "oci_cis_evaluator_engine.py", result_count=len(cis_results))
+        except ImportError:
+            logger.warning("OCI CIS evaluator engine not available, falling back to legacy CIS coverage")
+            if slog:
+                slog.log_phase_start("cis_coverage_legacy", "oci_scanner.py")
+            results.extend(self._emit_cis_coverage(results))
+            if slog:
+                slog.log_phase_end("cis_coverage_legacy", "oci_scanner.py", result_count=len(results))
+        except Exception as e:
+            logger.error("OCI CIS evaluator engine failed: %s, falling back to legacy", e)
+            if slog:
+                slog.log_error("cis_evaluator_engine", str(e))
+            results.extend(self._emit_cis_coverage(results))
 
         return results
