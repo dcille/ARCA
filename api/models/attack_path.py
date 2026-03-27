@@ -28,4 +28,9 @@ class AttackPath(Base):
     affected_resources: Mapped[str] = mapped_column(Text, nullable=True)  # JSON string
     remediation: Mapped[str] = mapped_column(Text, nullable=True)  # JSON string
     graph_data: Mapped[str] = mapped_column(Text, nullable=True)  # JSON string (nodes + edges)
+    # BAS 2.0 fields
+    blast_radius: Mapped[str] = mapped_column(Text, nullable=True)  # JSON: {total_reachable, data_stores, ...}
+    detection_coverage: Mapped[str] = mapped_column(Text, nullable=True)  # JSON: {coverage_pct, verdict, ...}
+    confidence: Mapped[str] = mapped_column(String(20), default="template")  # template | theoretical | confirmed
+    source: Mapped[str] = mapped_column(String(20), default="scenario")  # scenario | iam_discovery | combined
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -5,7 +5,9 @@ from .models import CATEGORY_WEIGHTS, SEVERITY_WEIGHTS, KILL_CHAIN_PHASES, TACTI
 
 
 def score_path(path: dict, centrality_scores: dict | None = None,
-               mitre_techniques_db: dict | None = None) -> dict:
+               mitre_techniques_db: dict | None = None,
+               blast_radius: dict | None = None,
+               detection_coverage: dict | None = None) -> dict:
     """
     Enhanced scoring for a single attack path.
 
@@ -69,9 +71,45 @@ def score_path(path: dict, centrality_scores: dict | None = None,
             max_centrality = max(cp['centrality'] for cp in choke_points)
             centrality_factor = 1.0 + max_centrality * 0.5
 
+    # ── BAS 2.0: Blast radius factor ──────────────────────────────
+    blast_radius_factor = 1.0
+    if blast_radius:
+        total_reachable = blast_radius.get('total_reachable', 0)
+        if total_reachable >= 50:
+            blast_radius_factor = 1.6
+        elif total_reachable >= 20:
+            blast_radius_factor = 1.4
+        elif total_reachable >= 10:
+            blast_radius_factor = 1.2
+        elif total_reachable >= 5:
+            blast_radius_factor = 1.1
+        # PII or admin escalation further increases the factor
+        if blast_radius.get('pii_exposure'):
+            blast_radius_factor *= 1.15
+        if blast_radius.get('admin_escalation'):
+            blast_radius_factor *= 1.1
+        blast_radius_factor = min(blast_radius_factor, 2.0)
+
+    # ── BAS 2.0: Detection gap factor ─────────────────────────────
+    # Paths that are NOT detected by monitoring get a HIGHER score
+    # (they are more dangerous because they're invisible)
+    detection_gap_factor = 1.0
+    if detection_coverage:
+        coverage_pct = detection_coverage.get('coverage_pct', 100)
+        if coverage_pct == 0:
+            detection_gap_factor = 1.5   # Completely blind: max danger
+        elif coverage_pct < 25:
+            detection_gap_factor = 1.35  # Mostly blind
+        elif coverage_pct < 50:
+            detection_gap_factor = 1.2   # Partially monitored
+        elif coverage_pct < 75:
+            detection_gap_factor = 1.1   # Mostly monitored
+        # Well-monitored paths (>=75%) get no boost
+
     # Compute final score (normalized to 0-100)
     raw_score = (base_score * cat_weight * step_factor * resource_factor *
-                 kill_chain_factor * exposure_factor * env_factor * centrality_factor)
+                 kill_chain_factor * exposure_factor * env_factor * centrality_factor *
+                 blast_radius_factor * detection_gap_factor)
     risk_score = min(round(raw_score, 1), 100.0)
 
     return {
@@ -88,6 +126,8 @@ def score_path(path: dict, centrality_scores: dict | None = None,
             'public_exposure': exposure_factor,
             'environment': env_factor,
             'centrality': round(centrality_factor, 2),
+            'blast_radius': round(blast_radius_factor, 2),
+            'detection_gap': round(detection_gap_factor, 2),
         },
     }
 

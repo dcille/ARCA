@@ -68,6 +68,11 @@ class AttackPath:
     techniques: list[str]
     affected_resources: list[str]
     remediation: list[str]
+    # BAS 2.0 fields (optional, backward compatible)
+    blast_radius: Optional[dict] = None
+    detection_coverage: Optional[dict] = None
+    confidence: str = "template"   # template | theoretical | confirmed
+    source: str = "scenario"       # scenario | iam_discovery | combined
 
 
 class AttackPathGraph:
@@ -422,17 +427,89 @@ SCENARIO_TEMPLATES = [
 class AttackPathAnalyzer:
     """Analyzes findings to discover attack paths."""
 
-    def __init__(self, findings: list[dict]):
+    def __init__(self, findings: list[dict], all_findings: Optional[list[dict]] = None,
+                 cloud_credentials: Optional[dict] = None):
+        """
+        Args:
+            findings: FAIL findings used to build attack paths (backward compatible).
+            all_findings: ALL findings (PASS + FAIL) for detection coverage analysis.
+                         If None, only findings (FAIL) are used.
+            cloud_credentials: Cloud credentials for IAM graph building (Phase 2+).
+                              If None, IAM analysis is skipped.
+        """
         self.findings = findings
+        self.all_findings = all_findings or findings
+        self.cloud_credentials = cloud_credentials
         self.graph = AttackPathGraph()
         self.paths: list[AttackPath] = []
 
     def analyze(self) -> list[AttackPath]:
         """Run full analysis pipeline."""
+        # ── EXISTING: Template-based discovery (unchanged) ──
         self._build_graph()
         self._detect_paths()
         self._score_paths()
+
+        # ── BAS 2.0: Enrichment with blast radius + detection coverage ──
+        # These work from existing data, no cloud API calls needed.
+        self._calculate_blast_radius()
+        self._evaluate_detection_coverage()
+
+        # Re-score with enrichment data
+        self._enhanced_score_paths()
+
         return sorted(self.paths, key=lambda p: p.risk_score, reverse=True)
+
+    def _calculate_blast_radius(self) -> None:
+        """Calculate blast radius for each discovered path."""
+        try:
+            from .blast_radius import BlastRadiusCalculator
+            calculator = BlastRadiusCalculator()
+            for path in self.paths:
+                br = calculator.calculate(path, self.graph)
+                path.blast_radius = br.to_dict()
+        except Exception:
+            pass  # Don't fail the whole pipeline if blast radius fails
+
+    def _evaluate_detection_coverage(self) -> None:
+        """Evaluate detection coverage for each discovered path."""
+        try:
+            from .detection import DetectionCoverageAnalyzer
+            analyzer = DetectionCoverageAnalyzer(self.all_findings)
+            for path in self.paths:
+                report = analyzer.analyze_path(path)
+                path.detection_coverage = {
+                    "coverage_pct": report.coverage_pct,
+                    "detected_steps": report.detected_steps,
+                    "undetected_steps": report.undetected_steps,
+                    "total_steps": report.total_steps,
+                    "verdict": report.verdict,
+                    "blind_spot_summary": report.blind_spot_summary,
+                }
+        except Exception:
+            pass  # Don't fail the whole pipeline if detection analysis fails
+
+    def _enhanced_score_paths(self) -> None:
+        """Re-score paths using BAS 2.0 enrichment data (blast radius + detection gaps)."""
+        from .scoring import score_path as enhanced_score
+        from .models import CATEGORY_WEIGHTS, SEVERITY_WEIGHTS
+
+        for path in self.paths:
+            path_dict = {
+                'severity': path.severity,
+                'category': path.category,
+                'nodes': [{'id': n.id} for n in path.nodes],
+                'edges': [{'source_id': e.source_id, 'target_id': e.target_id} for e in path.edges],
+                'techniques': path.techniques,
+                'affected_resources': path.affected_resources,
+                'entry_point': path.entry_point,
+            }
+            result = enhanced_score(
+                path_dict,
+                blast_radius=path.blast_radius,
+                detection_coverage=path.detection_coverage,
+            )
+            path.risk_score = result['risk_score']
 
     def _build_graph(self) -> None:
         """Build the resource graph from findings."""
