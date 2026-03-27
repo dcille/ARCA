@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Header from '@/components/layout/Header'
 import { api } from '@/lib/api'
 import { formatPercent, getPassRateColor, getPassRateStroke } from '@/lib/utils'
-import { XMarkIcon, ChevronDownIcon, ChevronRightIcon, BookOpenIcon, FunnelIcon, CheckIcon, CloudIcon, ServerIcon, PlusIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, ChevronDownIcon, ChevronRightIcon, BookOpenIcon, FunnelIcon, CheckIcon, CloudIcon, ServerIcon, PlusIcon, WrenchScrewdriverIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -21,6 +21,7 @@ const STATUS_COLORS: Record<string, string> = {
   FAIL: 'bg-red-100 text-red-800',
   MANUAL: 'bg-purple-100 text-purple-700',
   NOT_EVALUATED: 'bg-amber-100 text-amber-700',
+  ERROR: 'bg-orange-100 text-orange-700',
   'N/A': 'bg-gray-100 text-gray-600',
   EXCEPTION: 'bg-cyan-100 text-cyan-700',
 }
@@ -30,6 +31,7 @@ const STATUS_DOT: Record<string, string> = {
   FAIL: 'bg-red-500',
   MANUAL: 'bg-purple-400',
   NOT_EVALUATED: 'bg-amber-400',
+  ERROR: 'bg-orange-500',
   'N/A': 'bg-gray-400',
   EXCEPTION: 'bg-cyan-500',
 }
@@ -219,6 +221,93 @@ export default function CompliancePage() {
     setExpandedControls(new Set())
     setShowLibrary(false)
     setLibraryData(null)
+  }
+
+  const exportFrameworkCSV = () => {
+    if (!controlsData?.controls?.length) return
+
+    const frameworkName = controlsData.framework?.name || 'framework'
+    const rows: string[][] = []
+
+    // Header row
+    rows.push([
+      'Control ID',
+      'Control Title',
+      'Control Status',
+      'Severity',
+      'Assessment Type',
+      'CIS Level',
+      'Provider',
+      'Check ID',
+      'Check Description',
+      'Check Status',
+      'Findings',
+      'Failed',
+      'Passed',
+      'Error Detail',
+    ])
+
+    for (const ctrl of controlsData.controls) {
+      const providerKeys = Object.keys(ctrl.checks || {})
+      if (providerKeys.length === 0) {
+        // Control with no checks — emit one row
+        rows.push([
+          ctrl.id,
+          ctrl.title,
+          ctrl.status,
+          ctrl.severity || '',
+          ctrl.assessment_type || '',
+          ctrl.cis_level || '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+        ])
+      } else {
+        for (const provider of providerKeys) {
+          for (const check of ctrl.checks[provider] || []) {
+            rows.push([
+              ctrl.id,
+              ctrl.title,
+              ctrl.status,
+              ctrl.severity || '',
+              ctrl.assessment_type || '',
+              ctrl.cis_level || '',
+              provider,
+              check.check_id,
+              check.description || '',
+              check.status,
+              String(check.finding_count ?? ''),
+              String(check.fail_count ?? ''),
+              String(check.pass_count ?? ''),
+              check.error_detail || check.status_extended || '',
+            ])
+          }
+        }
+      }
+    }
+
+    // Build CSV string with proper escaping
+    const csvContent = rows
+      .map((row) =>
+        row.map((cell) => {
+          const val = String(cell).replace(/"/g, '""')
+          return /[",\n\r]/.test(val) ? `"${val}"` : val
+        }).join(',')
+      )
+      .join('\n')
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${frameworkName.replace(/[^a-zA-Z0-9_.-]/g, '_')}_controls.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const openOverrideModal = (checkId: string, checkTitle: string, controlId: string) => {
@@ -571,6 +660,12 @@ export default function CompliancePage() {
                       <span className="font-medium text-gray-500">{summary.na}</span>
                     </div>
                   )}
+                  {(summary.error || 0) > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-orange-600">Error</span>
+                      <span className="font-medium text-orange-600">{summary.error}</span>
+                    </div>
+                  )}
                   {(summary.not_evaluated || 0) > 0 && (
                     <div className="flex justify-between text-xs">
                       <span className="text-amber-600">Not Evaluated</span>
@@ -637,6 +732,12 @@ export default function CompliancePage() {
                   <p className="text-xs text-gray-500">N/A</p>
                 </div>
               )}
+              {(controlsData.summary.error || 0) > 0 && (
+                <div className="bg-orange-50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-orange-600">{controlsData.summary.error}</p>
+                  <p className="text-xs text-orange-600">Error</p>
+                </div>
+              )}
               {(controlsData.summary.exception || 0) > 0 && (
                 <div className="bg-cyan-50 rounded-lg p-3 text-center">
                   <p className="text-2xl font-bold text-cyan-700">{controlsData.summary.exception}</p>
@@ -654,11 +755,11 @@ export default function CompliancePage() {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-brand-gray-700">Filter:</label>
-              {['all', 'PASS', 'FAIL', 'MANUAL', 'NOT_EVALUATED', 'N/A', 'EXCEPTION'].map((s) => {
+              {['all', 'PASS', 'FAIL', 'MANUAL', 'ERROR', 'NOT_EVALUATED', 'N/A', 'EXCEPTION'].map((s) => {
                 const count = s === 'all'
                   ? controlsData?.controls?.length || 0
                   : controlsData?.controls?.filter((c: any) => c.status === s).length || 0
-                if ((s === 'EXCEPTION' || s === 'N/A') && count === 0) return null
+                if ((s === 'EXCEPTION' || s === 'N/A' || s === 'ERROR') && count === 0) return null
                 return (
                   <button
                     key={s}
@@ -669,29 +770,40 @@ export default function CompliancePage() {
                         : s === 'FAIL' ? 'bg-red-100 text-red-800'
                         : s === 'MANUAL' ? 'bg-purple-100 text-purple-700'
                         : s === 'NOT_EVALUATED' ? 'bg-amber-100 text-amber-700'
+                        : s === 'ERROR' ? 'bg-orange-100 text-orange-700'
                         : s === 'N/A' ? 'bg-gray-100 text-gray-600'
                         : s === 'EXCEPTION' ? 'bg-cyan-100 text-cyan-700'
                         : 'bg-brand-green text-white'
                         : 'border border-brand-gray-300 text-brand-gray-500 hover:bg-brand-gray-50'
                     }`}
                   >
-                    {s === 'all' ? 'All' : s === 'NOT_EVALUATED' ? 'Not Evaluated' : s === 'N/A' ? 'N/A' : s === 'MANUAL' ? 'Manual' : s === 'PASS' ? 'Passed' : s === 'EXCEPTION' ? 'Excepted' : 'Failed'}
+                    {s === 'all' ? 'All' : s === 'NOT_EVALUATED' ? 'Not Evaluated' : s === 'N/A' ? 'N/A' : s === 'MANUAL' ? 'Manual' : s === 'ERROR' ? 'Error' : s === 'PASS' ? 'Passed' : s === 'EXCEPTION' ? 'Excepted' : 'Failed'}
                     <span className="ml-1.5 opacity-70">({count})</span>
                   </button>
                 )
               })}
             </div>
-            <button
-              onClick={toggleLibrary}
-              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                showLibrary
-                  ? 'bg-brand-green text-white'
-                  : 'border border-brand-gray-300 text-brand-gray-700 hover:bg-brand-gray-50'
-              }`}
-            >
-              <BookOpenIcon className="w-4 h-4" />
-              Check Library
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={exportFrameworkCSV}
+                disabled={!controlsData?.controls?.length}
+                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors border border-brand-gray-300 text-brand-gray-700 hover:bg-brand-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ArrowDownTrayIcon className="w-4 h-4" />
+                Export CSV
+              </button>
+              <button
+                onClick={toggleLibrary}
+                className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  showLibrary
+                    ? 'bg-brand-green text-white'
+                    : 'border border-brand-gray-300 text-brand-gray-700 hover:bg-brand-gray-50'
+                }`}
+              >
+                <BookOpenIcon className="w-4 h-4" />
+                Check Library
+              </button>
+            </div>
           </div>
 
           {/* Check Library Panel */}
@@ -870,7 +982,7 @@ export default function CompliancePage() {
                               <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_COLORS[ctrl.status] || 'bg-gray-100 text-gray-500'}`}>
                                 {ctrl.status === 'NOT_EVALUATED' ? 'NOT EVALUATED' : ctrl.status === 'EXCEPTION' ? 'EXCEPTED' : ctrl.status}
                               </span>
-                              {ctrl.assessment_type && (
+                              {ctrl.assessment_type && !(ctrl.status === 'MANUAL' && ctrl.assessment_type === 'manual') && (
                                 <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${
                                   ctrl.assessment_type === 'automated' ? 'bg-blue-50 text-blue-600' :
                                   ctrl.assessment_type === 'manual' ? 'bg-purple-50 text-purple-600' :
@@ -903,6 +1015,11 @@ export default function CompliancePage() {
                               {ctrl.status === 'EXCEPTION' && (
                                 <span className="text-[10px] text-cyan-600">
                                   Excepted — this control has been marked as an exception
+                                </span>
+                              )}
+                              {ctrl.status === 'ERROR' && (
+                                <span className="text-[10px] text-orange-600">
+                                  Evaluation error — check permissions or API access for this control
                                 </span>
                               )}
                               {ctrl.status === 'N/A' && (
@@ -1014,6 +1131,8 @@ export default function CompliancePage() {
                                           ? 'border-purple-200 bg-purple-50/30'
                                           : check.status === 'EXCEPTION'
                                           ? 'border-cyan-200 bg-cyan-50/30'
+                                          : check.status === 'ERROR'
+                                          ? 'border-orange-200 bg-orange-50/30'
                                           : 'border-amber-200 bg-amber-50/30'
                                       }`}
                                     >
@@ -1076,6 +1195,21 @@ export default function CompliancePage() {
                                             <p className="text-[10px] text-amber-600 mt-1 italic">
                                               Not evaluated — no scan has been executed for this provider yet, or the scanner does not cover this specific check. Run a scan on the corresponding cloud account to evaluate this control.
                                             </p>
+                                          )}
+                                          {check.status === 'ERROR' && (
+                                            <div className="mt-1">
+                                              <p className="text-[10px] text-orange-600 italic">
+                                                Evaluation error — the check could not be completed.
+                                              </p>
+                                              {(check.error_detail || check.status_extended) && (
+                                                <div className="mt-1 bg-orange-50 border border-orange-200 rounded px-2 py-1.5">
+                                                  <p className="text-[10px] font-medium text-orange-700 mb-0.5">SDK / API Response:</p>
+                                                  <p className="text-[10px] text-orange-800 font-mono break-all">
+                                                    {check.error_detail || check.status_extended}
+                                                  </p>
+                                                </div>
+                                              )}
+                                            </div>
                                           )}
                                           {check.evidence_method && (
                                             <p className="text-[10px] text-brand-gray-400 mt-1">

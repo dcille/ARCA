@@ -232,6 +232,9 @@ async def evaluate_custom_framework(
             Finding.check_id,
             func.sum(case((Finding.status == "FAIL", 1), else_=0)).label("fail_count"),
             func.sum(case((Finding.status == "PASS", 1), else_=0)).label("pass_count"),
+            func.sum(case((Finding.status == "MANUAL", 1), else_=0)).label("manual_count"),
+            func.sum(case((Finding.status == "ERROR", 1), else_=0)).label("error_count"),
+            func.sum(case((Finding.status == "N/A", 1), else_=0)).label("na_count"),
         )
         .join(Scan, Finding.scan_id == Scan.id)
         .where(Scan.user_id == user_id)
@@ -243,7 +246,7 @@ async def evaluate_custom_framework(
 
     result = await db.execute(query)
     findings_map = {
-        row.check_id: (row.fail_count or 0, row.pass_count or 0)
+        row.check_id: (row.fail_count or 0, row.pass_count or 0, row.manual_count or 0, row.error_count or 0, row.na_count or 0)
         for row in result.all()
     }
 
@@ -254,6 +257,7 @@ async def evaluate_custom_framework(
     passed = 0
     failed = 0
     not_evaluated = 0
+    error_checks = 0
 
     for entry in check_entries:
         if entry["assessment_type"] == "manual":
@@ -263,18 +267,23 @@ async def evaluate_custom_framework(
         # Check if any scanner_id has findings
         has_fail = False
         has_pass = False
+        has_error = False
         for sid in entry["scanner_ids"]:
             if sid in findings_map:
-                fc, pc = findings_map[sid]
+                fc, pc, mc, ec, nc = findings_map[sid]
                 if fc > 0:
                     has_fail = True
                 if pc > 0:
                     has_pass = True
+                if ec > 0:
+                    has_error = True
 
         if has_fail:
             failed += 1
         elif has_pass:
             passed += 1
+        elif has_error:
+            error_checks += 1
         else:
             not_evaluated += 1
 
@@ -289,6 +298,7 @@ async def evaluate_custom_framework(
         "passed": passed,
         "failed": failed,
         "not_evaluated": not_evaluated,
+        "error": error_checks,
         "pass_rate": pass_rate,
         "evaluation_coverage": evaluation_coverage,
     }

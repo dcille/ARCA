@@ -290,6 +290,8 @@ async def get_framework_evaluation(
             Finding.check_id,
             func.sum(case((Finding.status == "FAIL", 1), else_=0)).label("fail_count"),
             func.sum(case((Finding.status == "PASS", 1), else_=0)).label("pass_count"),
+            func.sum(case((Finding.status == "MANUAL", 1), else_=0)).label("manual_count"),
+            func.sum(case((Finding.status == "ERROR", 1), else_=0)).label("error_count"),
             func.count(Finding.id).label("total"),
         )
         .join(Scan, Finding.scan_id == Scan.id)
@@ -299,7 +301,7 @@ async def get_framework_evaluation(
     )
     result = await db.execute(query)
     findings_map = {
-        row.check_id: (row.fail_count or 0, row.pass_count or 0, row.total or 0)
+        row.check_id: (row.fail_count or 0, row.pass_count or 0, row.manual_count or 0, row.error_count or 0, row.total or 0)
         for row in result.all()
     }
 
@@ -308,22 +310,32 @@ async def get_framework_evaluation(
     for check_id, scanner_ids in check_scanner_map.items():
         has_fail = False
         has_pass = False
+        has_manual = False
+        has_error = False
         total_findings = 0
         total_fails = 0
         for sid in scanner_ids:
             if sid in findings_map:
-                fc, pc, t = findings_map[sid]
+                fc, pc, mc, ec, t = findings_map[sid]
                 if fc > 0:
                     has_fail = True
                     total_fails += fc
                 if pc > 0:
                     has_pass = True
+                if mc > 0:
+                    has_manual = True
+                if ec > 0:
+                    has_error = True
                 total_findings += t
 
         if has_fail:
             status = "FAIL"
         elif has_pass:
             status = "PASS"
+        elif has_manual:
+            status = "MANUAL"
+        elif has_error:
+            status = "ERROR"
         else:
             status = "NOT_EVALUATED"
 
