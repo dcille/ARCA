@@ -45,9 +45,10 @@ class GitHubCredentials(BaseModel):
 
 
 class GoogleWorkspaceCredentials(BaseModel):
-    service_account_json: str  # JSON key file contents as string
-    delegated_admin_email: str
-    customer_id: str
+    service_account_key: str  # JSON key file contents as string
+    admin_email: str  # Super Admin email for domain-wide delegation
+    domain: str  # Primary Google Workspace domain
+    customer_id: str = "my_customer"  # GWS customer ID, defaults to auto-detect
 
 
 class CloudflareCredentials(BaseModel):

@@ -119,9 +119,10 @@ export default function SaaSSecurityPage() {
       { key: 'organization', label: 'Organization (optional)' },
     ],
     google_workspace: [
-      { key: 'service_account_json', label: 'Service Account Key (JSON)', type: 'password' },
-      { key: 'delegated_admin_email', label: 'Delegated Admin Email' },
-      { key: 'customer_id', label: 'Customer ID' },
+      { key: 'service_account_key', label: 'Service Account JSON Key', type: 'password', help: 'Paste the full JSON key file from GCP IAM > Service Accounts > Keys' },
+      { key: 'admin_email', label: 'Admin Email (Super Admin)', placeholder: 'admin@company.com', help: 'Super Admin email for domain-wide delegation impersonation' },
+      { key: 'domain', label: 'Primary Domain', placeholder: 'company.com', help: 'Your primary Google Workspace domain' },
+      { key: 'customer_id', label: 'Customer ID (optional)', placeholder: 'my_customer', help: 'Leave as my_customer for auto-detection' },
     ],
     cloudflare: [
       { key: 'api_token', label: 'API Token', type: 'password' },
