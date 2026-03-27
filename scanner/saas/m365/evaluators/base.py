@@ -90,14 +90,17 @@ def make_result(cis_id, title, resource_id, passed, detail="",
         "status": "PASS" if passed else "FAIL",
         "resource_id": resource_id,
         "resource_name": resource_id,
+        "description": detail,
         "status_extended": detail,
         "remediation": remediation,
+        "remediation_url": None,
         "compliance_frameworks": FW,
         "cis_control_id": cis_id,
         "cis_level": level,
     }
 
 def make_manual(cis_id, title, svc="M365", sev="medium", lv="L1"):
+    detail = f"CIS {cis_id}: Requires manual/PowerShell verification"
     return {
         "check_id": f"m365_cis_{cis_id.replace('.', '_')}",
         "check_title": title,
@@ -105,8 +108,10 @@ def make_manual(cis_id, title, svc="M365", sev="medium", lv="L1"):
         "status": "MANUAL",
         "resource_id": "m365-tenant",
         "resource_name": "Manual verification required",
-        "status_extended": f"CIS {cis_id}: Requires manual/PowerShell verification",
+        "description": detail,
+        "status_extended": detail,
         "remediation": f"Refer to CIS M365 v6.0.1, control {cis_id}",
+        "remediation_url": None,
         "compliance_frameworks": FW,
         "cis_control_id": cis_id, "cis_level": lv,
     }

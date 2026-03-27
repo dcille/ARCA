@@ -1643,9 +1643,30 @@ class M365Scanner(BaseSaaSScanner):
         return manual_results
 
     def run_all_checks(self) -> list[dict]:
-        """Run all M365 security checks including complete CIS benchmark coverage."""
-        results = []
-        check_groups = [
+        """Run all M365 security checks including complete CIS v6.0.1 benchmark coverage.
+
+        Executes the M365CISEvaluatorEngine (142 controls) as the primary CIS
+        evaluation layer, then runs legacy check groups for non-CIS findings
+        (Defender recommendations, AAD user enumeration, etc.).  Duplicate
+        check_ids are de-duplicated — the evaluator engine result wins.
+        """
+        results: list[dict] = []
+
+        # ── Phase 1: CIS v6.0.1 evaluator engine (142 controls) ──────────
+        try:
+            from scanner.saas.m365.m365_cis_evaluator_engine import M365CISEvaluatorEngine
+            engine = M365CISEvaluatorEngine(
+                self.client_id, self.client_secret, self.tenant_id,
+            )
+            cis_results = engine.evaluate_all()
+            results.extend(cis_results)
+            logger.info("M365 CIS evaluator engine: %d results", len(cis_results))
+        except Exception as e:
+            logger.error("M365 CIS evaluator engine failed, falling back to legacy: %s", e)
+
+        # ── Phase 2: legacy / non-CIS check groups ───────────────────────
+        seen_ids = {r["check_id"] for r in results}
+        legacy_groups = [
             self._check_aad_users,
             self._check_conditional_access,
             self._check_defender_recommendations,
@@ -1654,19 +1675,15 @@ class M365Scanner(BaseSaaSScanner):
             self._check_data_protection,
             self._check_email_security,
             self._check_teams_sharepoint,
-            self._check_cis_admin_center,
-            self._check_cis_exchange_online,
-            self._check_cis_intune_entra,
         ]
-
-        for check_fn in check_groups:
+        for check_fn in legacy_groups:
             try:
-                results.extend(check_fn())
+                for r in check_fn():
+                    if r["check_id"] not in seen_ids:
+                        results.append(r)
+                        seen_ids.add(r["check_id"])
             except Exception as e:
-                logger.error(f"M365 check group failed: {e}")
-
-        # Add MANUAL results for any CIS controls not covered by automated checks
-        results.extend(self._emit_cis_coverage(results))
+                logger.error("M365 check group %s failed: %s", check_fn.__name__, e)
 
         return results
 
