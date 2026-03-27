@@ -2783,6 +2783,7 @@ class AzureScanner:
                 credentials=self.credentials,
                 services=self.services,
                 custom_controls=self.custom_controls,
+                scan_logger=slog,
             )
             unified_results = engine.evaluate_all()
 
