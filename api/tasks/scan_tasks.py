@@ -210,6 +210,32 @@ def run_cloud_scan(self, scan_id: str, provider_id: str, services=None, regions=
         except Exception as rr_err:
             logger.warning(f"RR evaluation trigger failed: {rr_err}")
 
+        # Trigger DSPM scan automatically after cloud scan completion
+        try:
+            from api.models.dspm_scan import DSPMScan
+            dspm_scan_record = DSPMScan(
+                user_id=scan.user_id,
+                provider_id=provider_id,
+                status="pending",
+                enable_content_scanning=False,
+            )
+            session.add(dspm_scan_record)
+            session.commit()
+
+            celery_app.send_task(
+                "api.tasks.dspm_tasks.run_dspm_scan",
+                kwargs={
+                    "dspm_scan_id": dspm_scan_record.id,
+                    "provider_id": provider_id,
+                    "user_id": scan.user_id,
+                    "enable_content_scanning": False,
+                    "skip_modules": ["content_sampler", "pii_scanner", "data_classifier"],
+                },
+            )
+            logger.info(f"DSPM scan triggered automatically for scan {scan_id}")
+        except Exception as dspm_err:
+            logger.warning(f"DSPM auto-trigger failed: {dspm_err}")
+
         logger.info(f"Cloud scan {scan_id} completed: {total} checks, {passed} passed, {failed} failed")
 
     except Exception as e:

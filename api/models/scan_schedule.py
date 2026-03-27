@@ -15,7 +15,7 @@ class ScanSchedule(Base):
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     provider_id: Mapped[str] = mapped_column(String(36), ForeignKey("providers.id"), nullable=True)
     connection_id: Mapped[str] = mapped_column(String(36), ForeignKey("saas_connections.id"), nullable=True)
-    scan_type: Mapped[str] = mapped_column(String(50), nullable=False)  # cloud, saas
+    scan_type: Mapped[str] = mapped_column(String(50), nullable=False)  # cloud, saas, dspm
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     frequency: Mapped[str] = mapped_column(String(50), nullable=False)  # daily, weekly, monthly
     cron_expression: Mapped[str] = mapped_column(String(100), nullable=True)  # for custom schedules

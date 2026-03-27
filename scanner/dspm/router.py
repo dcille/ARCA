@@ -704,21 +704,23 @@ class DSPMOrchestrator:
             provider, len(targets), skip or "none",
         )
 
-        # 1. PII scanning
-        if "pii_scanner" not in skip:
-            text = config.get("text", "")
-            if text:
-                mr = self.scan_pii(text=text)
-                report.module_results["pii_scanner"] = mr
-                all_findings.extend(mr.findings)
-        else:
-            report.module_results["pii_scanner"] = ModuleResult(
-                module_name="pii_scanner", status="skipped"
-            )
+        # 1. Content sampling + PII scanning + Data classification pipeline
+        # These three modules are chained: content_sampler produces text,
+        # pii_scanner detects PII in that text, data_classifier classifies
+        # resources based on PII results.
+        run_content_pipeline = (
+            "content_sampler" not in skip
+            and "pii_scanner" not in skip
+        )
 
-        # 2. Content sampling (per target)
-        if "content_sampler" not in skip:
+        if run_content_pipeline:
             sampler_findings: list[ModuleFinding] = []
+            pii_findings: list[ModuleFinding] = []
+            classifier_findings: list[ModuleFinding] = []
+
+            # Per-target content pipeline
+            per_target_pii_types: dict[str, list[str]] = {}
+
             for target in targets:
                 st = target.get("store_type", "")
                 target_kwargs = {
@@ -726,40 +728,110 @@ class DSPMOrchestrator:
                 }
                 if credentials:
                     target_kwargs.setdefault("credentials", credentials)
-                mr = self.sample_content(store_type=st, **target_kwargs)
-                sampler_findings.extend(mr.findings)
-            combined = ModuleResult(module_name="content_sampler", status="success")
-            combined.findings = sampler_findings
-            combined.finding_count = len(sampler_findings)
-            report.module_results["content_sampler"] = combined
+
+                # Step 1: Sample content from the data store
+                sample_mr = self.sample_content(store_type=st, **target_kwargs)
+                sampler_findings.extend(sample_mr.findings)
+
+                # Step 2: If content was sampled, run PII scanner on it
+                if sample_mr.status == "success" and sample_mr.raw_result:
+                    csr: ContentSampleResult = sample_mr.raw_result
+                    target_pii_types: list[str] = []
+                    for obj in csr.sampled_objects:
+                        if obj.content:
+                            pii_mr = self.scan_pii(
+                                file_content=obj.content,
+                                filename=obj.object_key,
+                            )
+                            pii_findings.extend(pii_mr.findings)
+                            target_pii_types.extend(
+                                f.evidence.get("pattern_id", "")
+                                for f in pii_mr.findings
+                                if f.evidence
+                            )
+
+                    rid = target.get("resource_id", "")
+                    if target_pii_types:
+                        per_target_pii_types[rid] = target_pii_types
+
+                    # Step 3: Classify resource based on PII found
+                    if "data_classifier" not in skip:
+                        cls_mr = self.classify_data(
+                            pii_results=target_pii_types,
+                            resource_id=rid,
+                            resource_name=target.get("resource_name", rid),
+                            provider=provider,
+                            current_tag=target.get("current_tag"),
+                        )
+                        classifier_findings.extend(cls_mr.findings)
+
+            combined_sampler = ModuleResult(module_name="content_sampler", status="success")
+            combined_sampler.findings = sampler_findings
+            combined_sampler.finding_count = len(sampler_findings)
+            report.module_results["content_sampler"] = combined_sampler
             all_findings.extend(sampler_findings)
+
+            combined_pii = ModuleResult(module_name="pii_scanner", status="success")
+            combined_pii.findings = pii_findings
+            combined_pii.finding_count = len(pii_findings)
+            report.module_results["pii_scanner"] = combined_pii
+            all_findings.extend(pii_findings)
+
+            if "data_classifier" not in skip:
+                combined_cls = ModuleResult(module_name="data_classifier", status="success")
+                combined_cls.findings = classifier_findings
+                combined_cls.finding_count = len(classifier_findings)
+                report.module_results["data_classifier"] = combined_cls
+                all_findings.extend(classifier_findings)
+            else:
+                report.module_results["data_classifier"] = ModuleResult(
+                    module_name="data_classifier", status="skipped"
+                )
         else:
+            # Modules run individually (or skipped)
+
+            # PII scanning on raw text (standalone mode)
+            if "pii_scanner" not in skip:
+                text = config.get("text", "")
+                if text:
+                    mr = self.scan_pii(text=text)
+                    report.module_results["pii_scanner"] = mr
+                    all_findings.extend(mr.findings)
+                else:
+                    report.module_results["pii_scanner"] = ModuleResult(
+                        module_name="pii_scanner", status="skipped"
+                    )
+            else:
+                report.module_results["pii_scanner"] = ModuleResult(
+                    module_name="pii_scanner", status="skipped"
+                )
+
             report.module_results["content_sampler"] = ModuleResult(
                 module_name="content_sampler", status="skipped"
             )
 
-        # 3. Data classification
-        if "data_classifier" not in skip:
-            pii_types = config.get("pii_types", [])
-            classifier_findings: list[ModuleFinding] = []
-            for target in targets:
-                mr = self.classify_data(
-                    pii_results=pii_types,
-                    resource_id=target.get("resource_id", ""),
-                    resource_name=target.get("resource_name", target.get("resource_id", "")),
-                    provider=provider,
-                    current_tag=target.get("current_tag"),
+            # Data classification (standalone, without PII pipeline)
+            if "data_classifier" not in skip:
+                pii_types = config.get("pii_types", [])
+                classifier_findings_standalone: list[ModuleFinding] = []
+                for target in targets:
+                    mr = self.classify_data(
+                        pii_results=pii_types,
+                        resource_id=target.get("resource_id", ""),
+                        resource_name=target.get("resource_name", target.get("resource_id", "")),
+                        provider=provider,
+                        current_tag=target.get("current_tag"),
+                    )
+                    classifier_findings_standalone.extend(mr.findings)
+                combined = ModuleResult(module_name="data_classifier", status="success")
+                combined.findings = classifier_findings_standalone
+                combined.finding_count = len(classifier_findings_standalone)
+                report.module_results["data_classifier"] = combined
+                all_findings.extend(classifier_findings_standalone)
+            else:
+                report.module_results["data_classifier"] = ModuleResult(
+                    module_name="data_classifier", status="skipped"
                 )
-                classifier_findings.extend(mr.findings)
-            combined = ModuleResult(module_name="data_classifier", status="success")
-            combined.findings = classifier_findings
-            combined.finding_count = len(classifier_findings)
-            report.module_results["data_classifier"] = combined
-            all_findings.extend(classifier_findings)
-        else:
-            report.module_results["data_classifier"] = ModuleResult(
-                module_name="data_classifier", status="skipped"
-            )
 
         # 4. Permission analysis (per target)
         if "permission_analyzer" not in skip:
