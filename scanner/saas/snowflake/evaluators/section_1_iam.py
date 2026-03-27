@@ -199,7 +199,7 @@ def eval_1_7(sf: SnowflakeClientCache) -> list[CheckResult]:
             WHERE AU.DELETED_ON IS NULL AND AU.DISABLED = 'false'
               AND EK.RSA_KEY_NAME IS NOT NULL
         )
-        SELECT SET_TIME, USERNAME, RSA_PUBLIC_KEY
+        SELECT SET_TIME, USERNAME, RSA_KEY_NAME
         FROM RECENT_KEYS WHERE RNUM = 1
     """)
     # If query returns results → those keys are >180 days old = FAIL

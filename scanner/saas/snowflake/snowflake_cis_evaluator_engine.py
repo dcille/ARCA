@@ -136,9 +136,9 @@ class SnowflakeCISEvaluatorEngine:
 
         # Determine automated vs manual by running a dry check on status
         # (we can't run without a connection, so use supplement presence)
-        from .supplements import SUPPLEMENT_EVALUATORS
-        from .section_1_iam import SECTION_1_EVALUATORS
-        from .section_3_4_net_data import SECTION_4_EVALUATORS
+        from .evaluators.supplements import SUPPLEMENT_EVALUATORS
+        from .evaluators.section_1_iam import SECTION_1_EVALUATORS
+        from .evaluators.section_3_4_net_data import SECTION_4_EVALUATORS
 
         manual_ids = {"1.3", "4.3", "4.9"}  # Truly manual (no supplement)
         for cis_id, meta in CIS_CONTROL_META.items():

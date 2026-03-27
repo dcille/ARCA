@@ -120,7 +120,14 @@ class SnowflakeClientCache:
         if self._password:
             params["password"] = self._password
         if self._private_key:
-            params["private_key"] = self._private_key
+            # Deserialize PEM bytes to cryptography private key object
+            from cryptography.hazmat.primitives.serialization import (
+                load_pem_private_key,
+            )
+            pem = self._private_key
+            if isinstance(pem, str):
+                pem = pem.encode("utf-8")
+            params["private_key"] = load_pem_private_key(pem, password=None)
         if self._warehouse:
             params["warehouse"] = self._warehouse
         if self._role:
