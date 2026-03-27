@@ -277,6 +277,702 @@ AWS_PRIVESC_PATTERNS: list[PrivescPattern] = [
 ]
 
 
+# ── Azure Privilege Escalation Patterns ──────────────────────────────
+# Based on Azure AD / Entra ID and RBAC privilege escalation research.
+
+AZURE_PRIVESC_PATTERNS: list[PrivescPattern] = [
+    PrivescPattern(
+        id="azure-privesc-01",
+        name="UserAccessAdministrator",
+        required_perms=["Microsoft.Authorization/roleAssignments/write"],
+        mitre_id="T1098.003",
+        description="Can assign any RBAC role, including Owner, to any principal.",
+        provider="azure",
+    ),
+    PrivescPattern(
+        id="azure-privesc-02",
+        name="ServicePrincipalCredentialAdd",
+        required_perms=["microsoft.directory/servicePrincipals/credentials/update"],
+        mitre_id="T1098.001",
+        description="Can add credentials to a service principal to impersonate it.",
+        provider="azure",
+    ),
+    PrivescPattern(
+        id="azure-privesc-03",
+        name="ApplicationCredentialAdd",
+        required_perms=["microsoft.directory/applications/credentials/update"],
+        mitre_id="T1098.001",
+        description="Can add credentials to an app registration to obtain its permissions.",
+        provider="azure",
+    ),
+    PrivescPattern(
+        id="azure-privesc-04",
+        name="KeyVaultSecretAccess",
+        required_perms=["Microsoft.KeyVault/vaults/secrets/getSecret/action"],
+        mitre_id="T1552.004",
+        description="Can read Key Vault secrets that may contain credentials or keys.",
+        provider="azure",
+    ),
+    PrivescPattern(
+        id="azure-privesc-05",
+        name="GlobalAdminRoleActivation",
+        required_perms=["microsoft.directory/roleAssignments/allProperties/allTasks"],
+        mitre_id="T1098.003",
+        description="Can activate Global Administrator role via PIM or direct assignment.",
+        provider="azure",
+    ),
+    PrivescPattern(
+        id="azure-privesc-06",
+        name="AutomationRunAsAccount",
+        required_perms=["Microsoft.Automation/automationAccounts/runbooks/write",
+                        "Microsoft.Automation/automationAccounts/jobs/write"],
+        mitre_id="T1078.004",
+        description="Can create/run automation runbook using elevated RunAs account.",
+        provider="azure",
+    ),
+    PrivescPattern(
+        id="azure-privesc-07",
+        name="VMRunCommand",
+        required_perms=["Microsoft.Compute/virtualMachines/runCommand/action"],
+        mitre_id="T1059.004",
+        description="Can execute commands on VMs with their managed identity.",
+        provider="azure",
+    ),
+    PrivescPattern(
+        id="azure-privesc-08",
+        name="ManagedIdentityTokenAccess",
+        required_perms=["Microsoft.ManagedIdentity/userAssignedIdentities/assign/action",
+                        "Microsoft.Compute/virtualMachines/write"],
+        mitre_id="T1550.001",
+        description="Can assign a managed identity to a VM to steal its token.",
+        provider="azure",
+    ),
+    PrivescPattern(
+        id="azure-privesc-09",
+        name="CustomRoleEscalation",
+        required_perms=["Microsoft.Authorization/roleDefinitions/write"],
+        mitre_id="T1098.003",
+        description="Can create or modify custom RBAC roles to grant elevated permissions.",
+        provider="azure",
+    ),
+    PrivescPattern(
+        id="azure-privesc-10",
+        name="ConditionalAccessBypass",
+        required_perms=["microsoft.directory/conditionalAccessPolicies/delete"],
+        mitre_id="T1556",
+        description="Can delete Conditional Access policies to weaken authentication controls.",
+        provider="azure",
+    ),
+]
+
+
+# ── GCP Privilege Escalation Patterns ────────────────────────────────
+# Based on GCP IAM & service account escalation research.
+
+GCP_PRIVESC_PATTERNS: list[PrivescPattern] = [
+    PrivescPattern(
+        id="gcp-privesc-01",
+        name="SetIAMPolicy",
+        required_perms=["resourcemanager.projects.setIamPolicy"],
+        mitre_id="T1098.003",
+        description="Can set IAM policy on a project, granting any role to any principal.",
+        provider="gcp",
+    ),
+    PrivescPattern(
+        id="gcp-privesc-02",
+        name="ServiceAccountKeyCreate",
+        required_perms=["iam.serviceAccountKeys.create"],
+        mitre_id="T1098.001",
+        description="Can create keys for any service account to impersonate it.",
+        provider="gcp",
+    ),
+    PrivescPattern(
+        id="gcp-privesc-03",
+        name="ServiceAccountTokenCreator",
+        required_perms=["iam.serviceAccounts.getAccessToken"],
+        mitre_id="T1550.001",
+        description="Can generate access tokens for service accounts.",
+        provider="gcp",
+    ),
+    PrivescPattern(
+        id="gcp-privesc-04",
+        name="ServiceAccountImpersonation",
+        required_perms=["iam.serviceAccounts.implicitDelegation"],
+        mitre_id="T1550.001",
+        description="Can impersonate a service account via delegation chain.",
+        provider="gcp",
+    ),
+    PrivescPattern(
+        id="gcp-privesc-05",
+        name="CloudFunctionDeploy",
+        required_perms=["cloudfunctions.functions.create", "cloudfunctions.functions.call",
+                        "iam.serviceAccounts.actAs"],
+        mitre_id="T1078.004",
+        description="Can deploy Cloud Function with elevated service account.",
+        provider="gcp",
+    ),
+    PrivescPattern(
+        id="gcp-privesc-06",
+        name="ComputeInstanceSA",
+        required_perms=["compute.instances.create", "iam.serviceAccounts.actAs"],
+        mitre_id="T1078.004",
+        description="Can create compute instance with elevated service account.",
+        provider="gcp",
+    ),
+    PrivescPattern(
+        id="gcp-privesc-07",
+        name="CustomRoleUpdate",
+        required_perms=["iam.roles.update"],
+        mitre_id="T1098.003",
+        description="Can modify custom roles to add elevated permissions.",
+        provider="gcp",
+    ),
+    PrivescPattern(
+        id="gcp-privesc-08",
+        name="ComputeSSH",
+        required_perms=["compute.instances.setMetadata", "compute.projects.setCommonInstanceMetadata"],
+        mitre_id="T1059.004",
+        description="Can inject SSH keys via instance/project metadata.",
+        provider="gcp",
+    ),
+    PrivescPattern(
+        id="gcp-privesc-09",
+        name="CloudBuildEditor",
+        required_perms=["cloudbuild.builds.create"],
+        mitre_id="T1078.004",
+        description="Can create Cloud Build jobs that run as the Cloud Build service account.",
+        provider="gcp",
+    ),
+    PrivescPattern(
+        id="gcp-privesc-10",
+        name="OrgPolicyBypass",
+        required_perms=["orgpolicy.policy.set"],
+        mitre_id="T1562.001",
+        description="Can modify org policies to disable security guardrails.",
+        provider="gcp",
+    ),
+]
+
+
+# ── OCI Privilege Escalation Patterns ────────────────────────────────
+
+OCI_PRIVESC_PATTERNS: list[PrivescPattern] = [
+    PrivescPattern(
+        id="oci-privesc-01",
+        name="PolicyManipulation",
+        required_perms=["manage policies in tenancy"],
+        mitre_id="T1098.003",
+        description="Can create or modify IAM policies to grant admin access.",
+        provider="oci",
+    ),
+    PrivescPattern(
+        id="oci-privesc-02",
+        name="UserGroupManipulation",
+        required_perms=["manage groups in tenancy", "manage users in tenancy"],
+        mitre_id="T1098.003",
+        description="Can add self to admin groups.",
+        provider="oci",
+    ),
+    PrivescPattern(
+        id="oci-privesc-03",
+        name="APIKeyAdd",
+        required_perms=["manage users in tenancy"],
+        mitre_id="T1098.001",
+        description="Can add API keys to other users to impersonate them.",
+        provider="oci",
+    ),
+    PrivescPattern(
+        id="oci-privesc-04",
+        name="DynamicGroupManipulation",
+        required_perms=["manage dynamic-groups in tenancy"],
+        mitre_id="T1078.004",
+        description="Can create dynamic group rules to include attacker-controlled instances.",
+        provider="oci",
+    ),
+    PrivescPattern(
+        id="oci-privesc-05",
+        name="InstancePrincipalAbuse",
+        required_perms=["manage instances in compartment"],
+        mitre_id="T1078.004",
+        description="Can launch instance matching admin dynamic group for elevated permissions.",
+        provider="oci",
+    ),
+    PrivescPattern(
+        id="oci-privesc-06",
+        name="VaultSecretAccess",
+        required_perms=["read secret-family in compartment"],
+        mitre_id="T1552.004",
+        description="Can read vault secrets containing credentials.",
+        provider="oci",
+    ),
+]
+
+
+# ── Alibaba Cloud Privilege Escalation Patterns ──────────────────────
+
+ALIBABA_PRIVESC_PATTERNS: list[PrivescPattern] = [
+    PrivescPattern(
+        id="ali-privesc-01",
+        name="RAMPolicyAttach",
+        required_perms=["ram:AttachPolicyToUser", "ram:AttachPolicyToGroup"],
+        mitre_id="T1098.003",
+        description="Can attach AdministratorAccess policy to users or groups.",
+        provider="alibaba",
+    ),
+    PrivescPattern(
+        id="ali-privesc-02",
+        name="RAMUserAccessKeyCreate",
+        required_perms=["ram:CreateAccessKey"],
+        mitre_id="T1098.001",
+        description="Can create access keys for other RAM users.",
+        provider="alibaba",
+    ),
+    PrivescPattern(
+        id="ali-privesc-03",
+        name="RAMRoleAssume",
+        required_perms=["sts:AssumeRole"],
+        mitre_id="T1550.001",
+        description="Can assume RAM roles with elevated permissions.",
+        provider="alibaba",
+    ),
+    PrivescPattern(
+        id="ali-privesc-04",
+        name="RAMPolicyUpdate",
+        required_perms=["ram:CreatePolicyVersion", "ram:SetDefaultPolicyVersion"],
+        mitre_id="T1098.003",
+        description="Can create and set permissive policy versions.",
+        provider="alibaba",
+    ),
+    PrivescPattern(
+        id="ali-privesc-05",
+        name="ECSInstanceRAMRole",
+        required_perms=["ecs:AttachInstanceRamRole", "ecs:RunInstances"],
+        mitre_id="T1078.004",
+        description="Can launch ECS instance with admin RAM role.",
+        provider="alibaba",
+    ),
+    PrivescPattern(
+        id="ali-privesc-06",
+        name="FunctionComputeEscalation",
+        required_perms=["fc:CreateFunction", "fc:InvokeFunction", "ram:PassRole"],
+        mitre_id="T1078.004",
+        description="Can create Function Compute function with elevated service role.",
+        provider="alibaba",
+    ),
+]
+
+
+# ── IBM Cloud Privilege Escalation Patterns ──────────────────────────
+
+IBM_CLOUD_PRIVESC_PATTERNS: list[PrivescPattern] = [
+    PrivescPattern(
+        id="ibm-privesc-01",
+        name="IAMPolicyCreate",
+        required_perms=["iam-identity.policy.create", "iam-identity.policy.update"],
+        mitre_id="T1098.003",
+        description="Can create or update IAM access policies to grant admin access.",
+        provider="ibm_cloud",
+    ),
+    PrivescPattern(
+        id="ibm-privesc-02",
+        name="ServiceIDKeyCreate",
+        required_perms=["iam-identity.apikey.create"],
+        mitre_id="T1098.001",
+        description="Can create API keys for service IDs with elevated permissions.",
+        provider="ibm_cloud",
+    ),
+    PrivescPattern(
+        id="ibm-privesc-03",
+        name="AccessGroupManipulation",
+        required_perms=["iam-groups.groups.update", "iam-groups.members.add"],
+        mitre_id="T1098.003",
+        description="Can add users/service IDs to access groups with admin policies.",
+        provider="ibm_cloud",
+    ),
+    PrivescPattern(
+        id="ibm-privesc-04",
+        name="TrustedProfileAbuse",
+        required_perms=["iam-identity.profile.create", "iam-identity.profile.linkToResource"],
+        mitre_id="T1078.004",
+        description="Can create trusted profiles linked to compute resources for token theft.",
+        provider="ibm_cloud",
+    ),
+]
+
+
+# ── Kubernetes Privilege Escalation Patterns ─────────────────────────
+# Based on Kubernetes RBAC escalation research.
+
+K8S_PRIVESC_PATTERNS: list[PrivescPattern] = [
+    PrivescPattern(
+        id="k8s-privesc-01",
+        name="ClusterRoleBinding",
+        required_perms=["rbac.authorization.k8s.io/clusterrolebindings:create"],
+        mitre_id="T1098.003",
+        description="Can bind cluster-admin ClusterRole to any subject.",
+        provider="kubernetes",
+    ),
+    PrivescPattern(
+        id="k8s-privesc-02",
+        name="PodCreate+ServiceAccount",
+        required_perms=["pods:create"],
+        mitre_id="T1078.004",
+        description="Can create pod mounting privileged service account token.",
+        provider="kubernetes",
+    ),
+    PrivescPattern(
+        id="k8s-privesc-03",
+        name="PodExec",
+        required_perms=["pods/exec:create"],
+        mitre_id="T1059.004",
+        description="Can exec into pods running with privileged service accounts.",
+        provider="kubernetes",
+    ),
+    PrivescPattern(
+        id="k8s-privesc-04",
+        name="SecretRead",
+        required_perms=["secrets:get", "secrets:list"],
+        mitre_id="T1552.004",
+        description="Can read all secrets including service account tokens.",
+        provider="kubernetes",
+    ),
+    PrivescPattern(
+        id="k8s-privesc-05",
+        name="NodeProxy",
+        required_perms=["nodes/proxy:create"],
+        mitre_id="T1021",
+        description="Can access the Kubelet API to execute commands in any pod on a node.",
+        provider="kubernetes",
+    ),
+    PrivescPattern(
+        id="k8s-privesc-06",
+        name="ImpersonateUser",
+        required_perms=["users:impersonate"],
+        mitre_id="T1550.001",
+        description="Can impersonate any user including cluster-admin.",
+        provider="kubernetes",
+    ),
+    PrivescPattern(
+        id="k8s-privesc-07",
+        name="CSRApproval",
+        required_perms=["certificatesigningrequests:create",
+                        "certificatesigningrequests/approval:update"],
+        mitre_id="T1098.001",
+        description="Can create and approve CSRs to obtain certificates for any identity.",
+        provider="kubernetes",
+    ),
+]
+
+
+# ── SaaS Privilege Escalation Patterns ───────────────────────────────
+
+M365_PRIVESC_PATTERNS: list[PrivescPattern] = [
+    PrivescPattern(
+        id="m365-privesc-01",
+        name="ExchangeAdminRoleAssign",
+        required_perms=["RoleManagement.ReadWrite.All"],
+        mitre_id="T1098.003",
+        description="Can assign Exchange admin or Global admin roles.",
+        provider="m365",
+    ),
+    PrivescPattern(
+        id="m365-privesc-02",
+        name="MailboxDelegation",
+        required_perms=["Mail.ReadWrite"],
+        mitre_id="T1098.002",
+        description="Can set mailbox delegation to read other users' email.",
+        provider="m365",
+    ),
+    PrivescPattern(
+        id="m365-privesc-03",
+        name="AppConsentGrant",
+        required_perms=["AppRoleAssignment.ReadWrite.All"],
+        mitre_id="T1098.003",
+        description="Can grant admin consent to OAuth apps with broad permissions.",
+        provider="m365",
+    ),
+    PrivescPattern(
+        id="m365-privesc-04",
+        name="eDiscoveryExfiltration",
+        required_perms=["eDiscovery.ReadWrite.All"],
+        mitre_id="T1114.002",
+        description="Can run eDiscovery searches across all mailboxes and SharePoint.",
+        provider="m365",
+    ),
+]
+
+GITHUB_PRIVESC_PATTERNS: list[PrivescPattern] = [
+    PrivescPattern(
+        id="gh-privesc-01",
+        name="OrgOwnerPromotion",
+        required_perms=["admin:org"],
+        mitre_id="T1098.003",
+        description="Can promote users to org owners, granting full repository access.",
+        provider="github",
+    ),
+    PrivescPattern(
+        id="gh-privesc-02",
+        name="SecretsExfiltration",
+        required_perms=["admin:org", "repo"],
+        mitre_id="T1552.004",
+        description="Can read org-level secrets via workflow dispatch.",
+        provider="github",
+    ),
+    PrivescPattern(
+        id="gh-privesc-03",
+        name="WorkflowInjection",
+        required_perms=["repo:write", "actions:write"],
+        mitre_id="T1525",
+        description="Can modify workflows to exfiltrate secrets via CI/CD pipeline.",
+        provider="github",
+    ),
+    PrivescPattern(
+        id="gh-privesc-04",
+        name="DeployKeyCompromise",
+        required_perms=["admin:repo_hook", "admin:public_key"],
+        mitre_id="T1098.001",
+        description="Can add deploy keys for persistent repo access.",
+        provider="github",
+    ),
+]
+
+GWS_PRIVESC_PATTERNS: list[PrivescPattern] = [
+    PrivescPattern(
+        id="gws-privesc-01",
+        name="SuperAdminPromotion",
+        required_perms=["admin.directory.users.update"],
+        mitre_id="T1098.003",
+        description="Can promote user to super admin role.",
+        provider="google_workspace",
+    ),
+    PrivescPattern(
+        id="gws-privesc-02",
+        name="DomainWideDelgation",
+        required_perms=["admin.directory.domainAliases", "iam.serviceAccountKeys.create"],
+        mitre_id="T1550.001",
+        description="Can configure domain-wide delegation for a service account.",
+        provider="google_workspace",
+    ),
+    PrivescPattern(
+        id="gws-privesc-03",
+        name="OAuthAppApproval",
+        required_perms=["admin.directory.oauthApps"],
+        mitre_id="T1098.003",
+        description="Can approve OAuth apps with broad Drive/Gmail scopes.",
+        provider="google_workspace",
+    ),
+    PrivescPattern(
+        id="gws-privesc-04",
+        name="AdminAPITokenTheft",
+        required_perms=["admin.directory.users.readonly"],
+        mitre_id="T1528",
+        description="Can enumerate users to target for phishing or credential stuffing.",
+        provider="google_workspace",
+    ),
+]
+
+SALESFORCE_PRIVESC_PATTERNS: list[PrivescPattern] = [
+    PrivescPattern(
+        id="sf-privesc-01",
+        name="PermissionSetAssign",
+        required_perms=["ManageUsers", "AssignPermissionSets"],
+        mitre_id="T1098.003",
+        description="Can assign System Administrator permission set to any user.",
+        provider="salesforce",
+    ),
+    PrivescPattern(
+        id="sf-privesc-02",
+        name="ConnectedAppAbuse",
+        required_perms=["ManageConnectedApps"],
+        mitre_id="T1098.001",
+        description="Can create connected apps with OAuth for persistent API access.",
+        provider="salesforce",
+    ),
+    PrivescPattern(
+        id="sf-privesc-03",
+        name="ApexCodeExecution",
+        required_perms=["AuthorApex"],
+        mitre_id="T1059",
+        description="Can execute arbitrary Apex code with system-level access.",
+        provider="salesforce",
+    ),
+    PrivescPattern(
+        id="sf-privesc-04",
+        name="FieldLevelSecurityBypass",
+        required_perms=["ManageProfilesPermissionsets", "CustomizeApplication"],
+        mitre_id="T1548",
+        description="Can modify field-level security to access restricted data.",
+        provider="salesforce",
+    ),
+]
+
+SERVICENOW_PRIVESC_PATTERNS: list[PrivescPattern] = [
+    PrivescPattern(
+        id="sn-privesc-01",
+        name="AdminRoleGrant",
+        required_perms=["admin", "user_admin"],
+        mitre_id="T1098.003",
+        description="Can assign admin role to any user.",
+        provider="servicenow",
+    ),
+    PrivescPattern(
+        id="sn-privesc-02",
+        name="ACLBypass",
+        required_perms=["admin", "security_admin"],
+        mitre_id="T1548",
+        description="Can modify ACL rules to bypass access controls on tables.",
+        provider="servicenow",
+    ),
+    PrivescPattern(
+        id="sn-privesc-03",
+        name="ScriptExecution",
+        required_perms=["admin", "script_execution"],
+        mitre_id="T1059",
+        description="Can execute background scripts with full system access.",
+        provider="servicenow",
+    ),
+    PrivescPattern(
+        id="sn-privesc-04",
+        name="IntegrationCredentialAccess",
+        required_perms=["admin", "credential_admin"],
+        mitre_id="T1552.004",
+        description="Can read integration credentials and connection aliases.",
+        provider="servicenow",
+    ),
+]
+
+SNOWFLAKE_PRIVESC_PATTERNS: list[PrivescPattern] = [
+    PrivescPattern(
+        id="snow-privesc-01",
+        name="AccountAdminGrant",
+        required_perms=["MANAGE GRANTS"],
+        mitre_id="T1098.003",
+        description="Can grant ACCOUNTADMIN role to any user.",
+        provider="snowflake",
+    ),
+    PrivescPattern(
+        id="snow-privesc-02",
+        name="NetworkPolicyBypass",
+        required_perms=["CREATE NETWORK POLICY", "APPLY NETWORK POLICY"],
+        mitre_id="T1562.001",
+        description="Can modify network policies to allow access from any IP.",
+        provider="snowflake",
+    ),
+    PrivescPattern(
+        id="snow-privesc-03",
+        name="ExternalFunctionExec",
+        required_perms=["CREATE EXTERNAL FUNCTION", "USAGE ON INTEGRATION"],
+        mitre_id="T1059",
+        description="Can create external functions to exfiltrate data via API calls.",
+        provider="snowflake",
+    ),
+    PrivescPattern(
+        id="snow-privesc-04",
+        name="MaskingPolicyBypass",
+        required_perms=["APPLY MASKING POLICY", "CREATE MASKING POLICY"],
+        mitre_id="T1548",
+        description="Can modify masking policies to reveal protected columns.",
+        provider="snowflake",
+    ),
+]
+
+CLOUDFLARE_PRIVESC_PATTERNS: list[PrivescPattern] = [
+    PrivescPattern(
+        id="cf-privesc-01",
+        name="SuperAdminInvite",
+        required_perms=["#member:edit"],
+        mitre_id="T1098.003",
+        description="Can invite users with Super Administrator role.",
+        provider="cloudflare",
+    ),
+    PrivescPattern(
+        id="cf-privesc-02",
+        name="APITokenCreate",
+        required_perms=["#api_tokens:edit"],
+        mitre_id="T1098.001",
+        description="Can create API tokens with elevated permissions.",
+        provider="cloudflare",
+    ),
+    PrivescPattern(
+        id="cf-privesc-03",
+        name="WorkerScriptInject",
+        required_perms=["#worker:edit"],
+        mitre_id="T1525",
+        description="Can deploy Workers to intercept/modify traffic or exfiltrate data.",
+        provider="cloudflare",
+    ),
+    PrivescPattern(
+        id="cf-privesc-04",
+        name="DNSManipulation",
+        required_perms=["#dns_records:edit"],
+        mitre_id="T1584.002",
+        description="Can modify DNS records to redirect traffic.",
+        provider="cloudflare",
+    ),
+]
+
+OPENSTACK_PRIVESC_PATTERNS: list[PrivescPattern] = [
+    PrivescPattern(
+        id="os-privesc-01",
+        name="RoleAssignment",
+        required_perms=["identity:create_grant"],
+        mitre_id="T1098.003",
+        description="Can assign admin role to any user on any project.",
+        provider="openstack",
+    ),
+    PrivescPattern(
+        id="os-privesc-02",
+        name="TrustCreate",
+        required_perms=["identity:create_trust"],
+        mitre_id="T1550.001",
+        description="Can create trusts to impersonate other users.",
+        provider="openstack",
+    ),
+    PrivescPattern(
+        id="os-privesc-03",
+        name="CredentialCreate",
+        required_perms=["identity:create_credential"],
+        mitre_id="T1098.001",
+        description="Can create EC2/application credentials for any user.",
+        provider="openstack",
+    ),
+    PrivescPattern(
+        id="os-privesc-04",
+        name="PolicyFileOverride",
+        required_perms=["compute:inject_network_info", "compute:create"],
+        mitre_id="T1078.004",
+        description="Can launch instances with metadata service access to steal tokens.",
+        provider="openstack",
+    ),
+]
+
+
+# ── Unified Pattern Registry ─────────────────────────────────────────
+
+ALL_PRIVESC_PATTERNS: dict[str, list[PrivescPattern]] = {
+    "aws": AWS_PRIVESC_PATTERNS,
+    "azure": AZURE_PRIVESC_PATTERNS,
+    "gcp": GCP_PRIVESC_PATTERNS,
+    "oci": OCI_PRIVESC_PATTERNS,
+    "alibaba": ALIBABA_PRIVESC_PATTERNS,
+    "ibm_cloud": IBM_CLOUD_PRIVESC_PATTERNS,
+    "kubernetes": K8S_PRIVESC_PATTERNS,
+    "m365": M365_PRIVESC_PATTERNS,
+    "github": GITHUB_PRIVESC_PATTERNS,
+    "google_workspace": GWS_PRIVESC_PATTERNS,
+    "salesforce": SALESFORCE_PRIVESC_PATTERNS,
+    "servicenow": SERVICENOW_PRIVESC_PATTERNS,
+    "snowflake": SNOWFLAKE_PRIVESC_PATTERNS,
+    "cloudflare": CLOUDFLARE_PRIVESC_PATTERNS,
+    "openstack": OPENSTACK_PRIVESC_PATTERNS,
+}
+
+
+def build_from_provider(provider: str) -> list[PrivescPattern]:
+    """Factory: return the privesc patterns for a given cloud/SaaS provider."""
+    return ALL_PRIVESC_PATTERNS.get(provider, [])
+
+
 # ── Privesc Discovery Engine ──────────────────────────────────────────
 
 
@@ -303,9 +999,16 @@ class IAMPrivescDiscovery:
         self,
         iam_builder: IAMGraphBuilder,
         patterns: Optional[list[PrivescPattern]] = None,
+        provider: Optional[str] = None,
     ):
         self.builder = iam_builder
-        self.patterns = patterns or AWS_PRIVESC_PATTERNS
+        if patterns is not None:
+            self.patterns = patterns
+        elif provider is not None:
+            self.patterns = build_from_provider(provider)
+        else:
+            self.patterns = AWS_PRIVESC_PATTERNS
+        self.provider = provider or "aws"
         self.findings: list[PrivescFinding] = []
         self.shadow_admins: list[ShadowAdmin] = []
 
@@ -343,7 +1046,7 @@ class IAMPrivescDiscovery:
                     principal_id=principal.arn,
                     principal_name=principal.name,
                     principal_type=f"iam_{principal.principal_type}",
-                    provider="aws",
+                    provider=self.provider,
                     escalation_paths=[f.pattern.id for f in all_findings],
                     shortest_path_steps=min(f.steps for f in all_findings),
                     blast_radius_estimate=self._estimate_blast_radius(principal, all_findings),

@@ -222,6 +222,240 @@ DETECTION_REQUIREMENTS: dict[str, list[dict]] = {
     EdgeType.HAS_FINDING.value: [],  # Meta-edge, no detection needed
 }
 
+# ── Extended provider detection entries ───────────────────────────────
+# Add OCI, IBM Cloud, Kubernetes, and SaaS provider detection controls
+# to existing edge types for full 15-provider coverage.
+
+_EXTENDED_DETECTIONS: dict[str, list[dict]] = {
+    EdgeType.EXPOSES.value: [
+        {
+            "control": "oci_vcn_flow_logs",
+            "check_patterns": ["oci_vcn_flow_logs", "oci_logging_enabled"],
+            "event": "Network connection to exposed OCI resource",
+            "provider_scope": ["oci"],
+        },
+        {
+            "control": "ibm_flow_logs",
+            "check_patterns": ["ibm_flow_logs", "ibm_vpc_flow_logs"],
+            "event": "Network connection to exposed IBM Cloud resource",
+            "provider_scope": ["ibm_cloud"],
+        },
+        {
+            "control": "k8s_network_policy",
+            "check_patterns": ["k8s_network_policy", "k8s_pod_security"],
+            "event": "Network exposure in Kubernetes detected via network policy audit",
+            "provider_scope": ["kubernetes"],
+        },
+        {
+            "control": "cloudflare_waf",
+            "check_patterns": ["cloudflare_waf_enabled", "cloudflare_firewall"],
+            "event": "WAF detection of inbound attack on exposed endpoint",
+            "provider_scope": ["cloudflare"],
+        },
+    ],
+    EdgeType.ASSUMES_ROLE.value: [
+        {
+            "control": "oci_audit_logging",
+            "check_patterns": ["oci_audit_config", "oci_logging_enabled"],
+            "event": "Identity assumption logged in OCI Audit",
+            "provider_scope": ["oci"],
+        },
+        {
+            "control": "ibm_activity_tracker",
+            "check_patterns": ["ibm_activity_tracker", "ibm_at_enabled"],
+            "event": "IAM token generation logged in IBM Activity Tracker",
+            "provider_scope": ["ibm_cloud"],
+        },
+        {
+            "control": "k8s_audit_logging",
+            "check_patterns": ["k8s_audit_logging", "k8s_api_audit"],
+            "event": "Service account impersonation logged in K8s audit log",
+            "provider_scope": ["kubernetes"],
+        },
+    ],
+    EdgeType.CAN_ESCALATE.value: [
+        {
+            "control": "oci_cloud_guard",
+            "check_patterns": ["oci_cloud_guard", "oci_security_zone"],
+            "event": "Privilege escalation attempt detected by OCI Cloud Guard",
+            "provider_scope": ["oci"],
+        },
+        {
+            "control": "ibm_security_advisor",
+            "check_patterns": ["ibm_security_advisor", "ibm_scc_enabled"],
+            "event": "IAM policy change detected by IBM Security & Compliance Center",
+            "provider_scope": ["ibm_cloud"],
+        },
+        {
+            "control": "k8s_rbac_audit",
+            "check_patterns": ["k8s_audit_logging", "k8s_rbac_restriction"],
+            "event": "RBAC privilege escalation attempt in K8s audit log",
+            "provider_scope": ["kubernetes"],
+        },
+        {
+            "control": "m365_unified_audit",
+            "check_patterns": ["m365_audit_enabled", "m365_unified_audit_log"],
+            "event": "Role assignment change in M365 Unified Audit Log",
+            "provider_scope": ["m365"],
+        },
+        {
+            "control": "github_audit_log",
+            "check_patterns": ["github_audit_log", "github_org_audit"],
+            "event": "Permission change in GitHub Audit Log",
+            "provider_scope": ["github"],
+        },
+        {
+            "control": "gws_admin_audit",
+            "check_patterns": ["gws_admin_audit", "gws_login_audit"],
+            "event": "Admin role change in Google Workspace Admin Audit",
+            "provider_scope": ["google_workspace"],
+        },
+        {
+            "control": "salesforce_event_monitoring",
+            "check_patterns": ["sf_event_monitoring", "sf_shield_enabled"],
+            "event": "Permission set change in Salesforce Event Monitoring",
+            "provider_scope": ["salesforce"],
+        },
+        {
+            "control": "servicenow_sys_audit",
+            "check_patterns": ["sn_audit_enabled", "sn_system_logs"],
+            "event": "Role grant detected in ServiceNow system audit",
+            "provider_scope": ["servicenow"],
+        },
+        {
+            "control": "snowflake_access_history",
+            "check_patterns": ["snow_access_history", "snow_query_history"],
+            "event": "GRANT statement detected in Snowflake Access History",
+            "provider_scope": ["snowflake"],
+        },
+        {
+            "control": "openstack_audit",
+            "check_patterns": ["os_audit_middleware", "os_cadf_audit"],
+            "event": "Role assignment change in OpenStack audit middleware",
+            "provider_scope": ["openstack"],
+        },
+    ],
+    EdgeType.CREDENTIAL_ACCESS.value: [
+        {
+            "control": "oci_vault_logging",
+            "check_patterns": ["oci_logging_enabled", "oci_vault_audit"],
+            "event": "Vault secret access logged in OCI Audit",
+            "provider_scope": ["oci"],
+        },
+        {
+            "control": "ibm_key_protect_logging",
+            "check_patterns": ["ibm_activity_tracker", "ibm_key_protect"],
+            "event": "Key Protect / Secrets Manager access in IBM Activity Tracker",
+            "provider_scope": ["ibm_cloud"],
+        },
+        {
+            "control": "k8s_secret_audit",
+            "check_patterns": ["k8s_audit_logging", "k8s_secret_encryption"],
+            "event": "Secret read operation logged in K8s audit log",
+            "provider_scope": ["kubernetes"],
+        },
+        {
+            "control": "github_secret_scanning",
+            "check_patterns": ["github_secret_scanning", "github_advanced_security"],
+            "event": "Secret exposure detected by GitHub secret scanning",
+            "provider_scope": ["github"],
+        },
+    ],
+    EdgeType.LATERAL_MOVE.value: [
+        {
+            "control": "oci_vcn_flow_logs",
+            "check_patterns": ["oci_vcn_flow_logs", "oci_logging_enabled"],
+            "event": "Lateral movement captured in OCI VCN flow logs",
+            "provider_scope": ["oci"],
+        },
+        {
+            "control": "ibm_flow_logs",
+            "check_patterns": ["ibm_flow_logs", "ibm_vpc_flow_logs"],
+            "event": "Lateral movement captured in IBM VPC flow logs",
+            "provider_scope": ["ibm_cloud"],
+        },
+        {
+            "control": "k8s_network_policy_audit",
+            "check_patterns": ["k8s_network_policy", "k8s_audit_logging"],
+            "event": "Pod-to-pod lateral movement in K8s network/audit logs",
+            "provider_scope": ["kubernetes"],
+        },
+    ],
+    EdgeType.HAS_ACCESS.value: [
+        {
+            "control": "oci_audit_logging",
+            "check_patterns": ["oci_audit_config", "oci_logging_enabled"],
+            "event": "Resource access logged in OCI Audit",
+            "provider_scope": ["oci"],
+        },
+        {
+            "control": "ibm_activity_tracker",
+            "check_patterns": ["ibm_activity_tracker", "ibm_at_enabled"],
+            "event": "Resource access logged in IBM Activity Tracker",
+            "provider_scope": ["ibm_cloud"],
+        },
+        {
+            "control": "k8s_audit_logging",
+            "check_patterns": ["k8s_audit_logging", "k8s_api_audit"],
+            "event": "Resource access logged in K8s API audit log",
+            "provider_scope": ["kubernetes"],
+        },
+    ],
+    EdgeType.STORES_DATA.value: [
+        {
+            "control": "oci_object_storage_logging",
+            "check_patterns": ["oci_objectstorage_logging", "oci_logging_enabled"],
+            "event": "Object Storage access logged in OCI",
+            "provider_scope": ["oci"],
+        },
+        {
+            "control": "ibm_cos_logging",
+            "check_patterns": ["ibm_activity_tracker", "ibm_cos_logging"],
+            "event": "COS bucket access logged in IBM Activity Tracker",
+            "provider_scope": ["ibm_cloud"],
+        },
+        {
+            "control": "snowflake_access_history",
+            "check_patterns": ["snow_access_history", "snow_query_history"],
+            "event": "Data access logged in Snowflake Access History",
+            "provider_scope": ["snowflake"],
+        },
+    ],
+    EdgeType.ROUTES_TO.value: [
+        {
+            "control": "oci_vcn_flow_logs",
+            "check_patterns": ["oci_vcn_flow_logs", "oci_logging_enabled"],
+            "event": "Network traffic captured in OCI VCN flow logs",
+            "provider_scope": ["oci"],
+        },
+        {
+            "control": "ibm_flow_logs",
+            "check_patterns": ["ibm_flow_logs", "ibm_vpc_flow_logs"],
+            "event": "Network traffic captured in IBM VPC flow logs",
+            "provider_scope": ["ibm_cloud"],
+        },
+        {
+            "control": "k8s_network_policy",
+            "check_patterns": ["k8s_network_policy", "k8s_audit_logging"],
+            "event": "Network traffic between pods/services in K8s",
+            "provider_scope": ["kubernetes"],
+        },
+        {
+            "control": "cloudflare_analytics",
+            "check_patterns": ["cloudflare_analytics", "cloudflare_logpush"],
+            "event": "Traffic routing captured in Cloudflare analytics/logpush",
+            "provider_scope": ["cloudflare"],
+        },
+    ],
+}
+
+# Merge extended detections into the main registry
+for _edge_type, _entries in _EXTENDED_DETECTIONS.items():
+    if _edge_type in DETECTION_REQUIREMENTS:
+        DETECTION_REQUIREMENTS[_edge_type].extend(_entries)
+    else:
+        DETECTION_REQUIREMENTS[_edge_type] = _entries
+
 
 class DetectionCoverageAnalyzer:
     """
@@ -229,7 +463,17 @@ class DetectionCoverageAnalyzer:
 
     For each edge in a path, checks whether the security controls that would
     detect that activity are enabled (PASS in findings) or disabled (FAIL/missing).
+    Filters detection requirements by provider_scope to avoid cross-provider false positives.
     """
+
+    # Provider prefix mapping for check_id inference
+    _PROVIDER_PREFIXES = {
+        "azure_": "azure", "gcp_": "gcp", "oci_": "oci",
+        "ali_": "alibaba", "ibm_": "ibm_cloud", "k8s_": "kubernetes",
+        "m365_": "m365", "github_": "github", "gws_": "google_workspace",
+        "sf_": "salesforce", "sn_": "servicenow", "snow_": "snowflake",
+        "cloudflare_": "cloudflare", "os_": "openstack",
+    }
 
     def __init__(self, all_findings: list[dict]):
         """
@@ -239,16 +483,63 @@ class DetectionCoverageAnalyzer:
         """
         self._pass_check_ids: set[str] = set()
         self._fail_check_ids: set[str] = set()
+        self._provider_pass: dict[str, set[str]] = {}
 
         for f in all_findings:
             cid = f.get("check_id", "")
+            provider = self._infer_provider(cid)
             if f.get("status") == "PASS":
                 self._pass_check_ids.add(cid)
+                self._provider_pass.setdefault(provider, set()).add(cid)
             elif f.get("status") == "FAIL":
                 self._fail_check_ids.add(cid)
 
+    def _infer_provider(self, check_id: str) -> str:
+        """Infer provider from check_id prefix."""
+        for prefix, prov in self._PROVIDER_PREFIXES.items():
+            if check_id.startswith(prefix):
+                return prov
+        return "aws"  # Default for non-prefixed checks (e.g. cloudtrail_, guardduty_)
+
+    def _detect_path_provider(self, path: AttackPath) -> str:
+        """Detect the primary provider of an attack path from its nodes/metadata."""
+        for node in path.nodes:
+            svc = (node.service or "").lower()
+            label = (node.label or "").lower()
+            combined = f"{svc} {label}"
+            if any(k in combined for k in ("azure", "entra", "keyvault", "nsg")):
+                return "azure"
+            if any(k in combined for k in ("gcp", "bigquery", "gke", "cloudfunctions", "gcs")):
+                return "gcp"
+            if any(k in combined for k in ("oci", "objectstorage", "cloudguard", "vcn")):
+                return "oci"
+            if any(k in combined for k in ("alibaba", "aliyun", "ecs", "oss", "ram")):
+                return "alibaba"
+            if any(k in combined for k in ("ibm", "cloud object storage")):
+                return "ibm_cloud"
+            if any(k in combined for k in ("kubernetes", "k8s", "pod", "rbac")):
+                return "kubernetes"
+            if any(k in combined for k in ("m365", "microsoft 365", "exchange", "sharepoint")):
+                return "m365"
+            if any(k in combined for k in ("github",)):
+                return "github"
+            if any(k in combined for k in ("google workspace", "gws")):
+                return "google_workspace"
+            if any(k in combined for k in ("salesforce", "sfdc")):
+                return "salesforce"
+            if any(k in combined for k in ("servicenow",)):
+                return "servicenow"
+            if any(k in combined for k in ("snowflake",)):
+                return "snowflake"
+            if any(k in combined for k in ("cloudflare",)):
+                return "cloudflare"
+            if any(k in combined for k in ("openstack", "keystone", "nova")):
+                return "openstack"
+        return "aws"  # Default
+
     def analyze_path(self, path: AttackPath) -> DetectionReport:
         """Evaluate detection coverage for every edge in an attack path."""
+        path_provider = self._detect_path_provider(path)
         steps: list[StepDetection] = []
 
         for edge in path.edges:
@@ -257,6 +548,11 @@ class DetectionCoverageAnalyzer:
 
             detections = []
             for req in requirements:
+                # Filter by provider_scope to avoid cross-provider false positives
+                provider_scope = req.get("provider_scope")
+                if provider_scope and path_provider not in provider_scope:
+                    continue  # This control doesn't apply to this provider
+
                 detected = self._check_control_enabled(req["check_patterns"])
                 detections.append({
                     "control": req["control"],

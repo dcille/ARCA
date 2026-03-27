@@ -455,6 +455,10 @@ class AttackPathAnalyzer:
         self._calculate_blast_radius()
         self._evaluate_detection_coverage()
 
+        # ── BAS 2.0: IAM analysis (multi-provider) ──
+        if self.cloud_credentials:
+            self._run_iam_analysis()
+
         # Re-score with enrichment data
         self._enhanced_score_paths()
 
@@ -2561,6 +2565,283 @@ class AttackPathAnalyzer:
                 "Implement consistent identity governance across all clouds",
             ],
         )
+
+    def _run_iam_analysis(self) -> None:
+        """Run IAM graph building + privesc discovery for each provider."""
+        import logging
+        _logger = logging.getLogger(__name__)
+
+        from .iam_graph import IAMGraphBuilder
+        from .iam_privesc import IAMPrivescDiscovery, build_from_provider
+
+        providers = self.cloud_credentials
+        if isinstance(providers, dict):
+            providers = [providers]  # Single provider -> list
+
+        for prov in providers:
+            provider_type = prov.get("provider_type", "aws")
+            creds = prov.get("credentials", {})
+
+            try:
+                # Build IAM graph for this provider
+                builder = IAMGraphBuilder()
+                builder.build_from_provider(provider_type, creds)
+
+                # Run privesc discovery with provider-specific patterns
+                patterns = build_from_provider(provider_type)
+                if not patterns:
+                    continue
+
+                discovery = IAMPrivescDiscovery(
+                    builder,
+                    patterns=patterns,
+                    provider=provider_type,
+                )
+                discovery.discover()
+
+                # Convert to AttackPath format and add to self.paths
+                iam_paths = discovery.to_attack_paths()
+                for path_dict in iam_paths:
+                    path = AttackPath(
+                        id=path_dict.get("title", "iam-path"),
+                        title=path_dict["title"],
+                        description=path_dict.get("description", ""),
+                        severity=path_dict.get("severity", "high"),
+                        risk_score=0.0,
+                        nodes=[GraphNode(
+                            id=n["id"],
+                            node_type=NodeType.IDENTITY if n.get("node_type") == "identity" else NodeType.RESOURCE,
+                            label=n.get("label", ""),
+                            service=n.get("service", ""),
+                            metadata=n.get("metadata", {}),
+                        ) for n in path_dict.get("nodes", [])],
+                        edges=[GraphEdge(
+                            source_id=e["source_id"],
+                            target_id=e["target_id"],
+                            edge_type=EdgeType.CAN_ESCALATE if e.get("edge_type") == "privilege_escalation"
+                                else EdgeType.ASSUMES_ROLE if e.get("edge_type") == "assumes_role"
+                                else EdgeType.HAS_ACCESS,
+                            label=e.get("label", ""),
+                        ) for e in path_dict.get("edges", [])],
+                        entry_point=path_dict.get("entry_point", ""),
+                        target=path_dict.get("target", ""),
+                        category=path_dict.get("category", "privilege_escalation"),
+                        techniques=path_dict.get("techniques", []),
+                        affected_resources=path_dict.get("affected_resources", []),
+                        remediation=path_dict.get("remediation", []),
+                        confidence=path_dict.get("confidence", "theoretical"),
+                        source=path_dict.get("source", "iam_discovery"),
+                    )
+                    self.paths.append(path)
+
+                _logger.info(
+                    "IAM analysis for %s: %d findings, %d shadow admins",
+                    provider_type, len(discovery.findings), len(discovery.shadow_admins),
+                )
+            except Exception as e:
+                _logger.warning("IAM analysis failed for %s: %s", provider_type, e)
+
+        # After all providers, detect cross-provider edges
+        self._build_cross_provider_edges(providers)
+
+    def _build_cross_provider_edges(self, providers: list[dict]) -> None:
+        """Detect and create attack path edges between providers (cross-cloud pivots)."""
+        import logging
+        _logger = logging.getLogger(__name__)
+
+        provider_types = {p.get("provider_type", "aws") for p in providers}
+
+        cross_provider_paths: list[AttackPath] = []
+
+        # M365 <-> Azure (shared Entra ID identity)
+        if "m365" in provider_types and "azure" in provider_types:
+            cross_provider_paths.append(AttackPath(
+                id="cross-m365-azure",
+                title="M365 Global Admin to Azure Subscription Owner",
+                description="M365 Global Admin can toggle 'Access management for Azure resources' "
+                            "to gain Owner on all Azure subscriptions via shared Entra ID.",
+                severity="critical",
+                risk_score=0.0,
+                nodes=[
+                    GraphNode(id="m365:global-admin", node_type=NodeType.IDENTITY,
+                              label="M365 Global Admin", service="Microsoft 365"),
+                    GraphNode(id="azure:entra-id", node_type=NodeType.SERVICE,
+                              label="Entra ID (shared)", service="Azure AD"),
+                    GraphNode(id="azure:subscription-owner", node_type=NodeType.RESOURCE,
+                              label="Azure Subscription Owner", service="Azure"),
+                ],
+                edges=[
+                    GraphEdge(source_id="m365:global-admin", target_id="azure:entra-id",
+                              edge_type=EdgeType.HAS_ACCESS, label="shared identity"),
+                    GraphEdge(source_id="azure:entra-id", target_id="azure:subscription-owner",
+                              edge_type=EdgeType.CAN_ESCALATE, label="access mgmt toggle"),
+                ],
+                entry_point="M365 Global Admin",
+                target="Azure Subscription Owner",
+                category="privilege_escalation",
+                techniques=["T1078.004", "T1098.003"],
+                affected_resources=["m365:global-admin", "azure:subscription"],
+                remediation=[
+                    "Disable 'Access management for Azure resources' toggle for Global Admins",
+                    "Use separate admin accounts for M365 and Azure",
+                    "Enforce PIM with approval for Global Admin role activation",
+                ],
+                confidence="theoretical",
+                source="iam_discovery",
+            ))
+
+        # Google Workspace <-> GCP (shared Google Identity)
+        if "google_workspace" in provider_types and "gcp" in provider_types:
+            cross_provider_paths.append(AttackPath(
+                id="cross-gws-gcp",
+                title="Google Workspace Super Admin to GCP Org Admin",
+                description="Google Workspace Super Admin has implicit Organization Administrator "
+                            "in GCP via shared Google Identity.",
+                severity="critical",
+                risk_score=0.0,
+                nodes=[
+                    GraphNode(id="gws:super-admin", node_type=NodeType.IDENTITY,
+                              label="GWS Super Admin", service="Google Workspace"),
+                    GraphNode(id="gcp:org-admin", node_type=NodeType.RESOURCE,
+                              label="GCP Org Admin", service="GCP"),
+                ],
+                edges=[
+                    GraphEdge(source_id="gws:super-admin", target_id="gcp:org-admin",
+                              edge_type=EdgeType.CAN_ESCALATE, label="shared Google identity"),
+                ],
+                entry_point="Google Workspace Super Admin",
+                target="GCP Organization Admin",
+                category="privilege_escalation",
+                techniques=["T1078.004"],
+                affected_resources=["gws:super-admin", "gcp:organization"],
+                remediation=[
+                    "Use separate admin accounts for GWS and GCP",
+                    "Enforce 2FA on all Super Admin accounts",
+                    "Limit GWS Super Admin count to minimum required",
+                ],
+                confidence="theoretical",
+                source="iam_discovery",
+            ))
+
+        # GitHub -> any cloud (committed credentials risk)
+        if "github" in provider_types:
+            cloud_targets = provider_types - {"github", "m365", "google_workspace",
+                                               "salesforce", "servicenow", "snowflake",
+                                               "cloudflare", "openstack"}
+            if cloud_targets:
+                cross_provider_paths.append(AttackPath(
+                    id="cross-github-cloud",
+                    title="GitHub Secrets Leak to Cloud Account Compromise",
+                    description="Repositories without secret scanning may contain committed cloud "
+                                "credentials enabling direct cloud access.",
+                    severity="high",
+                    risk_score=0.0,
+                    nodes=[
+                        GraphNode(id="github:repo", node_type=NodeType.RESOURCE,
+                                  label="GitHub Repository", service="GitHub"),
+                        GraphNode(id="github:leaked-creds", node_type=NodeType.FINDING,
+                                  label="Leaked Credentials", service="GitHub"),
+                        GraphNode(id="cloud:iam", node_type=NodeType.IDENTITY,
+                                  label=f"Cloud IAM ({', '.join(sorted(cloud_targets))})",
+                                  service="Multi-Cloud"),
+                    ],
+                    edges=[
+                        GraphEdge(source_id="github:repo", target_id="github:leaked-creds",
+                                  edge_type=EdgeType.CREDENTIAL_ACCESS, label="committed secrets"),
+                        GraphEdge(source_id="github:leaked-creds", target_id="cloud:iam",
+                                  edge_type=EdgeType.LATERAL_MOVE, label="credential reuse"),
+                    ],
+                    entry_point="GitHub Repository",
+                    target=f"Cloud IAM ({', '.join(sorted(cloud_targets))})",
+                    category="credential_access",
+                    techniques=["T1552.004", "T1078.004"],
+                    affected_resources=["github:repositories"] + [f"{t}:iam" for t in cloud_targets],
+                    remediation=[
+                        "Enable GitHub Advanced Security with secret scanning",
+                        "Rotate any detected leaked credentials immediately",
+                        "Use OIDC federation instead of long-lived credentials in CI/CD",
+                    ],
+                    confidence="theoretical",
+                    source="iam_discovery",
+                ))
+
+        # Kubernetes -> cloud (workload identity / IRSA / pod identity)
+        if "kubernetes" in provider_types:
+            cloud_targets = {"aws", "azure", "gcp"} & provider_types
+            if cloud_targets:
+                cross_provider_paths.append(AttackPath(
+                    id="cross-k8s-cloud",
+                    title="Kubernetes Pod to Cloud IAM via Workload Identity",
+                    description="Compromised K8s pods with workload identity bindings (IRSA/Workload "
+                                "Identity/Pod Identity) can access cloud provider APIs.",
+                    severity="high",
+                    risk_score=0.0,
+                    nodes=[
+                        GraphNode(id="k8s:pod", node_type=NodeType.RESOURCE,
+                                  label="K8s Pod", service="Kubernetes"),
+                        GraphNode(id="k8s:sa", node_type=NodeType.IDENTITY,
+                                  label="K8s Service Account", service="Kubernetes"),
+                        GraphNode(id="cloud:iam-role", node_type=NodeType.IDENTITY,
+                                  label=f"Cloud IAM Role ({', '.join(sorted(cloud_targets))})",
+                                  service="Multi-Cloud"),
+                    ],
+                    edges=[
+                        GraphEdge(source_id="k8s:pod", target_id="k8s:sa",
+                                  edge_type=EdgeType.HAS_ACCESS, label="mounted SA token"),
+                        GraphEdge(source_id="k8s:sa", target_id="cloud:iam-role",
+                                  edge_type=EdgeType.ASSUMES_ROLE, label="workload identity"),
+                    ],
+                    entry_point="Kubernetes Pod",
+                    target=f"Cloud IAM Role ({', '.join(sorted(cloud_targets))})",
+                    category="lateral_movement",
+                    techniques=["T1550.001", "T1078.004"],
+                    affected_resources=["k8s:service-accounts"] + [f"{t}:iam-roles" for t in cloud_targets],
+                    remediation=[
+                        "Apply least-privilege to workload identity role bindings",
+                        "Use namespace-scoped service accounts with minimal permissions",
+                        "Enable pod security admission to prevent privilege escalation",
+                    ],
+                    confidence="theoretical",
+                    source="iam_discovery",
+                ))
+
+        # Snowflake -> S3/GCS (external stages)
+        if "snowflake" in provider_types and ("aws" in provider_types or "gcp" in provider_types):
+            cross_provider_paths.append(AttackPath(
+                id="cross-snowflake-cloud",
+                title="Snowflake External Stage to Cloud Storage Access",
+                description="Snowflake external stages with storage integration credentials "
+                            "can provide access to S3 buckets or GCS buckets.",
+                severity="medium",
+                risk_score=0.0,
+                nodes=[
+                    GraphNode(id="snowflake:stage", node_type=NodeType.RESOURCE,
+                              label="Snowflake External Stage", service="Snowflake"),
+                    GraphNode(id="cloud:storage", node_type=NodeType.DATA_STORE,
+                              label="Cloud Storage (S3/GCS)", service="Multi-Cloud"),
+                ],
+                edges=[
+                    GraphEdge(source_id="snowflake:stage", target_id="cloud:storage",
+                              edge_type=EdgeType.CREDENTIAL_ACCESS,
+                              label="storage integration credentials"),
+                ],
+                entry_point="Snowflake External Stage",
+                target="Cloud Storage (S3/GCS)",
+                category="credential_access",
+                techniques=["T1552.004", "T1530"],
+                affected_resources=["snowflake:stages", "cloud:storage-buckets"],
+                remediation=[
+                    "Use storage integrations with minimal IAM role permissions",
+                    "Audit external stage definitions regularly",
+                    "Restrict USAGE on storage integrations to specific roles",
+                ],
+                confidence="theoretical",
+                source="iam_discovery",
+            ))
+
+        self.paths.extend(cross_provider_paths)
+        if cross_provider_paths:
+            _logger.info("Added %d cross-provider attack paths", len(cross_provider_paths))
 
     def _score_paths(self) -> None:
         """Assign risk scores to discovered attack paths."""
