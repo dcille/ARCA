@@ -1675,7 +1675,13 @@ class AlibabaScanner:
         return manual_results
 
     def run_all_checks(self) -> list[dict]:
-        """Run all Alibaba Cloud security checks including complete CIS benchmark coverage."""
+        """Run all Alibaba Cloud security checks including complete CIS benchmark coverage.
+
+        Combines two sources:
+          1. Service checks (this scanner's hardcoded SDK methods)
+          2. CIS Evaluator Engine (85 CIS v2.0 controls via dedicated evaluators)
+        Falls back to _emit_cis_coverage() if the evaluator engine fails.
+        """
         slog = getattr(self, "_scan_logger", None)
 
         # Phase 1: Service checks
@@ -1685,11 +1691,37 @@ class AlibabaScanner:
         if slog:
             slog.log_phase_end("service_checks", "alibaba_scanner.py", result_count=len(results))
 
-        # Phase 2: CIS coverage
+        # Phase 2: CIS Evaluator Engine (85 controls)
         if slog:
-            slog.log_phase_start("cis_coverage", "alibaba_scanner.py")
-        results.extend(self._emit_cis_coverage(results))
-        if slog:
-            slog.log_phase_end("cis_coverage", "alibaba_scanner.py", result_count=len(results))
+            slog.log_phase_start("cis_evaluator_engine", "alibaba_cis_evaluator_engine.py")
+        try:
+            from .alibaba_cis_evaluator_engine import AlibabaCISEvaluatorEngine
+            engine = AlibabaCISEvaluatorEngine(
+                credentials=self.credentials,
+                regions=self.regions,
+                services=self.services,
+                scan_logger=slog,
+            )
+            cis_results = engine.evaluate_all()
+
+            # Deduplicate: CIS evaluator results take precedence
+            existing_check_ids = {r.get("check_id") for r in results if r.get("check_id")}
+            added = 0
+            for r in cis_results:
+                cid = r.get("check_id", "")
+                if cid not in existing_check_ids:
+                    results.append(r)
+                    existing_check_ids.add(cid)
+                    added += 1
+
+            logger.info("CIS engine added %d results", added)
+            if slog:
+                slog.log_phase_end("cis_evaluator_engine", "alibaba_cis_evaluator_engine.py", result_count=added)
+        except Exception as e:
+            logger.warning("CIS engine failed, falling back to CIS coverage gap-fill: %s", e)
+            if slog:
+                slog.log_error("alibaba_cis_evaluator_engine.py", f"CIS engine failed: {e}")
+                slog.log_phase_end("cis_evaluator_engine", "alibaba_cis_evaluator_engine.py", status="error")
+            results.extend(self._emit_cis_coverage(results))
 
         return results
