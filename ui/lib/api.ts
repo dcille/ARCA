@@ -121,6 +121,10 @@ class ApiClient {
     return this.request<any>('GET', `/api/v1/scans/${id}`)
   }
 
+  async getScanLogs(id: string) {
+    return this.request<any>('GET', `/api/v1/scans/${id}/logs`)
+  }
+
   // Findings
   async getFindings(params?: Record<string, string>) {
     return this.request<any[]>('GET', '/api/v1/findings', undefined, { params })

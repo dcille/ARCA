@@ -7,6 +7,7 @@ import Badge from '@/components/ui/Badge'
 import { api } from '@/lib/api'
 import { formatDate, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
+import ScanLogModal from '@/components/scans/ScanLogModal'
 import {
   ClockIcon,
   TrashIcon,
@@ -45,6 +46,7 @@ export default function ScansPage() {
   const [selectedConnection, setSelectedConnection] = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [selectedScanId, setSelectedScanId] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Schedule form state
@@ -328,6 +330,7 @@ export default function ScansPage() {
         data={scans}
         loading={loading}
         emptyMessage="No scans yet. Click 'New Scan' to get started."
+        onRowClick={(scan: any) => setSelectedScanId(scan.id)}
       />
 
       {/* Scheduled Scans */}
@@ -539,6 +542,14 @@ export default function ScansPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Scan Log Modal */}
+      {selectedScanId && (
+        <ScanLogModal
+          scanId={selectedScanId}
+          onClose={() => setSelectedScanId(null)}
+        />
       )}
 
       {/* New Scan Modal */}
