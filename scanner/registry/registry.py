@@ -370,6 +370,18 @@ class CheckRegistry:
     # Integrity report
     # ------------------------------------------------------------------
 
+    def validate_framework_references(self) -> dict:
+        """Validate compliance framework check_id references against the registry.
+
+        Checks ENS, GDPR, HIPAA, PCI-DSS, SOC2 framework files for:
+        - Orphaned check_ids (reference non-existent scanner checks)
+        - Missing SaaS provider mappings
+        - Missing OCI/Alibaba provider mappings
+        - Uncovered scanner checks (not in any framework)
+        """
+        from scanner.registry.framework_validator import validate_framework_references
+        return validate_framework_references(self)
+
     def integrity_report(self) -> dict:
         """Full integrity report with cross-reference validation."""
         stats = self.generate_catalog_report()
@@ -378,6 +390,7 @@ class CheckRegistry:
         stats["total_scanner_ids_indexed"] = len(self._scanner_index)
         stats["mitre_validation"] = self.validate_mitre_references()
         stats["rr_validation"] = self.validate_rr_references()
+        stats["framework_validation"] = self.validate_framework_references()
         return stats
 
     # ------------------------------------------------------------------
