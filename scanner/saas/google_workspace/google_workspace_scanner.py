@@ -1105,24 +1105,24 @@ class GoogleWorkspaceScanner(BaseSaaSScanner):
 
     def run_all_checks(self) -> list[dict]:
         """Run all Google Workspace security checks including complete CIS benchmark coverage."""
-        results = []
-        check_groups = [
+        results = self._run_check_groups([
             self._check_users,
             self._check_security,
             self._check_email_security,
             self._check_drive_and_data,
             self._check_cis_alert_rules,
             self._check_cis_directory_security,
-        ]
-
-        for check_fn in check_groups:
-            try:
-                results.extend(check_fn())
-            except Exception as e:
-                logger.error(f"Google Workspace check group failed: {e}")
+        ])
 
         # Add MANUAL results for any CIS controls not covered by automated checks
-        results.extend(self._emit_cis_coverage(results))
+        slog = getattr(self, "_scan_logger", None)
+        module_key = "google_workspace::_emit_cis_coverage"
+        if slog:
+            slog.log_module_start(module_key, "Emitting CIS coverage for uncovered controls")
+        coverage_results = self._emit_cis_coverage(results)
+        results.extend(coverage_results)
+        if slog:
+            slog.log_module_end(module_key, result_count=len(coverage_results))
 
         return results
 

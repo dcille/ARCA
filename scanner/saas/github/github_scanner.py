@@ -51,21 +51,12 @@ class GitHubScanner(BaseSaaSScanner):
 
     def run_all_checks(self) -> list[dict]:
         """Run all GitHub security checks."""
-        results = []
-        check_groups = [
+        return self._run_check_groups([
             self._check_org_security,
             self._check_repo_security,
             self._check_access_control,
             self._check_actions_security,
-        ]
-
-        for check_fn in check_groups:
-            try:
-                results.extend(check_fn())
-            except Exception as e:
-                logger.error(f"GitHub check group failed: {e}")
-
-        return results
+        ])
 
     def _check_org_security(self) -> list[dict]:
         """Organization-level security checks."""

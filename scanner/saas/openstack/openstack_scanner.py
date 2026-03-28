@@ -55,22 +55,13 @@ class OpenStackScanner(BaseSaaSScanner):
 
     def run_all_checks(self) -> list[dict]:
         """Run all OpenStack security checks."""
-        results = []
-        check_groups = [
+        return self._run_check_groups([
             self._check_identity,
             self._check_compute,
             self._check_networking,
             self._check_storage,
             self._check_image,
-        ]
-
-        for check_fn in check_groups:
-            try:
-                results.extend(check_fn())
-            except Exception as e:
-                logger.error(f"OpenStack check group failed: {e}")
-
-        return results
+        ])
 
     def _check_identity(self) -> list[dict]:
         """Identity (Keystone) security checks."""

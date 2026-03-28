@@ -24,11 +24,24 @@ class M365CISEvaluatorEngine:
     def __init__(self, client_id: str, client_secret: str, tenant_id: str):
         self.cfg = M365Config(client_id, client_secret, tenant_id)
         self.clients = M365MultiClient(self.cfg)
+        self._scan_logger = None
 
     def evaluate_all(self) -> list[dict]:
         results = []
+        slog = self._scan_logger
         for cis_id in sorted(EVALUATOR_REGISTRY, key=self._sort_key):
-            results.extend(safe_eval(EVALUATOR_REGISTRY[cis_id], self.clients, self.cfg))
+            module_name = f"evaluator::m365_cis_{cis_id}"
+            if slog:
+                slog.log_module_start(module_name, f"Evaluating CIS {cis_id}")
+            ctrl_results = safe_eval(EVALUATOR_REGISTRY[cis_id], self.clients, self.cfg)
+            results.extend(ctrl_results)
+            if slog:
+                has_error = any(r.get("status") == "ERROR" for r in ctrl_results)
+                slog.log_module_end(
+                    module_name,
+                    result_count=len(ctrl_results),
+                    status="error" if has_error else "success",
+                )
         return results
 
     def evaluate_section(self, section: str) -> list[dict]:

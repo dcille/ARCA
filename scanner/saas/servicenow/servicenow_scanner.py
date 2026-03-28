@@ -78,8 +78,7 @@ class ServiceNowScanner(BaseSaaSScanner):
 
     def run_all_checks(self) -> list[dict]:
         """Run all ServiceNow security checks."""
-        results = []
-        check_groups = [
+        return self._run_check_groups([
             self._check_users,
             self._check_access_control,
             self._check_attachments,
@@ -90,15 +89,7 @@ class ServiceNowScanner(BaseSaaSScanner):
             self._check_session_management,
             self._check_security_plugins,
             self._check_platform_security,
-        ]
-
-        for check_fn in check_groups:
-            try:
-                results.extend(check_fn())
-            except Exception as e:
-                logger.error(f"ServiceNow check group failed: {e}")
-
-        return results
+        ])
 
     def _check_users(self) -> list[dict]:
         """User security checks - MFA, failed logins, lockouts."""
