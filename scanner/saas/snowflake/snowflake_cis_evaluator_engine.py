@@ -93,14 +93,27 @@ class SnowflakeCISEvaluatorEngine:
             warehouse=warehouse,
             role=role,
         )
+        self._scan_logger = None
 
     # ── evaluate_all ──────────────────────────────────────────────────
     def evaluate_all(self) -> list[CheckResult]:
         """Run all 39 CIS controls."""
+        slog = self._scan_logger
         results: list[CheckResult] = []
         for cis_id, fn in sorted(EVALUATOR_REGISTRY.items(),
                                   key=lambda x: [int(p) for p in x[0].split(".")]):
-            results.extend(safe_evaluate(fn, self._sf))
+            module_name = f"evaluator::sf_cis_{cis_id}"
+            if slog:
+                slog.log_module_start(module_name, f"Evaluating CIS {cis_id}")
+            ctrl_results = safe_evaluate(fn, self._sf)
+            results.extend(ctrl_results)
+            if slog:
+                has_error = any(r.status == "ERROR" for r in ctrl_results)
+                slog.log_module_end(
+                    module_name,
+                    result_count=len(ctrl_results),
+                    status="error" if has_error else "success",
+                )
         return results
 
     # ── evaluate_section ──────────────────────────────────────────────

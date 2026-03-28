@@ -1650,19 +1650,30 @@ class M365Scanner(BaseSaaSScanner):
         (Defender recommendations, AAD user enumeration, etc.).  Duplicate
         check_ids are de-duplicated — the evaluator engine result wins.
         """
+        slog = getattr(self, "_scan_logger", None)
         results: list[dict] = []
 
         # ── Phase 1: CIS v6.0.1 evaluator engine (142 controls) ──────────
+        cis_module = "m365::cis_evaluator_engine"
+        if slog:
+            slog.log_module_start(cis_module, "Running M365 CIS v6.0.1 evaluator engine (142 controls)")
         try:
             from scanner.saas.m365.m365_cis_evaluator_engine import M365CISEvaluatorEngine
             engine = M365CISEvaluatorEngine(
                 self.client_id, self.client_secret, self.tenant_id,
             )
+            if slog:
+                engine._scan_logger = slog
             cis_results = engine.evaluate_all()
             results.extend(cis_results)
             logger.info("M365 CIS evaluator engine: %d results", len(cis_results))
+            if slog:
+                slog.log_module_end(cis_module, result_count=len(cis_results), status="success")
         except Exception as e:
             logger.error("M365 CIS evaluator engine failed, falling back to legacy: %s", e)
+            if slog:
+                slog.log_error(cis_module, f"CIS evaluator engine failed: {e}")
+                slog.log_module_end(cis_module, result_count=0, status="error")
 
         # ── Phase 2: legacy / non-CIS check groups ───────────────────────
         seen_ids = {r["check_id"] for r in results}
@@ -1677,13 +1688,25 @@ class M365Scanner(BaseSaaSScanner):
             self._check_teams_sharepoint,
         ]
         for check_fn in legacy_groups:
+            group_name = check_fn.__name__
+            module_key = f"m365::{group_name}"
+            if slog:
+                slog.log_module_start(module_key, f"Running {group_name}")
+            group_results = []
+            status = "success"
             try:
                 for r in check_fn():
                     if r["check_id"] not in seen_ids:
+                        group_results.append(r)
                         results.append(r)
                         seen_ids.add(r["check_id"])
             except Exception as e:
-                logger.error("M365 check group %s failed: %s", check_fn.__name__, e)
+                status = "error"
+                logger.error("M365 check group %s failed: %s", group_name, e)
+                if slog:
+                    slog.log_error(module_key, f"{group_name} raised {type(e).__name__}: {e}")
+            if slog:
+                slog.log_module_end(module_key, result_count=len(group_results), status=status)
 
         return results
 

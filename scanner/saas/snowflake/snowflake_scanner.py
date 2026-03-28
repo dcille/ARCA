@@ -195,24 +195,31 @@ class SnowflakeScanner(BaseSaaSScanner):
             cursor.close()
 
     def run_all_checks(self) -> list[dict]:
-        results = []
-        check_groups = [
+        slog = getattr(self, "_scan_logger", None)
+
+        results = self._run_check_groups([
             self._check_users,
             self._check_account,
             self._check_data_operations,
-        ]
-
-        for check_fn in check_groups:
-            try:
-                results.extend(check_fn())
-            except Exception as e:
-                logger.error(f"Snowflake check group failed: {e}")
+        ])
 
         # Run CIS evaluator engine (39 controls, 92.3% automated)
-        results.extend(self._run_cis_evaluator())
+        cis_module = "snowflake::cis_evaluator_engine"
+        if slog:
+            slog.log_module_start(cis_module, "Running CIS Snowflake v1.0.0 evaluator engine (39 controls)")
+        cis_results = self._run_cis_evaluator()
+        results.extend(cis_results)
+        if slog:
+            slog.log_module_end(cis_module, result_count=len(cis_results))
 
         # Add CIS coverage for any remaining uncovered controls
-        results.extend(self._emit_cis_coverage(results))
+        cov_module = "snowflake::_emit_cis_coverage"
+        if slog:
+            slog.log_module_start(cov_module, "Emitting CIS coverage for uncovered controls")
+        coverage_results = self._emit_cis_coverage(results)
+        results.extend(coverage_results)
+        if slog:
+            slog.log_module_end(cov_module, result_count=len(coverage_results))
 
         if self._connection:
             try:
@@ -239,6 +246,9 @@ class SnowflakeScanner(BaseSaaSScanner):
                 warehouse=self.warehouse_name or None,
                 role=self.role or None,
             )
+            slog = getattr(self, "_scan_logger", None)
+            if slog:
+                engine._scan_logger = slog
             cis_results = engine.evaluate_all()
             report = engine.coverage_report()
             logger.info(
