@@ -2,7 +2,7 @@
 
 **Cloud & SaaS Security Posture Management Platform**
 
-D-ARCA is a comprehensive CSPM platform that combines cloud infrastructure security scanning (AWS, Azure, GCP, OCI, Alibaba Cloud, Kubernetes) with SaaS application security assessment (ServiceNow, Microsoft 365, Salesforce, Snowflake, GitHub, Google Workspace, Cloudflare, OpenStack). It provides a unified dashboard for monitoring, analyzing, and improving the security posture of your entire technology stack — including compliance mapping, MITRE ATT&CK analysis, attack path analysis, data security posture management (DSPM), ransomware readiness assessment, interactive security graph, automated scheduling, audit logging, and executive reporting with embedded charts.
+D-ARCA is a comprehensive CSPM platform that combines cloud infrastructure security scanning (AWS, Azure, GCP, OCI, Alibaba Cloud, IBM Cloud, Kubernetes) with SaaS application security assessment (ServiceNow, Microsoft 365, Salesforce, Snowflake, GitHub, Google Workspace, Cloudflare, OpenStack). It provides a unified dashboard for monitoring, analyzing, and improving the security posture of your entire technology stack — including CIS Benchmark evaluator engines (9 benchmarks, 768 controls), compliance mapping with enrichment (300+ controls across 13 frameworks), MITRE ATT&CK analysis, Breach & Attack Simulation (BAS 2.0) with IAM privilege escalation discovery, attack path analysis with blast radius and detection coverage, data security posture management (DSPM) with active scanning, ransomware readiness assessment, interactive security graph, automated scheduling, scan execution logs, audit logging, and executive reporting with embedded charts.
 
 ---
 
@@ -19,13 +19,16 @@ D-ARCA is a comprehensive CSPM platform that combines cloud infrastructure secur
   - [Kubernetes](#kubernetes-8-categories-17-checks)
   - [OCI](#oci--oracle-cloud-infrastructure-18-services-63-checks)
   - [Alibaba Cloud](#alibaba-cloud-12-services-57-checks)
+  - [IBM Cloud](#ibm-cloud-9-services-73-checks)
+- [CIS Evaluator Engines](#cis-evaluator-engines)
 - [SaaS Security Scanning](#saas-security-scanning)
 - [Advanced Security Modules](#advanced-security-modules)
-  - [Attack Path Analysis](#attack-path-analysis)
+  - [Attack Path Analysis & BAS 2.0](#attack-path-analysis--bas-20)
   - [Security Graph](#security-graph)
   - [Data Security Posture Management (DSPM)](#data-security-posture-management-dspm)
   - [Ransomware Readiness](#ransomware-readiness)
   - [MITRE ATT&CK Analysis](#mitre-attck-analysis)
+  - [Compliance Framework Enrichment](#compliance-framework-enrichment)
   - [Drift Detection](#drift-detection)
 - [Operations & Management](#operations--management)
   - [Scan Scheduling](#scan-scheduling)
@@ -144,7 +147,7 @@ The API reloads on file changes automatically. The frontend runs on http://local
 - Recent scan history with status and pass/fail counts
 
 ### Cloud Provider Management
-- Add/remove cloud providers (AWS, Azure, GCP, OCI, Alibaba Cloud, Kubernetes)
+- Add/remove cloud providers (AWS, Azure, GCP, OCI, Alibaba Cloud, IBM Cloud, Kubernetes)
 - Credential storage with encryption at rest
 - Connection status tracking
 - Per-provider scan configuration
@@ -164,6 +167,7 @@ The API reloads on file changes automatically. The frontend runs on http://local
 - Background execution via Celery workers
 - Real-time progress tracking
 - Pass/fail summary per scan
+- **Scan execution logs**: Per-scan log viewer showing modules executed, API calls, and timing details
 
 ### Findings Browser
 - Filter by severity, status, service, region
@@ -172,10 +176,11 @@ The API reloads on file changes automatically. The frontend runs on http://local
 - Statistics endpoint with aggregation
 
 ### Compliance Assessment
-- 15+ compliance frameworks with control-level hierarchy (CIS, NIST, PCI-DSS, HIPAA, SOC2, GDPR, ISO-27001)
+- 28+ compliance frameworks with control-level hierarchy (CIS, NIST, PCI-DSS, HIPAA, SOC2, GDPR, ISO-27001, ENS, CCM, MCSB)
 - Per-framework pass rate calculation (per-unique-check, not per-resource)
 - Visual progress rings and Check Library with control descriptions
 - Framework descriptions, metadata, and per-cloud check mappings
+- **Compliance framework enrichment**: CIS cross-mapping, SaaS mappings, gap-filling controls for 300+ total controls across 13 providers
 - **Custom Framework Builder**: Create your own frameworks by selecting from 1,188 registry checks and/or defining custom controls
 
 ### Custom Framework Builder
@@ -431,6 +436,55 @@ The API reloads on file changes automatically. The frontend runs on http://local
 
 **Required credentials**: `access_key_id`, `access_key_secret`
 
+### IBM Cloud (9 services, 73 checks)
+
+| Service               | Checks                                                    |
+|-----------------------|-----------------------------------------------------------|
+| **IAM**               | API key rotation, MFA, service IDs, access groups, trusted profiles, inactive policies |
+| **Cloud Object Storage** | Encryption (SSE-KP), public access, activity tracking, retention policies |
+| **Activity Tracker**  | Event routing, COS targets, regional coverage, log analysis |
+| **Networking**        | Security groups, VPC flow logs, public gateways, ACLs, VPN gateways |
+| **Kubernetes (IKS)**  | RBAC, pod security, network policies, private endpoints, vulnerability advisor |
+| **Key Protect**       | Key rotation, dual authorization, imported key management |
+| **Databases**         | Encryption, backups, private endpoints, audit logging     |
+| **Secrets Manager**   | Secret rotation, access policies, engine configuration    |
+| **Security & Compliance** | SCC profiles, Posture Management, compliance scopes  |
+
+**Required credentials**: `api_key`, `account_id`
+
+---
+
+## CIS Evaluator Engines
+
+D-ARCA includes purpose-built CIS Benchmark evaluator engines that directly evaluate cloud and SaaS environments against official CIS controls. Each evaluator maps 1:1 to a CIS benchmark section and produces PASS/FAIL/MANUAL results per control.
+
+| Provider           | CIS Benchmark                                            | Controls | Automated | Coverage |
+|--------------------|----------------------------------------------------------|----------|-----------|----------|
+| AWS                | CIS AWS Foundations Benchmark v6.0                       | 62       | 34        | 100%     |
+| Azure              | CIS Microsoft Azure Foundations Benchmark v5.0           | 155      | 93        | 100%     |
+| GCP                | CIS Google Cloud Platform Benchmark v4.0                 | 84       | 72        | 100%     |
+| OCI                | CIS Oracle Cloud Infrastructure Benchmark v3.1.0         | 54       | 44        | 100%     |
+| Alibaba Cloud      | CIS Alibaba Cloud Foundation Benchmark v2.0              | 85       | 41        | 100%     |
+| IBM Cloud          | CIS IBM Cloud Foundations Benchmark v2.0.0               | 73       | 7         | 100%     |
+| M365               | CIS Microsoft 365 Foundations Benchmark v6.0.1           | 142      | ~132      | 100%     |
+| Google Workspace   | CIS Google Workspace Benchmark v1.3.0                    | 89       | varies    | 100%     |
+| Snowflake          | CIS Snowflake Foundations Benchmark v1.0.0               | 39       | 36        | 100%     |
+| **Total**          |                                                          | **783**  |           |          |
+
+**Evaluator architecture:**
+```
+scanner/providers/<provider>/evaluators/
+├── __init__.py              # Registry: maps control IDs to evaluator functions
+├── base.py                  # EvaluatorFn type, shared helpers
+├── section_N_<topic>.py     # Per-section evaluator implementations
+└── supplements.py           # (SaaS) Overlay upgrades for manual → automated
+```
+
+Each evaluator engine features:
+- **Per-module logging**: Every evaluator logs API calls, timing, and results via the scan log system
+- **Coverage reports**: `coverage_report()` returns total/implemented/coverage_pct per provider
+- **Graceful degradation**: Missing API permissions produce MANUAL status instead of failures
+
 ---
 
 ## SaaS Security Scanning
@@ -565,16 +619,28 @@ SaaS security checks are inspired by [ElectricEye](https://github.com/jonrau1/El
 
 ## Advanced Security Modules
 
-### Attack Path Analysis
+### Attack Path Analysis & BAS 2.0
 
-D-ARCA discovers multi-step attack paths that chain together individual misconfigurations into exploitable routes through your infrastructure.
+D-ARCA discovers multi-step attack paths that chain together individual misconfigurations into exploitable routes through your infrastructure. BAS 2.0 extends this with IAM privilege escalation discovery, blast radius analysis, and detection coverage assessment (~7,500 lines).
 
-| Component           | Description                                                    |
-|---------------------|----------------------------------------------------------------|
-| **Graph Engine**    | Builds a resource dependency graph and discovers attack chains (2,881 lines) |
-| **Path Scoring**    | Risk scoring based on severity, blast radius, and exploitability (174 lines) |
-| **Choke Points**    | Identifies optimal remediation points to break multiple paths  |
-| **Run Comparison**  | Compare analysis runs to track posture improvement over time   |
+| Component              | Lines | Description                                                    |
+|------------------------|-------|----------------------------------------------------------------|
+| **Graph Engine**       | 2,881 | Builds a resource dependency graph and discovers attack chains |
+| **IAM Graph Builder**  | 1,605 | Constructs IAM relationship graph across all 15 providers for privilege analysis |
+| **IAM Privesc Engine** | 1,364 | 30+ AWS privilege escalation patterns (Rhino Security research), shadow admin discovery, cross-account role chaining |
+| **Detection Coverage** | 702   | Per-step detection evaluation: logging, monitoring, and threat detection control assessment |
+| **Blast Radius**       | 274   | Impact analysis: reachable resources, data stores, PII exposure, admin escalation from any entry point |
+| **Path Scoring**       | 174   | Risk scoring based on severity, blast radius, and exploitability |
+| **Choke Points**       |       | Identifies optimal remediation points to break multiple paths  |
+| **Run Comparison**     |       | Compare analysis runs to track posture improvement over time   |
+
+**BAS 2.0 capabilities:**
+- Multi-cloud IAM privilege escalation discovery across all 15 providers
+- Shadow admin detection (non-admin principals that can escalate to admin)
+- Cross-account escalation via role chaining
+- Detection heatmap visualization
+- Per-step detection coverage (detected / partially detected / undetected)
+- Blast radius per attack path with PII and backup exposure flags
 
 ### Security Graph
 
@@ -591,7 +657,7 @@ Interactive visualization of cloud resource relationships and security posture.
 
 ### Data Security Posture Management (DSPM)
 
-Complete data security lifecycle management across cloud providers (~7,800 lines).
+Complete data security lifecycle management across cloud providers (~7,800 lines) with active scanning via Celery.
 
 | Module                  | Lines | Description                                           |
 |-------------------------|-------|-------------------------------------------------------|
@@ -603,6 +669,14 @@ Complete data security lifecycle management across cloud providers (~7,800 lines
 | **Content Sampler**     | 680   | Data content sampling for classification              |
 | **Data Classifier**     | 465   | Automated sensitivity and compliance classification   |
 | **Native Integrations** | 703   | Cloud-native data platform connectors                 |
+
+**Active DSPM scanning:**
+- `POST /api/v1/dspm/scan` endpoint triggers a Celery background task
+- Content pipeline: data store discovery → PII scanning → permission analysis → classification
+- Scan status tracking via `GET /api/v1/dspm/scan-status/{scan_id}`
+- Scan history with `GET /api/v1/dspm/scans` and per-scan findings
+- Finding status management (acknowledge, remediate, false positive)
+- Per-provider scan capability detection
 
 ### Ransomware Readiness
 
@@ -622,7 +696,7 @@ Features: Knowledge base side panel, domain drill-down, account-level assessment
 
 ### MITRE ATT&CK Analysis
 
-Maps all security findings to the MITRE ATT&CK framework for threat-centric visibility.
+Maps all security findings to the MITRE ATT&CK framework for threat-centric visibility. 768 CIS controls mapped across 9 benchmarks (~5,740 lines + SaaS enrichment).
 
 | Feature                 | Description                                              |
 |-------------------------|----------------------------------------------------------|
@@ -631,6 +705,28 @@ Maps all security findings to the MITRE ATT&CK framework for threat-centric visi
 | **Technique Detail**    | Per-technique evidence with mapped checks                |
 | **Navigator Layer**     | Export to MITRE ATT&CK Navigator format                  |
 | **Attack Path Coverage** | Cross-reference with discovered attack paths            |
+| **SaaS Coverage**       | Extended technique mappings for SaaS platforms via enrichment |
+| **Cross-reference**     | 233 MITRE refs + 309 RR refs resolved at 100% coverage  |
+
+### Compliance Framework Enrichment
+
+Automated enrichment pipeline that extends compliance framework coverage via CIS cross-mapping, SaaS mappings, and gap-filling controls (~2,530 lines).
+
+| Module                 | Lines | Description                                           |
+|------------------------|-------|-------------------------------------------------------|
+| **CIS Crossmap**       | 422   | Bidirectional CIS section → regulatory framework control mapping |
+| **Cloud Gap Mappings** | 429   | Gap-filling check mappings for cloud providers not covered by base frameworks |
+| **SaaS Mappings**      | 581   | Maps SaaS scanner checks to regulatory/industry frameworks |
+| **MITRE SaaS**         | 166   | Extends MITRE ATT&CK technique coverage to SaaS platforms |
+| **New Controls**       | 868   | Additional controls for ENS, GDPR, HIPAA, PCI-DSS, SOC2 (~63 new controls) |
+
+**Supported frameworks**: ENS, GDPR, HIPAA, PCI-DSS v4.0, SOC2
+
+**Enrichment pipeline:**
+```
+Base framework controls (237) + New controls (63) + CIS cross-references + SaaS mappings
+→ ~300 enriched controls across 13 providers
+```
 
 ### Drift Detection
 
@@ -830,11 +926,12 @@ All other endpoints require `Authorization: Bearer <token>` header.
 
 ### Scans
 
-| Method | Endpoint                | Description         |
-|--------|-------------------------|---------------------|
-| GET    | `/api/v1/scans`         | List scans          |
-| POST   | `/api/v1/scans`         | Start new scan      |
-| GET    | `/api/v1/scans/{id}`    | Get scan status     |
+| Method | Endpoint                     | Description              |
+|--------|------------------------------|--------------------------|
+| GET    | `/api/v1/scans`              | List scans               |
+| POST   | `/api/v1/scans`              | Start new scan           |
+| GET    | `/api/v1/scans/{id}`         | Get scan status          |
+| GET    | `/api/v1/scans/{id}/logs`    | Get scan execution logs  |
 
 ### Cloud Findings
 
@@ -895,17 +992,19 @@ Query parameters for `/available-checks`: `search`, `provider`, `category`, `sev
 | GET    | `/api/v1/saas/overview`                       | SaaS aggregate stats     |
 | GET    | `/api/v1/saas/findings/stats`                 | SaaS finding statistics  |
 
-### Attack Paths
+### Attack Paths & BAS 2.0
 
-| Method | Endpoint                               | Description                    |
-|--------|----------------------------------------|--------------------------------|
-| POST   | `/api/v1/attack-paths/analyze`         | Run attack path analysis       |
-| GET    | `/api/v1/attack-paths`                 | List discovered attack paths   |
-| GET    | `/api/v1/attack-paths/summary`         | Aggregate path statistics      |
-| GET    | `/api/v1/attack-paths/{id}`            | Get path details               |
-| GET    | `/api/v1/attack-paths/runs`            | List analysis runs             |
-| GET    | `/api/v1/attack-paths/choke-points`    | Get remediation choke points   |
-| GET    | `/api/v1/attack-paths/compare`         | Compare two analysis runs      |
+| Method | Endpoint                                  | Description                    |
+|--------|-------------------------------------------|--------------------------------|
+| POST   | `/api/v1/attack-paths/analyze`            | Run attack path analysis       |
+| GET    | `/api/v1/attack-paths`                    | List discovered attack paths   |
+| GET    | `/api/v1/attack-paths/summary`            | Aggregate path statistics      |
+| GET    | `/api/v1/attack-paths/{path_id}`          | Get path details               |
+| GET    | `/api/v1/attack-paths/runs`               | List analysis runs             |
+| GET    | `/api/v1/attack-paths/choke-points`       | Get remediation choke points   |
+| GET    | `/api/v1/attack-paths/compare`            | Compare two analysis runs      |
+| GET    | `/api/v1/attack-paths/detection-heatmap`  | Detection coverage heatmap     |
+| GET    | `/api/v1/attack-paths/shadow-admins`      | IAM shadow admin discovery     |
 
 ### Security Graph
 
@@ -931,11 +1030,22 @@ Query parameters for `/available-checks`: `search`, `provider`, `category`, `sev
 
 ### DSPM
 
-| Method | Endpoint                     | Description                    |
-|--------|------------------------------|--------------------------------|
-| GET    | `/api/v1/dspm/overview`      | DSPM posture overview          |
-| GET    | `/api/v1/dspm/checks`        | Data security checks           |
-| GET    | `/api/v1/dspm/data-stores`   | Discovered data stores         |
+| Method | Endpoint                                | Description                    |
+|--------|-----------------------------------------|--------------------------------|
+| GET    | `/api/v1/dspm/overview`                 | DSPM posture overview          |
+| GET    | `/api/v1/dspm/checks`                   | Data security checks           |
+| GET    | `/api/v1/dspm/data-stores`              | Discovered data stores         |
+| GET    | `/api/v1/dspm/attack-paths`             | DSPM-related attack paths      |
+| GET    | `/api/v1/dspm/findings`                 | DSPM findings                  |
+| GET    | `/api/v1/dspm/pii-patterns`             | PII detection patterns         |
+| GET    | `/api/v1/dspm/classification-levels`    | Data classification levels     |
+| POST   | `/api/v1/dspm/scan`                     | Trigger DSPM scan (Celery)     |
+| GET    | `/api/v1/dspm/scan-status/{scan_id}`    | Get DSPM scan status           |
+| GET    | `/api/v1/dspm/scans`                    | List DSPM scan history         |
+| GET    | `/api/v1/dspm/scans/{scan_id}`          | Get DSPM scan details          |
+| GET    | `/api/v1/dspm/scan-findings`            | Get findings for a DSPM scan   |
+| PUT    | `/api/v1/dspm/scan-findings/{id}/status`| Update finding status          |
+| GET    | `/api/v1/dspm/scan-capabilities`        | Provider scan capabilities     |
 
 ### Reports & Export
 
@@ -1035,7 +1145,7 @@ Query parameters for `/available-checks`: `search`, `provider`, `category`, `sev
 | **Ransomware Readiness**| `/darca/ransomware-readiness`       | Readiness dashboard with domains, findings, governance   |
 | **Security Graph**      | `/darca/security-graph`             | Interactive resource relationship graph                  |
 | **Inventory**           | `/darca/inventory`                  | Cloud resource inventory and account summary             |
-| **Cloud Providers**     | `/darca/providers`                  | Provider management (AWS/Azure/GCP/OCI/Alibaba/K8s)     |
+| **Cloud Providers**     | `/darca/providers`                  | Provider management (AWS/Azure/GCP/OCI/Alibaba/IBM/K8s) |
 | **Data Security**       | `/darca/dspm`                       | Data Security Posture Management module                  |
 | **SaaS Security**       | `/darca/saas-security`              | SaaS hub: overview, connections, findings                |
 | **Scans**               | `/darca/scans`                      | Scan management (create, monitor, history)               |
@@ -1148,6 +1258,13 @@ D-ARCA maps security checks to compliance frameworks at the **control level** �
 | CIS-Alibaba-2.0    | CIS Alibaba Cloud Foundation Benchmark v2.0.0                  | 85       | Alibaba       |
 | CIS-K8s-1.8        | CIS Kubernetes Benchmark v1.8                                  | 14       | Kubernetes    |
 | CIS-M365-3.0       | CIS Microsoft 365 Foundations Benchmark v3.0                   | 21       | Microsoft 365 |
+| CIS-M365-6.0.1     | CIS Microsoft 365 Foundations Benchmark v6.0.1                 | 142      | Microsoft 365 |
+| CIS-Azure-5.0      | CIS Microsoft Azure Foundations Benchmark v5.0                 | 155      | Azure         |
+| CIS-GCP-4.0        | CIS Google Cloud Platform Foundation Benchmark v4.0            | 84       | GCP           |
+| CIS-AWS-6.0        | CIS Amazon Web Services Foundations Benchmark v6.0             | 56       | AWS           |
+| CIS-GWS-1.3        | CIS Google Workspace Benchmark v1.3.0                          | 89       | Google Workspace |
+| CIS-Snowflake-1.0  | CIS Snowflake Foundations Benchmark v1.0.0                     | 39       | Snowflake     |
+| CIS-IBM-Cloud-1.1  | CIS IBM Cloud Foundations Benchmark v1.1.0                     | 73       | IBM Cloud     |
 
 ### CIS Control Library (904 Controls + 284 Supplementary)
 
@@ -1214,20 +1331,20 @@ D-ARCA includes a complete CIS control library with full metadata (descriptions,
 ```
 ARCA/
 ├── api/                              # Backend (Python / FastAPI)
-│   ├── main.py                       # FastAPI application entry point (21 routers)
+│   ├── main.py                       # FastAPI application entry point (21 routers + enrichment)
 │   ├── config.py                     # Settings (env vars)
 │   ├── database.py                   # SQLAlchemy async engine setup
 │   ├── celery_app.py                 # Celery configuration
 │   ├── requirements.txt              # Python dependencies
-│   ├── models/                       # SQLAlchemy ORM models (20 tables)
+│   ├── models/                       # SQLAlchemy ORM models (22 tables)
 │   │   ├── user.py                   # User model (auth)
 │   │   ├── provider.py               # Cloud provider model
-│   │   ├── scan.py                   # Scan model (cloud + SaaS)
+│   │   ├── scan.py                   # Scan model (cloud + SaaS) + scan_log field
 │   │   ├── finding.py                # Cloud finding model
 │   │   ├── finding_action.py         # Finding exception/remediation actions
 │   │   ├── saas_connection.py        # SaaS connection model
 │   │   ├── saas_finding.py           # SaaS finding model
-│   │   ├── attack_path.py            # Attack path model
+│   │   ├── attack_path.py            # Attack path model (+ BAS fields)
 │   │   ├── scan_schedule.py          # Scan schedule model
 │   │   ├── notification.py           # Notification model
 │   │   ├── integration.py            # Third-party integration model
@@ -1237,6 +1354,9 @@ ARCA/
 │   │   ├── rr_score.py               # Ransomware readiness scores
 │   │   ├── rr_finding.py             # Ransomware readiness findings
 │   │   ├── rr_governance.py          # Ransomware readiness governance
+│   │   ├── dspm_scan.py              # DSPM scan model
+│   │   ├── dspm_finding.py           # DSPM finding model
+│   │   ├── framework_preference.py   # User framework preferences
 │   │   └── custom_framework.py       # Custom frameworks, checks, controls (3 models)
 │   ├── schemas/                      # Pydantic request/response schemas
 │   │   ├── auth.py                   # Auth DTOs
@@ -1276,25 +1396,38 @@ ARCA/
 │   │   ├── audit_service.py          # Audit log recording
 │   │   ├── custom_framework_service.py # Custom framework sync, evaluation, lifecycle
 │   │   ├── excel_template_service.py # Excel template generation from registry
-│   │   └── excel_import_service.py   # Excel parsing + registry validation
+│   │   ├── excel_import_service.py   # Excel parsing + registry validation
+│   │   └── org_service.py            # Organization management service
 │   └── tasks/                        # Celery background tasks
 │       ├── scan_tasks.py             # Cloud scan execution
-│       └── saas_tasks.py             # SaaS scan execution
+│       ├── saas_tasks.py             # SaaS scan execution
+│       ├── dspm_tasks.py             # DSPM scan execution (Celery task)
+│       ├── rr_tasks.py               # Ransomware readiness evaluation
+│       └── schedule_tasks.py         # Scheduled scan execution
 │
 ├── scanner/                          # Security scanning engine
 │   ├── providers/                    # Cloud provider scanners
 │   │   ├── cloud_scanner.py          # Scanner dispatcher
 │   │   ├── base_check.py             # CheckResult dataclass
 │   │   ├── aws/
-│   │   │   └── aws_scanner.py        # AWS checks (30 services, 95 checks)
+│   │   │   ├── aws_scanner.py        # AWS checks (30 services, 95 checks)
+│   │   │   └── evaluators/           # CIS AWS v6.0 evaluator engine (62 controls)
 │   │   ├── azure/
-│   │   │   └── azure_scanner.py      # Azure checks (17 services, 127 checks)
+│   │   │   ├── azure_scanner.py      # Azure checks (17 services, 127 checks)
+│   │   │   └── evaluator/            # CIS Azure v5.0 evaluator engine (155 controls)
 │   │   ├── gcp/
-│   │   │   └── gcp_scanner.py        # GCP checks (15 services, 121 checks)
+│   │   │   ├── gcp_scanner.py        # GCP checks (15 services, 121 checks)
+│   │   │   └── evaluators/           # CIS GCP v4.0 evaluator engine (84 controls)
 │   │   ├── oci/
-│   │   │   └── oci_scanner.py        # OCI checks (18 services, 63 checks)
+│   │   │   ├── oci_scanner.py        # OCI checks (18 services, 63 checks)
+│   │   │   └── evaluators/           # CIS OCI v3.1.0 evaluator engine (54 controls)
 │   │   ├── alibaba/
-│   │   │   └── alibaba_scanner.py    # Alibaba checks (12 services, 57 checks)
+│   │   │   ├── alibaba_scanner.py    # Alibaba checks (12 services, 57 checks)
+│   │   │   └── evaluators/           # CIS Alibaba v2.0 evaluator engine (85 controls)
+│   │   ├── ibm_cloud/
+│   │   │   ├── ibm_cloud_scanner.py  # IBM Cloud checks (9 services, 73 checks)
+│   │   │   ├── ibm_cis_evaluator_engine.py  # CIS evaluator engine wrapper
+│   │   │   └── evaluators/           # CIS IBM Cloud v2.0.0 evaluator engine (73 controls)
 │   │   └── kubernetes/
 │   │       └── k8s_scanner.py        # K8s checks (8 categories, 17 checks)
 │   ├── saas/                         # SaaS application scanners (8 platforms)
@@ -1303,10 +1436,13 @@ ARCA/
 │   │   ├── connection_tester.py      # Connection test functions
 │   │   ├── servicenow/               # ServiceNow checks (50+)
 │   │   ├── m365/                     # Microsoft 365 checks (37)
+│   │   │   └── evaluators/           # CIS M365 v6.0.1 evaluator engine (142 controls)
 │   │   ├── salesforce/               # Salesforce checks (18)
 │   │   ├── snowflake/                # Snowflake checks (21)
+│   │   │   └── evaluators/           # CIS Snowflake v1.0.0 evaluator engine (39 controls)
 │   │   ├── github/                   # GitHub checks (~30)
 │   │   ├── google_workspace/         # Google Workspace checks (~30)
+│   │   │   └── evaluators/           # CIS GWS v1.3.0 evaluator engine (89 controls)
 │   │   ├── cloudflare/               # Cloudflare checks (~25)
 │   │   └── openstack/                # OpenStack checks (~30)
 │   ├── compliance/
@@ -1319,11 +1455,15 @@ ARCA/
 │   │   └── soc2.py                   # SOC 2 Type II controls
 │   ├── mitre/
 │   │   └── attack_mapping.py         # MITRE ATT&CK technique-to-check mapping
-│   ├── attack_paths/                 # Attack path analysis engine (~3,025 lines)
+│   ├── attack_paths/                 # Attack path analysis + BAS 2.0 engine (~7,500 lines)
 │   │   ├── graph_engine.py           # Path finding and graph construction
 │   │   ├── graph.py                  # Graph data structure
 │   │   ├── scoring.py                # Path risk scoring
-│   │   └── models.py                 # Attack path data models
+│   │   ├── models.py                 # Attack path data models
+│   │   ├── iam_graph.py              # IAM relationship graph builder (1,605 lines)
+│   │   ├── iam_privesc.py            # IAM privilege escalation discovery (1,364 lines)
+│   │   ├── blast_radius.py           # Blast radius calculator (274 lines)
+│   │   └── detection.py              # Detection coverage analyzer (702 lines)
 │   ├── dspm/                         # Data Security Posture Management (~7,800 lines)
 │   │   ├── router.py                 # DSPM orchestrator/router
 │   │   ├── permission_analyzer.py    # IAM/RBAC permission analysis
@@ -1355,7 +1495,7 @@ ARCA/
 │   │       ├── snowflake_checks.py   # Snowflake check definitions (57 checks)
 │   │       ├── cloudflare_checks.py  # Cloudflare check definitions (56 checks)
 │   │       └── openstack_checks.py   # OpenStack check definitions (57 checks)
-│   ├── cis_controls/                 # CIS Benchmark control definitions (9 benchmarks)
+│   ├── cis_controls/                 # CIS Benchmark control definitions (10 benchmarks)
 │   │   ├── aws_cis_controls.py       # AWS CIS Foundations Benchmark v3.0
 │   │   ├── azure_cis_controls.py     # Azure CIS Foundations Benchmark v5.0
 │   │   ├── gcp_cis_controls.py       # GCP CIS Platform Benchmark v3.0
@@ -1365,7 +1505,14 @@ ARCA/
 │   │   ├── kubernetes_cis_controls.py# Kubernetes CIS Benchmark v1.8
 │   │   ├── m365_cis_controls.py      # M365 CIS Benchmark v6.0.1
 │   │   ├── google_workspace_cis_controls.py # Google Workspace CIS v1.3
-│   │   └── snowflake_cis_controls.py # Snowflake CIS Benchmark v1.0
+│   │   └── snowflake_cis_controls.py # Snowflake CIS Benchmark v1.0.0
+│   ├── enrichment/                   # Compliance framework enrichment (~2,530 lines)
+│   │   ├── __init__.py               # Enrichment pipeline orchestrator
+│   │   ├── cis_crossmap.py           # CIS section ↔ regulatory framework cross-refs
+│   │   ├── cloud_gap_mappings.py     # Gap-filling check mappings for cloud providers
+│   │   ├── saas_mappings.py          # SaaS scanner checks → regulatory frameworks
+│   │   ├── mitre_saas.py             # MITRE ATT&CK extension for SaaS platforms
+│   │   └── new_controls.py           # Additional controls for ENS/GDPR/HIPAA/PCI/SOC2
 │   ├── check_library.py              # Backward-compatible facade over scanner.registry
 │   ├── drift_detection.py            # Configuration drift detection (697 lines)
 │   └── ransomware_readiness/         # Ransomware readiness module (105 rules, 7 domains)
