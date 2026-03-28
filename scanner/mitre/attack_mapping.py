@@ -637,6 +637,340 @@ MITRE_TECHNIQUES: dict[str, dict] = {
         ),
         "url": "https://attack.mitre.org/techniques/T1499/",
     },
+    # -- Reconnaissance --
+    "T1589": {
+        "name": "Gather Victim Identity Information",
+        "tactic": "Reconnaissance",
+        "description": (
+            "Adversaries may gather information about the victim's "
+            "identity, including employee names, email addresses, and "
+            "credentials. This information can be used for targeted "
+            "phishing, social engineering, or credential-based attacks "
+            "against cloud and SaaS environments."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1589/",
+    },
+    # -- Initial Access (sub-techniques) --
+    "T1078.001": {
+        "name": "Valid Accounts: Default Accounts",
+        "tactic": "Initial Access",
+        "description": (
+            "Adversaries may obtain and abuse credentials of default "
+            "accounts as a means of gaining initial access. Default "
+            "accounts are those built into an OS, application, or service, "
+            "such as root, admin, or guest accounts. In cloud environments, "
+            "default service accounts and root accounts are high-value "
+            "targets."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1078/001/",
+    },
+    "T1505": {
+        "name": "Server Software Component",
+        "tactic": "Initial Access",
+        "description": (
+            "Adversaries may abuse legitimate extensible development "
+            "features of servers to establish persistent access. Server "
+            "software components including web shells, transport agents, "
+            "and SQL stored procedures can be used to maintain access to "
+            "compromised systems."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1505/",
+    },
+    "T1566.001": {
+        "name": "Phishing: Spearphishing Attachment",
+        "tactic": "Initial Access",
+        "description": (
+            "Adversaries may send spearphishing emails with malicious "
+            "attachments to gain access to victim systems. The attachment "
+            "may contain exploits, macros, or executables that execute upon "
+            "opening. In M365 and Google Workspace environments, Safe "
+            "Attachments policies help detect and block these threats."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1566/001/",
+    },
+    "T1566.002": {
+        "name": "Phishing: Spearphishing Link",
+        "tactic": "Initial Access",
+        "description": (
+            "Adversaries may send spearphishing emails with malicious links "
+            "to gain access to victim systems. The links may lead to "
+            "credential harvesting pages, drive-by download sites, or "
+            "exploit kits. Safe Links policies in M365 help rewrite and "
+            "verify URLs to protect users."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1566/002/",
+    },
+    # -- Execution (additional) --
+    "T1021.007": {
+        "name": "Remote Services: Cloud Services",
+        "tactic": "Execution",
+        "description": (
+            "Adversaries may log into accessible cloud services within a "
+            "compromised environment using valid accounts. In cloud "
+            "environments, adversaries may leverage access to cloud-based "
+            "management portals, command-line interfaces, or APIs to move "
+            "laterally between tenants, subscriptions, or projects."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1021/007/",
+    },
+    "T1053": {
+        "name": "Scheduled Task/Job",
+        "tactic": "Execution",
+        "description": (
+            "Adversaries may abuse task scheduling functionality to "
+            "facilitate initial or recurring execution of malicious code. "
+            "In cloud environments, this includes cron jobs, cloud "
+            "scheduler tasks, Azure Automation runbooks, AWS EventBridge "
+            "rules, and similar services that execute code on a schedule."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1053/",
+    },
+    "T1059.009": {
+        "name": "Command and Scripting Interpreter: Cloud API",
+        "tactic": "Execution",
+        "description": (
+            "Adversaries may abuse cloud management APIs to execute "
+            "commands and scripts. Cloud provider CLIs (aws, az, gcloud) "
+            "and SDKs allow programmatic interaction with cloud services, "
+            "enabling adversaries to automate malicious activities like "
+            "data exfiltration, resource provisioning, or privilege "
+            "escalation."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1059/009/",
+    },
+    "T1203": {
+        "name": "Exploitation for Client Execution",
+        "tactic": "Execution",
+        "description": (
+            "Adversaries may exploit software vulnerabilities in client "
+            "applications to execute code. Common targets include browsers, "
+            "Office applications, and PDF readers. Vulnerabilities can be "
+            "exploited through crafted documents, web pages, or emails to "
+            "gain code execution on the victim's system."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1203/",
+    },
+    # -- Persistence (additional) --
+    "T1098.001": {
+        "name": "Account Manipulation: Additional Cloud Credentials",
+        "tactic": "Persistence",
+        "description": (
+            "Adversaries may add adversary-controlled credentials to cloud "
+            "accounts to maintain persistent access. This includes adding "
+            "SSH keys, API keys, service account keys, or OAuth tokens to "
+            "existing cloud accounts, enabling continued access even if the "
+            "original credentials are rotated."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1098/001/",
+    },
+    "T1098.003": {
+        "name": "Account Manipulation: Additional Cloud Roles",
+        "tactic": "Persistence",
+        "description": (
+            "Adversaries may add additional roles or permissions to cloud "
+            "accounts to maintain persistent access and escalate "
+            "privileges. In cloud environments, this includes granting "
+            "admin roles, modifying IAM policies, or adding accounts to "
+            "privileged groups to ensure continued access."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1098/003/",
+    },
+    "T1137": {
+        "name": "Office Application Startup",
+        "tactic": "Persistence",
+        "description": (
+            "Adversaries may leverage Microsoft Office application startup "
+            "features for persistence. Mechanisms such as Office add-ins, "
+            "templates, macros, and VSTO can be abused to execute malicious "
+            "code each time an Office application is started. In M365 "
+            "environments, add-ins can persist across cloud sessions."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1137/",
+    },
+    # -- Defense Evasion (additional) --
+    "T1071": {
+        "name": "Application Layer Protocol",
+        "tactic": "Defense Evasion",
+        "description": (
+            "Adversaries may communicate using OSI application layer "
+            "protocols to avoid detection by blending in with existing "
+            "traffic. Commands to remote systems and data exfiltration are "
+            "often performed using common protocols such as HTTPS, DNS, or "
+            "SMTP."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1071/",
+    },
+    "T1222": {
+        "name": "File and Directory Permissions Modification",
+        "tactic": "Defense Evasion",
+        "description": (
+            "Adversaries may modify file or directory permissions to evade "
+            "access control lists (ACLs). In cloud environments, this "
+            "includes modifying IAM policies, bucket ACLs, object "
+            "permissions, or storage access policies to grant unauthorized "
+            "access to resources."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1222/",
+    },
+    "T1562.004": {
+        "name": "Impair Defenses: Disable or Modify System Firewall",
+        "tactic": "Defense Evasion",
+        "description": (
+            "Adversaries may disable or modify system firewalls in order "
+            "to bypass controls limiting network usage. In cloud environments, "
+            "this includes modifying OS-level firewalls on instances, "
+            "disabling iptables rules, or altering Windows Firewall settings "
+            "to allow unauthorized traffic."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1562/004/",
+    },
+    "T1562.007": {
+        "name": "Impair Defenses: Disable or Modify Cloud Firewall",
+        "tactic": "Defense Evasion",
+        "description": (
+            "Adversaries may disable or modify cloud firewalls to bypass "
+            "network security controls. This includes modifying security "
+            "groups, network ACLs, cloud firewall rules, and WAF "
+            "configurations to allow unauthorized network traffic and "
+            "enable lateral movement or data exfiltration."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1562/007/",
+    },
+    "T1578.002": {
+        "name": "Modify Cloud Compute Infrastructure: Create Cloud Instance",
+        "tactic": "Defense Evasion",
+        "description": (
+            "Adversaries may create new cloud instances to evade defenses. "
+            "By creating instances in regions or subscriptions with less "
+            "monitoring, adversaries can execute malicious workloads, "
+            "establish persistence, or use resources for cryptocurrency "
+            "mining while avoiding detection."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1578/002/",
+    },
+    "T1578.003": {
+        "name": "Modify Cloud Compute Infrastructure: Delete Cloud Instance",
+        "tactic": "Defense Evasion",
+        "description": (
+            "Adversaries may delete cloud instances to remove evidence of "
+            "their presence. By destroying virtual machines, containers, or "
+            "serverless functions used during an attack, adversaries can "
+            "hinder forensic investigation and incident response efforts."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1578/003/",
+    },
+    # -- Credential Access (additional) --
+    "T1110.001": {
+        "name": "Brute Force: Password Guessing",
+        "tactic": "Credential Access",
+        "description": (
+            "Adversaries may guess passwords without prior knowledge of the "
+            "system. This technique involves systematically trying common "
+            "passwords against accounts without triggering lockout "
+            "mechanisms. In cloud environments, weak password policies "
+            "amplify the risk of successful guessing attacks."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1110/001/",
+    },
+    "T1550.001": {
+        "name": "Use Alternate Authentication Material: Application Access Token",
+        "tactic": "Credential Access",
+        "description": (
+            "Adversaries may use stolen application access tokens to bypass "
+            "the typical authentication process and access restricted "
+            "accounts, information, or services. In cloud and SaaS "
+            "environments, OAuth tokens and API keys can be used to "
+            "authenticate without passwords or MFA."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1550/001/",
+    },
+    "T1552.004": {
+        "name": "Unsecured Credentials: Private Keys",
+        "tactic": "Credential Access",
+        "description": (
+            "Adversaries may search for private keys on compromised systems "
+            "to enable authenticated access. Private cryptographic keys and "
+            "certificates are used for authentication, encryption, and "
+            "digital signatures. In cloud environments, SSH keys, TLS "
+            "certificates, and service account keys are valuable targets."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1552/004/",
+    },
+    # -- Discovery (additional) --
+    "T1538": {
+        "name": "Cloud Service Dashboard",
+        "tactic": "Discovery",
+        "description": (
+            "Adversaries may use cloud service dashboards to discover "
+            "information about cloud infrastructure. Dashboard GUIs like "
+            "AWS Console, Azure Portal, and GCP Console provide adversaries "
+            "with visibility into running services, configurations, "
+            "storage, and network architecture."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1538/",
+    },
+    "T1619": {
+        "name": "Cloud Storage Object Discovery",
+        "tactic": "Discovery",
+        "description": (
+            "Adversaries may enumerate objects within cloud storage "
+            "infrastructure. In AWS S3, Azure Blob Storage, and GCP Cloud "
+            "Storage, adversaries may list bucket contents to identify "
+            "sensitive files, backups, credentials, or configuration data "
+            "that can be exfiltrated or exploited."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1619/",
+    },
+    # -- Collection (additional) --
+    "T1114": {
+        "name": "Email Collection",
+        "tactic": "Collection",
+        "description": (
+            "Adversaries may collect email data from compromised accounts "
+            "to gather sensitive information. In SaaS environments like "
+            "M365 or Google Workspace, adversaries can access mailboxes, "
+            "export PST files, or use eDiscovery tools to collect email "
+            "data at scale."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1114/",
+    },
+    "T1114.003": {
+        "name": "Email Collection: Email Forwarding Rule",
+        "tactic": "Collection",
+        "description": (
+            "Adversaries may set up email forwarding rules to collect "
+            "information from a victim's email. In M365 and Google "
+            "Workspace, adversaries can create inbox rules or forwarding "
+            "settings to automatically redirect copies of incoming emails "
+            "to an adversary-controlled address."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1114/003/",
+    },
+    # -- Impact (additional) --
+    "T1489": {
+        "name": "Service Stop",
+        "tactic": "Impact",
+        "description": (
+            "Adversaries may stop or disable services on a system to render "
+            "those services unavailable to legitimate users. In cloud "
+            "environments, this includes stopping virtual machines, "
+            "disabling cloud services, deleting serverless functions, or "
+            "modifying service configurations to cause outages."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1489/",
+    },
+    "T1565": {
+        "name": "Data Manipulation",
+        "tactic": "Impact",
+        "description": (
+            "Adversaries may modify data to influence business processes, "
+            "operations, or decision-making. In cloud environments, this "
+            "includes altering database records, modifying stored objects, "
+            "or manipulating configuration data to cause harm or enable "
+            "further attacks."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1565/",
+    },
 }
 
 
@@ -1371,6 +1705,2341 @@ CHECK_TO_MITRE: dict[str, list[str]] = {
     ],
     "openstack_identity_token_expiry": [
         "T1550", "T1134",
+    ],
+
+    # -----------------------------------------------------------------------
+    # CIS Benchmark Controls (9 benchmarks, 768 controls)
+    # -----------------------------------------------------------------------
+    # -----------------------------------------------------------------------
+    # CIS Azure v5.0
+    # -----------------------------------------------------------------------
+    "azure_cis_2_1_1": [
+        "T1190", "T1580",
+    ],
+    "azure_cis_2_1_2": [
+        "T1078.004", "T1562.001",
+    ],
+    "azure_cis_2_1_3": [
+        "T1190", "T1530",
+    ],
+    "azure_cis_2_1_4": [
+        "T1530", "T1213",
+    ],
+    "azure_cis_2_1_5": [
+        "T1562.008",
+    ],
+    "azure_cis_2_1_6": [
+        "T1078.004", "T1098.003",
+    ],
+    "azure_cis_2_1_7": [
+        "T1562.008",
+    ],
+    "azure_cis_2_1_8": [
+        "T1562.001",
+    ],
+    "azure_cis_2_1_9": [
+        "T1530", "T1213",
+    ],
+    "azure_cis_2_1_10": [
+        "T1578.002", "T1496",
+    ],
+    "azure_cis_2_1_11": [
+        "T1528", "T1550.001",
+    ],
+    "azure_cis_5_1_1": [
+        "T1078.004", "T1110", "T1621",
+    ],
+    "azure_cis_5_1_2": [
+        "T1078.004", "T1110", "T1556",
+    ],
+    "azure_cis_5_1_3": [
+        "T1078.004", "T1098.003",
+    ],
+    "azure_cis_5_2_1": [
+        "T1078.004", "T1098.003",
+    ],
+    "azure_cis_5_2_2": [
+        "T1078.004", "T1098.003", "T1110",
+    ],
+    "azure_cis_5_2_3": [
+        "T1078.004", "T1059.009",
+    ],
+    "azure_cis_5_2_4": [
+        "T1538", "T1078.004",
+    ],
+    "azure_cis_5_2_5": [
+        "T1078.004", "T1110",
+    ],
+    "azure_cis_5_2_6": [
+        "T1078.004", "T1556",
+    ],
+    "azure_cis_5_2_7": [
+        "T1078.004", "T1199",
+    ],
+    "azure_cis_5_2_8": [
+        "T1110.001",
+    ],
+    "azure_cis_5_3_1": [
+        "T1078.004", "T1098.003",
+    ],
+    "azure_cis_5_3_2": [
+        "T1078.004", "T1098.003",
+    ],
+    "azure_cis_5_3_3": [
+        "T1098.003", "T1562.001",
+    ],
+    "azure_cis_5_3_4": [
+        "T1098.003",
+    ],
+    "azure_cis_5_3_5": [
+        "T1098.003", "T1078.004",
+    ],
+    "azure_cis_5_4": [
+        "T1078.004", "T1199",
+    ],
+    "azure_cis_5_5": [
+        "T1136.003", "T1199",
+    ],
+    "azure_cis_5_6": [
+        "T1098.003",
+    ],
+    "azure_cis_5_7": [
+        "T1098.003", "T1136.003",
+    ],
+    "azure_cis_5_8": [
+        "T1098.003",
+    ],
+    "azure_cis_5_9": [
+        "T1098.001", "T1525",
+    ],
+    "azure_cis_5_10": [
+        "T1528",
+    ],
+    "azure_cis_5_11": [
+        "T1078.004", "T1098.003",
+    ],
+    "azure_cis_5_12": [
+        "T1078.004", "T1199",
+    ],
+    "azure_cis_5_13": [
+        "T1078.004", "T1556",
+    ],
+    "azure_cis_5_14": [
+        "T1556", "T1621",
+    ],
+    "azure_cis_5_15": [
+        "T1098.001",
+    ],
+    "azure_cis_5_16": [
+        "T1098.001", "T1528",
+    ],
+    "azure_cis_5_17": [
+        "T1538",
+    ],
+    "azure_cis_6_1_2_1": [
+        "T1562.008", "T1578",
+    ],
+    "azure_cis_6_1_2_2": [
+        "T1562.008", "T1578.003",
+    ],
+    "azure_cis_6_1_2_3": [
+        "T1562.001", "T1190",
+    ],
+    "azure_cis_6_1_2_4": [
+        "T1562.001",
+    ],
+    "azure_cis_6_1_2_5": [
+        "T1562.001", "T1190",
+    ],
+    "azure_cis_6_1_2_6": [
+        "T1562.001",
+    ],
+    "azure_cis_6_1_2_7": [
+        "T1562.001",
+    ],
+    "azure_cis_6_1_2_8": [
+        "T1562.001",
+    ],
+    "azure_cis_6_1_2_9": [
+        "T1562.001", "T1190",
+    ],
+    "azure_cis_6_1_2_10": [
+        "T1562.001",
+    ],
+    "azure_cis_6_1_2_11": [
+        "T1562.001", "T1098.003",
+    ],
+    "azure_cis_6_2": [
+        "T1562.008", "T1078.004",
+    ],
+    "azure_cis_7_1": [
+        "T1021.001", "T1190",
+    ],
+    "azure_cis_7_2": [
+        "T1021.004", "T1190",
+    ],
+    "azure_cis_7_3": [
+        "T1498", "T1190",
+    ],
+    "azure_cis_7_4": [
+        "T1190",
+    ],
+    "azure_cis_7_5": [
+        "T1562.008", "T1580",
+    ],
+    "azure_cis_7_6": [
+        "T1562.008", "T1580",
+    ],
+    "azure_cis_7_7": [
+        "T1190", "T1580",
+    ],
+    "azure_cis_7_8": [
+        "T1562.008",
+    ],
+    "azure_cis_7_9": [
+        "T1078.004", "T1556",
+    ],
+    "azure_cis_7_10": [
+        "T1190",
+    ],
+    "azure_cis_7_11": [
+        "T1190", "T1580",
+    ],
+    "azure_cis_7_12": [
+        "T1557", "T1190",
+    ],
+    "azure_cis_7_13": [
+        "T1190",
+    ],
+    "azure_cis_7_14": [
+        "T1190",
+    ],
+    "azure_cis_7_15": [
+        "T1190", "T1498",
+    ],
+    "azure_cis_7_16": [
+        "T1190", "T1580",
+    ],
+    "azure_cis_8_1_10": [
+        "T1562.001", "T1059.009",
+    ],
+    "azure_cis_8_1_11": [
+        "T1562.001",
+    ],
+    "azure_cis_8_2_1": [
+        "T1562.001",
+    ],
+    "azure_cis_8_3_1": [
+        "T1552", "T1528",
+    ],
+    "azure_cis_8_3_2": [
+        "T1552", "T1552.001",
+    ],
+    "azure_cis_8_3_3": [
+        "T1098.003", "T1552",
+    ],
+    "azure_cis_8_3_4": [
+        "T1485", "T1552",
+    ],
+    "azure_cis_8_3_5": [
+        "T1190", "T1552",
+    ],
+    "azure_cis_8_3_6": [
+        "T1190", "T1552",
+    ],
+    "azure_cis_8_3_7": [
+        "T1485", "T1531",
+    ],
+    "azure_cis_8_3_8": [
+        "T1552", "T1528",
+    ],
+    "azure_cis_8_3_9": [
+        "T1552", "T1552.001",
+    ],
+    "azure_cis_8_3_10": [
+        "T1485",
+    ],
+    "azure_cis_8_3_11": [
+        "T1485",
+    ],
+    "azure_cis_9_1_1": [
+        "T1485",
+    ],
+    "azure_cis_9_1_2": [
+        "T1557", "T1530",
+    ],
+    "azure_cis_9_1_3": [
+        "T1557",
+    ],
+    "azure_cis_9_2_1": [
+        "T1485",
+    ],
+    "azure_cis_9_2_2": [
+        "T1485",
+    ],
+    "azure_cis_9_2_3": [
+        "T1485", "T1486",
+    ],
+    "azure_cis_9_3_1_1": [
+        "T1552", "T1528",
+    ],
+    "azure_cis_9_3_1_2": [
+        "T1552",
+    ],
+    "azure_cis_9_3_1_3": [
+        "T1078.004", "T1552",
+    ],
+    "azure_cis_9_3_2_1": [
+        "T1190", "T1530",
+    ],
+    "azure_cis_9_3_2_2": [
+        "T1190", "T1530",
+    ],
+    "azure_cis_9_3_2_3": [
+        "T1190", "T1530",
+    ],
+    "azure_cis_9_3_3_1": [
+        "T1078.004",
+    ],
+    "azure_cis_9_3_4": [
+        "T1557", "T1530",
+    ],
+    "azure_cis_9_3_5": [
+        "T1199",
+    ],
+    "azure_cis_9_3_6": [
+        "T1557",
+    ],
+    "azure_cis_9_3_7": [
+        "T1537",
+    ],
+    "azure_cis_9_3_8": [
+        "T1530", "T1190",
+    ],
+    "azure_cis_9_3_9": [
+        "T1485",
+    ],
+    "azure_cis_9_3_10": [
+        "T1485", "T1578",
+    ],
+    "azure_cis_9_3_11": [
+        "T1485", "T1489",
+    ],
+    "azure_cis_3_1_1": [
+        "T1078.004", "T1110", "T1021.001",
+    ],
+    "azure_cis_5_3_6": [
+        "T1098.003",
+    ],
+    "azure_cis_5_3_7": [
+        "T1098.003", "T1078.004",
+    ],
+    "azure_cis_5_18": [
+        "T1526", "T1580",
+    ],
+    "azure_cis_5_19": [
+        "T1098.003", "T1136.003",
+    ],
+    "azure_cis_5_20": [
+        "T1098.003",
+    ],
+    "azure_cis_5_21": [
+        "T1098.003",
+    ],
+    "azure_cis_5_22": [
+        "T1078.004", "T1110",
+    ],
+    "azure_cis_5_23": [
+        "T1098.003", "T1078.004",
+    ],
+    "azure_cis_5_24": [
+        "T1485", "T1098.003",
+    ],
+    "azure_cis_5_25": [
+        "T1537", "T1199",
+    ],
+    "azure_cis_5_26": [
+        "T1078.004", "T1098.003",
+    ],
+    "azure_cis_5_27": [
+        "T1078.004", "T1098.003",
+    ],
+    "azure_cis_5_28": [
+        "T1110", "T1556",
+    ],
+    "azure_cis_6_1_1_1": [
+        "T1562.008",
+    ],
+    "azure_cis_6_1_1_2": [
+        "T1562.008",
+    ],
+    "azure_cis_6_1_1_3": [
+        "T1562.008", "T1530",
+    ],
+    "azure_cis_6_1_1_4": [
+        "T1562.008", "T1552",
+    ],
+    "azure_cis_6_1_1_5": [
+        "T1562.008", "T1580",
+    ],
+    "azure_cis_6_1_1_6": [
+        "T1562.008", "T1190",
+    ],
+    "azure_cis_6_1_1_7": [
+        "T1562.008", "T1580",
+    ],
+    "azure_cis_6_1_1_8": [
+        "T1562.008", "T1078.004",
+    ],
+    "azure_cis_6_1_1_9": [
+        "T1562.008", "T1078.004",
+    ],
+    "azure_cis_6_1_1_10": [
+        "T1562.008",
+    ],
+    "azure_cis_6_1_3_1": [
+        "T1562.008", "T1190",
+    ],
+    "azure_cis_6_1_4": [
+        "T1562.008",
+    ],
+    "azure_cis_6_1_5": [
+        "T1562.001", "T1190",
+    ],
+    "azure_cis_8_1_1_1": [
+        "T1562.001", "T1578",
+    ],
+    "azure_cis_8_1_2_1": [
+        "T1562.001", "T1190",
+    ],
+    "azure_cis_8_1_3_1": [
+        "T1562.001",
+    ],
+    "azure_cis_8_1_3_2": [
+        "T1190", "T1562.001",
+    ],
+    "azure_cis_8_1_3_3": [
+        "T1562.001",
+    ],
+    "azure_cis_8_1_3_4": [
+        "T1562.001", "T1580",
+    ],
+    "azure_cis_8_1_3_5": [
+        "T1562.001", "T1565",
+    ],
+    "azure_cis_8_1_4_1": [
+        "T1562.001",
+    ],
+    "azure_cis_8_1_5_1": [
+        "T1562.001",
+    ],
+    "azure_cis_8_1_5_2": [
+        "T1562.001", "T1530",
+    ],
+    "azure_cis_8_1_6_1": [
+        "T1562.001", "T1530",
+    ],
+    "azure_cis_8_1_7_1": [
+        "T1562.001", "T1525",
+    ],
+    "azure_cis_8_1_7_2": [
+        "T1562.001", "T1525",
+    ],
+    "azure_cis_8_1_7_3": [
+        "T1562.001", "T1580",
+    ],
+    "azure_cis_8_1_7_4": [
+        "T1562.001", "T1525",
+    ],
+    "azure_cis_8_1_8_1": [
+        "T1562.001", "T1552",
+    ],
+    "azure_cis_8_1_9_1": [
+        "T1562.001", "T1071",
+    ],
+    "azure_cis_8_1_12": [
+        "T1562.001",
+    ],
+    "azure_cis_8_1_13": [
+        "T1562.001",
+    ],
+    "azure_cis_8_1_14": [
+        "T1562.001",
+    ],
+    "azure_cis_8_1_15": [
+        "T1562.001", "T1580",
+    ],
+    "azure_cis_8_1_16": [
+        "T1580", "T1190",
+    ],
+    "azure_cis_8_4_1": [
+        "T1021.001", "T1021.004", "T1190",
+    ],
+    "azure_cis_8_5": [
+        "T1498",
+    ],
+    # -----------------------------------------------------------------------
+    # CIS AWS v6.0
+    # -----------------------------------------------------------------------
+    "aws_cis_2_1": [
+        "T1562.001",
+    ],
+    "aws_cis_2_2": [
+        "T1562.001",
+    ],
+    "aws_cis_2_3": [
+        "T1078.001", "T1552",
+    ],
+    "aws_cis_2_4": [
+        "T1078.001", "T1110",
+    ],
+    "aws_cis_2_5": [
+        "T1078.001", "T1621",
+    ],
+    "aws_cis_2_6": [
+        "T1078.001", "T1098.003",
+    ],
+    "aws_cis_2_7": [
+        "T1110.001",
+    ],
+    "aws_cis_2_8": [
+        "T1110.001", "T1078.004",
+    ],
+    "aws_cis_2_9": [
+        "T1078.004", "T1110",
+    ],
+    "aws_cis_2_10": [
+        "T1552", "T1098.001",
+    ],
+    "aws_cis_2_11": [
+        "T1078.004", "T1552",
+    ],
+    "aws_cis_2_12": [
+        "T1552", "T1098.001",
+    ],
+    "aws_cis_2_13": [
+        "T1552", "T1528",
+    ],
+    "aws_cis_2_14": [
+        "T1098.003", "T1078.004",
+    ],
+    "aws_cis_2_15": [
+        "T1098.003", "T1078.004",
+    ],
+    "aws_cis_2_16": [
+        "T1098.003",
+    ],
+    "aws_cis_2_17": [
+        "T1552.005", "T1078.004",
+    ],
+    "aws_cis_2_18": [
+        "T1552", "T1190",
+    ],
+    "aws_cis_2_19": [
+        "T1580", "T1098.003",
+    ],
+    "aws_cis_2_20": [
+        "T1078.004", "T1199",
+    ],
+    "aws_cis_2_21": [
+        "T1059.009", "T1078.004",
+    ],
+    "aws_cis_3_1_1": [
+        "T1530", "T1557",
+    ],
+    "aws_cis_3_1_2": [
+        "T1485", "T1530",
+    ],
+    "aws_cis_3_1_3": [
+        "T1530", "T1619",
+    ],
+    "aws_cis_3_1_4": [
+        "T1530", "T1190",
+    ],
+    "aws_cis_3_2_1": [
+        "T1530", "T1213",
+    ],
+    "aws_cis_3_2_2": [
+        "T1190",
+    ],
+    "aws_cis_3_2_3": [
+        "T1190", "T1213",
+    ],
+    "aws_cis_3_2_4": [
+        "T1489", "T1485",
+    ],
+    "aws_cis_3_3_1": [
+        "T1530",
+    ],
+    "aws_cis_4_1": [
+        "T1562.008",
+    ],
+    "aws_cis_4_2": [
+        "T1562.008", "T1565",
+    ],
+    "aws_cis_4_3": [
+        "T1562.008", "T1580",
+    ],
+    "aws_cis_4_4": [
+        "T1562.008", "T1530",
+    ],
+    "aws_cis_4_5": [
+        "T1562.008", "T1552",
+    ],
+    "aws_cis_4_6": [
+        "T1552", "T1528",
+    ],
+    "aws_cis_4_7": [
+        "T1562.008", "T1580",
+    ],
+    "aws_cis_4_8": [
+        "T1562.008", "T1485",
+    ],
+    "aws_cis_4_9": [
+        "T1562.008", "T1530",
+    ],
+    "aws_cis_5_1": [
+        "T1562.008", "T1059.009",
+    ],
+    "aws_cis_5_2": [
+        "T1562.008", "T1078.004",
+    ],
+    "aws_cis_5_3": [
+        "T1562.008", "T1078.001",
+    ],
+    "aws_cis_5_4": [
+        "T1562.008", "T1098.003",
+    ],
+    "aws_cis_5_5": [
+        "T1562.008",
+    ],
+    "aws_cis_5_6": [
+        "T1562.008", "T1110",
+    ],
+    "aws_cis_5_7": [
+        "T1562.008", "T1485",
+    ],
+    "aws_cis_5_8": [
+        "T1562.008", "T1530",
+    ],
+    "aws_cis_5_9": [
+        "T1562.008",
+    ],
+    "aws_cis_5_10": [
+        "T1562.008", "T1562.001",
+    ],
+    "aws_cis_5_11": [
+        "T1562.008", "T1562.001",
+    ],
+    "aws_cis_5_12": [
+        "T1562.008", "T1580",
+    ],
+    "aws_cis_5_13": [
+        "T1562.008",
+    ],
+    "aws_cis_5_14": [
+        "T1562.008", "T1580",
+    ],
+    "aws_cis_5_15": [
+        "T1562.008", "T1098.003",
+    ],
+    "aws_cis_5_16": [
+        "T1562.001",
+    ],
+    "aws_cis_6_1_1": [
+        "T1530",
+    ],
+    "aws_cis_6_1_2": [
+        "T1021.007", "T1190",
+    ],
+    "aws_cis_6_2": [
+        "T1190", "T1021.001", "T1021.004",
+    ],
+    "aws_cis_6_3": [
+        "T1190", "T1021.001", "T1021.004",
+    ],
+    "aws_cis_6_4": [
+        "T1190", "T1021.001", "T1021.004",
+    ],
+    "aws_cis_6_5": [
+        "T1190", "T1078.001",
+    ],
+    "aws_cis_6_6": [
+        "T1199", "T1580",
+    ],
+    # -----------------------------------------------------------------------
+    # CIS GCP v4.0
+    # -----------------------------------------------------------------------
+    "gcp_cis_1_1": [
+        "T1078.004",
+    ],
+    "gcp_cis_1_2": [
+        "T1078.004", "T1110",
+    ],
+    "gcp_cis_1_3": [
+        "T1078.004", "T1621",
+    ],
+    "gcp_cis_1_4": [
+        "T1552", "T1098.001",
+    ],
+    "gcp_cis_1_5": [
+        "T1078.004", "T1098.003",
+    ],
+    "gcp_cis_1_6": [
+        "T1098.003", "T1078.004",
+    ],
+    "gcp_cis_1_7": [
+        "T1552", "T1528",
+    ],
+    "gcp_cis_1_8": [
+        "T1098.003",
+    ],
+    "gcp_cis_1_9": [
+        "T1552", "T1530",
+    ],
+    "gcp_cis_1_10": [
+        "T1552", "T1528",
+    ],
+    "gcp_cis_1_11": [
+        "T1098.003", "T1552",
+    ],
+    "gcp_cis_1_12": [
+        "T1528", "T1550.001",
+    ],
+    "gcp_cis_1_13": [
+        "T1528",
+    ],
+    "gcp_cis_1_14": [
+        "T1528", "T1059.009",
+    ],
+    "gcp_cis_1_15": [
+        "T1528", "T1552",
+    ],
+    "gcp_cis_1_16": [
+        "T1562.001",
+    ],
+    "gcp_cis_1_17": [
+        "T1552.001",
+    ],
+    "gcp_cis_2_1": [
+        "T1562.008",
+    ],
+    "gcp_cis_2_2": [
+        "T1562.008",
+    ],
+    "gcp_cis_2_3": [
+        "T1562.008",
+    ],
+    "gcp_cis_2_4": [
+        "T1562.008", "T1098.003",
+    ],
+    "gcp_cis_2_5": [
+        "T1562.008",
+    ],
+    "gcp_cis_2_6": [
+        "T1562.008", "T1098.003",
+    ],
+    "gcp_cis_2_7": [
+        "T1562.008", "T1562.001",
+    ],
+    "gcp_cis_2_8": [
+        "T1562.008",
+    ],
+    "gcp_cis_2_9": [
+        "T1562.008", "T1580",
+    ],
+    "gcp_cis_2_10": [
+        "T1562.008", "T1530",
+    ],
+    "gcp_cis_2_11": [
+        "T1562.008",
+    ],
+    "gcp_cis_2_12": [
+        "T1562.008", "T1071",
+    ],
+    "gcp_cis_2_13": [
+        "T1562.008", "T1580",
+    ],
+    "gcp_cis_2_14": [
+        "T1562.008",
+    ],
+    "gcp_cis_2_15": [
+        "T1562.008", "T1098.003",
+    ],
+    "gcp_cis_2_16": [
+        "T1562.008", "T1190",
+    ],
+    "gcp_cis_3_1": [
+        "T1190", "T1078.001",
+    ],
+    "gcp_cis_3_2": [
+        "T1190", "T1580",
+    ],
+    "gcp_cis_3_3": [
+        "T1557",
+    ],
+    "gcp_cis_3_4": [
+        "T1557",
+    ],
+    "gcp_cis_3_5": [
+        "T1557",
+    ],
+    "gcp_cis_3_6": [
+        "T1021.004", "T1190",
+    ],
+    "gcp_cis_3_7": [
+        "T1021.001", "T1190",
+    ],
+    "gcp_cis_3_8": [
+        "T1562.008", "T1580",
+    ],
+    "gcp_cis_3_9": [
+        "T1557", "T1190",
+    ],
+    "gcp_cis_3_10": [
+        "T1190", "T1078.004",
+    ],
+    "gcp_cis_4_1": [
+        "T1078.001", "T1552.005",
+    ],
+    "gcp_cis_4_2": [
+        "T1078.004", "T1059.009",
+    ],
+    "gcp_cis_4_3": [
+        "T1021.004", "T1098.001",
+    ],
+    "gcp_cis_4_4": [
+        "T1078.004", "T1021.004",
+    ],
+    "gcp_cis_4_5": [
+        "T1059.009", "T1021.007",
+    ],
+    "gcp_cis_4_6": [
+        "T1557", "T1580",
+    ],
+    "gcp_cis_4_7": [
+        "T1530",
+    ],
+    "gcp_cis_4_8": [
+        "T1525", "T1578",
+    ],
+    "gcp_cis_4_9": [
+        "T1190", "T1580",
+    ],
+    "gcp_cis_4_10": [
+        "T1557", "T1190",
+    ],
+    "gcp_cis_4_11": [
+        "T1530", "T1552.005",
+    ],
+    "gcp_cis_4_12": [
+        "T1190", "T1203",
+    ],
+    "gcp_cis_5_1": [
+        "T1530", "T1190",
+    ],
+    "gcp_cis_5_2": [
+        "T1530", "T1098.003",
+    ],
+    "gcp_cis_6_1": [
+        "T1190", "T1213",
+    ],
+    "gcp_cis_6_2": [
+        "T1562.008",
+    ],
+    "gcp_cis_6_3": [
+        "T1059.009",
+    ],
+    "gcp_cis_6_4": [
+        "T1557", "T1213",
+    ],
+    "gcp_cis_6_5": [
+        "T1190", "T1213",
+    ],
+    "gcp_cis_6_6": [
+        "T1190", "T1213",
+    ],
+    "gcp_cis_6_7": [
+        "T1485", "T1486",
+    ],
+    "gcp_cis_7_1": [
+        "T1530", "T1213",
+    ],
+    "gcp_cis_7_2": [
+        "T1530", "T1213",
+    ],
+    "gcp_cis_7_3": [
+        "T1530",
+    ],
+    "gcp_cis_7_4": [
+        "T1530", "T1619",
+    ],
+    "gcp_cis_8_1": [
+        "T1530",
+    ],
+    # -----------------------------------------------------------------------
+    # CIS OCI v3.1
+    # -----------------------------------------------------------------------
+    "oci_cis_1_1": [
+        "T1098.003", "T1078.004",
+    ],
+    "oci_cis_1_2": [
+        "T1098.003", "T1078.004",
+    ],
+    "oci_cis_1_3": [
+        "T1098.003",
+    ],
+    "oci_cis_1_4": [
+        "T1110.001",
+    ],
+    "oci_cis_1_5": [
+        "T1110.001", "T1078.004",
+    ],
+    "oci_cis_1_6": [
+        "T1110.001",
+    ],
+    "oci_cis_1_7": [
+        "T1078.004", "T1110",
+    ],
+    "oci_cis_1_8": [
+        "T1552", "T1528",
+    ],
+    "oci_cis_1_9": [
+        "T1552", "T1528",
+    ],
+    "oci_cis_1_10": [
+        "T1552", "T1528",
+    ],
+    "oci_cis_1_11": [
+        "T1552",
+    ],
+    "oci_cis_1_12": [
+        "T1078.004", "T1552",
+    ],
+    "oci_cis_1_13": [
+        "T1078.004",
+    ],
+    "oci_cis_1_14": [
+        "T1552.005", "T1078.004",
+    ],
+    "oci_cis_1_15": [
+        "T1485", "T1098.003",
+    ],
+    "oci_cis_1_16": [
+        "T1078.004", "T1552",
+    ],
+    "oci_cis_1_17": [
+        "T1552", "T1098.001",
+    ],
+    "oci_cis_2_1": [
+        "T1021.004", "T1190",
+    ],
+    "oci_cis_2_2": [
+        "T1021.001", "T1190",
+    ],
+    "oci_cis_2_3": [
+        "T1021.004", "T1190",
+    ],
+    "oci_cis_2_4": [
+        "T1021.001", "T1190",
+    ],
+    "oci_cis_2_5": [
+        "T1190", "T1078.001",
+    ],
+    "oci_cis_2_6": [
+        "T1190",
+    ],
+    "oci_cis_2_7": [
+        "T1190",
+    ],
+    "oci_cis_2_8": [
+        "T1190", "T1213",
+    ],
+    "oci_cis_3_1": [
+        "T1552.005",
+    ],
+    "oci_cis_3_2": [
+        "T1525", "T1578",
+    ],
+    "oci_cis_3_3": [
+        "T1557", "T1530",
+    ],
+    "oci_cis_4_1": [
+        "T1580",
+    ],
+    "oci_cis_4_2": [
+        "T1562.001",
+    ],
+    "oci_cis_4_3": [
+        "T1562.008", "T1556",
+    ],
+    "oci_cis_4_4": [
+        "T1562.008", "T1098.003",
+    ],
+    "oci_cis_4_5": [
+        "T1562.008", "T1098.003",
+    ],
+    "oci_cis_4_6": [
+        "T1562.008", "T1098.003",
+    ],
+    "oci_cis_4_7": [
+        "T1562.008", "T1136.003",
+    ],
+    "oci_cis_4_8": [
+        "T1562.008", "T1580",
+    ],
+    "oci_cis_4_9": [
+        "T1562.008",
+    ],
+    "oci_cis_4_10": [
+        "T1562.008", "T1562.001",
+    ],
+    "oci_cis_4_11": [
+        "T1562.008", "T1562.001",
+    ],
+    "oci_cis_4_12": [
+        "T1562.008", "T1580",
+    ],
+    "oci_cis_4_13": [
+        "T1562.008", "T1580",
+    ],
+    "oci_cis_4_14": [
+        "T1562.001",
+    ],
+    "oci_cis_4_15": [
+        "T1562.001", "T1562.008",
+    ],
+    "oci_cis_4_16": [
+        "T1552", "T1528",
+    ],
+    "oci_cis_4_17": [
+        "T1562.008", "T1530",
+    ],
+    "oci_cis_4_18": [
+        "T1562.008", "T1078.004",
+    ],
+    "oci_cis_5_1_1": [
+        "T1530", "T1190",
+    ],
+    "oci_cis_5_1_2": [
+        "T1530",
+    ],
+    "oci_cis_5_1_3": [
+        "T1485",
+    ],
+    "oci_cis_5_2_1": [
+        "T1530",
+    ],
+    "oci_cis_5_2_2": [
+        "T1530",
+    ],
+    "oci_cis_5_3_1": [
+        "T1530",
+    ],
+    "oci_cis_6_1": [
+        "T1580",
+    ],
+    "oci_cis_6_2": [
+        "T1580", "T1078.001",
+    ],
+    # -----------------------------------------------------------------------
+    # CIS Alibaba v2.0
+    # -----------------------------------------------------------------------
+    "alibaba_cis_1_1": [
+        "T1078.001",
+    ],
+    "alibaba_cis_1_2": [
+        "T1078.001", "T1552",
+    ],
+    "alibaba_cis_1_3": [
+        "T1078.001", "T1110",
+    ],
+    "alibaba_cis_1_4": [
+        "T1078.004", "T1110",
+    ],
+    "alibaba_cis_1_5": [
+        "T1078.004", "T1552",
+    ],
+    "alibaba_cis_1_6": [
+        "T1552", "T1528",
+    ],
+    "alibaba_cis_1_7": [
+        "T1110.001",
+    ],
+    "alibaba_cis_1_8": [
+        "T1110.001",
+    ],
+    "alibaba_cis_1_9": [
+        "T1110.001",
+    ],
+    "alibaba_cis_1_10": [
+        "T1110.001",
+    ],
+    "alibaba_cis_1_11": [
+        "T1110.001",
+    ],
+    "alibaba_cis_1_12": [
+        "T1110.001",
+    ],
+    "alibaba_cis_1_13": [
+        "T1110.001", "T1078.004",
+    ],
+    "alibaba_cis_1_14": [
+        "T1110",
+    ],
+    "alibaba_cis_1_15": [
+        "T1098.003", "T1078.004",
+    ],
+    "alibaba_cis_1_16": [
+        "T1098.003",
+    ],
+    "alibaba_cis_2_1": [
+        "T1562.008",
+    ],
+    "alibaba_cis_2_2": [
+        "T1530", "T1562.008",
+    ],
+    "alibaba_cis_2_3": [
+        "T1562.008",
+    ],
+    "alibaba_cis_2_4": [
+        "T1562.008", "T1525",
+    ],
+    "alibaba_cis_2_5": [
+        "T1562.008", "T1580",
+    ],
+    "alibaba_cis_2_6": [
+        "T1562.008", "T1498",
+    ],
+    "alibaba_cis_2_7": [
+        "T1562.008", "T1190",
+    ],
+    "alibaba_cis_2_8": [
+        "T1562.008", "T1562.001",
+    ],
+    "alibaba_cis_2_9": [
+        "T1562.008", "T1562.001",
+    ],
+    "alibaba_cis_2_10": [
+        "T1562.008", "T1098.003",
+    ],
+    "alibaba_cis_2_11": [
+        "T1562.008", "T1562.001",
+    ],
+    "alibaba_cis_2_12": [
+        "T1562.008",
+    ],
+    "alibaba_cis_2_13": [
+        "T1562.008", "T1580",
+    ],
+    "alibaba_cis_2_14": [
+        "T1562.008", "T1530",
+    ],
+    "alibaba_cis_2_15": [
+        "T1562.008",
+    ],
+    "alibaba_cis_2_16": [
+        "T1562.008", "T1059.009",
+    ],
+    "alibaba_cis_2_17": [
+        "T1562.008", "T1078.004",
+    ],
+    "alibaba_cis_2_18": [
+        "T1562.008", "T1078.001",
+    ],
+    "alibaba_cis_2_19": [
+        "T1562.008", "T1110",
+    ],
+    "alibaba_cis_2_20": [
+        "T1562.008", "T1485",
+    ],
+    "alibaba_cis_2_21": [
+        "T1562.008", "T1530",
+    ],
+    "alibaba_cis_2_22": [
+        "T1562.008", "T1562.001",
+    ],
+    "alibaba_cis_2_23": [
+        "T1562.008",
+    ],
+    "alibaba_cis_3_1": [
+        "T1190", "T1580",
+    ],
+    "alibaba_cis_3_2": [
+        "T1021.004", "T1190",
+    ],
+    "alibaba_cis_3_3": [
+        "T1562.008", "T1580",
+    ],
+    "alibaba_cis_3_4": [
+        "T1199", "T1580",
+    ],
+    "alibaba_cis_3_5": [
+        "T1190",
+    ],
+    "alibaba_cis_4_1": [
+        "T1530",
+    ],
+    "alibaba_cis_4_2": [
+        "T1530",
+    ],
+    "alibaba_cis_4_3": [
+        "T1021.004", "T1190",
+    ],
+    "alibaba_cis_4_4": [
+        "T1021.001", "T1190",
+    ],
+    "alibaba_cis_4_5": [
+        "T1190", "T1203",
+    ],
+    "alibaba_cis_4_6": [
+        "T1562.001",
+    ],
+    "alibaba_cis_5_1": [
+        "T1530", "T1190",
+    ],
+    "alibaba_cis_5_2": [
+        "T1530",
+    ],
+    "alibaba_cis_5_3": [
+        "T1562.008", "T1530",
+    ],
+    "alibaba_cis_5_4": [
+        "T1557",
+    ],
+    "alibaba_cis_5_5": [
+        "T1528",
+    ],
+    "alibaba_cis_5_6": [
+        "T1557",
+    ],
+    "alibaba_cis_5_7": [
+        "T1190", "T1530",
+    ],
+    "alibaba_cis_5_8": [
+        "T1530",
+    ],
+    "alibaba_cis_5_9": [
+        "T1530",
+    ],
+    "alibaba_cis_6_1": [
+        "T1557", "T1213",
+    ],
+    "alibaba_cis_6_2": [
+        "T1190", "T1213",
+    ],
+    "alibaba_cis_6_3": [
+        "T1562.008",
+    ],
+    "alibaba_cis_6_4": [
+        "T1562.008",
+    ],
+    "alibaba_cis_6_5": [
+        "T1530", "T1213",
+    ],
+    "alibaba_cis_6_6": [
+        "T1530", "T1552",
+    ],
+    "alibaba_cis_6_7": [
+        "T1562.008",
+    ],
+    "alibaba_cis_6_8": [
+        "T1562.008",
+    ],
+    "alibaba_cis_6_9": [
+        "T1562.008",
+    ],
+    "alibaba_cis_7_1": [
+        "T1562.008", "T1525",
+    ],
+    "alibaba_cis_7_2": [
+        "T1562.001",
+    ],
+    "alibaba_cis_7_3": [
+        "T1098.003", "T1078.004",
+    ],
+    "alibaba_cis_7_4": [
+        "T1190",
+    ],
+    "alibaba_cis_7_5": [
+        "T1538",
+    ],
+    "alibaba_cis_7_6": [
+        "T1110", "T1078.004",
+    ],
+    "alibaba_cis_7_7": [
+        "T1190",
+    ],
+    "alibaba_cis_7_8": [
+        "T1190",
+    ],
+    "alibaba_cis_7_9": [
+        "T1190", "T1580",
+    ],
+    "alibaba_cis_8_1": [
+        "T1562.001",
+    ],
+    "alibaba_cis_8_2": [
+        "T1562.001",
+    ],
+    "alibaba_cis_8_3": [
+        "T1562.001",
+    ],
+    "alibaba_cis_8_4": [
+        "T1505", "T1190",
+    ],
+    "alibaba_cis_8_5": [
+        "T1562.001",
+    ],
+    "alibaba_cis_8_6": [
+        "T1562.001", "T1580",
+    ],
+    "alibaba_cis_8_7": [
+        "T1190",
+    ],
+    "alibaba_cis_8_8": [
+        "T1580",
+    ],
+    # -----------------------------------------------------------------------
+    # CIS IBM Cloud v2.0
+    # -----------------------------------------------------------------------
+    "ibm_cis_1_1": [
+        "T1078.001",
+    ],
+    "ibm_cis_1_2": [
+        "T1552", "T1078.004",
+    ],
+    "ibm_cis_1_3": [
+        "T1552", "T1528",
+    ],
+    "ibm_cis_1_4": [
+        "T1098.001",
+    ],
+    "ibm_cis_1_5": [
+        "T1078.001", "T1552",
+    ],
+    "ibm_cis_1_6": [
+        "T1078.004", "T1110",
+    ],
+    "ibm_cis_1_7": [
+        "T1078.004", "T1110",
+    ],
+    "ibm_cis_1_8": [
+        "T1078.004", "T1110",
+    ],
+    "ibm_cis_1_9": [
+        "T1078.004",
+    ],
+    "ibm_cis_1_10": [
+        "T1078.004",
+    ],
+    "ibm_cis_1_11": [
+        "T1552.005", "T1078.004",
+    ],
+    "ibm_cis_1_12": [
+        "T1190",
+    ],
+    "ibm_cis_1_13": [
+        "T1199", "T1078.004",
+    ],
+    "ibm_cis_1_14": [
+        "T1098.003",
+    ],
+    "ibm_cis_1_15": [
+        "T1098.003",
+    ],
+    "ibm_cis_1_16": [
+        "T1078.004", "T1098.003",
+    ],
+    "ibm_cis_1_17": [
+        "T1078.004", "T1098.003",
+    ],
+    "ibm_cis_1_18": [
+        "T1190", "T1530",
+    ],
+    "ibm_cis_1_19": [
+        "T1078.004", "T1552",
+    ],
+    "ibm_cis_1_20": [
+        "T1562.008",
+    ],
+    "ibm_cis_2_1_1_1": [
+        "T1530",
+    ],
+    "ibm_cis_2_1_1_2": [
+        "T1530",
+    ],
+    "ibm_cis_2_1_1_3": [
+        "T1530",
+    ],
+    "ibm_cis_2_1_2": [
+        "T1190", "T1530",
+    ],
+    "ibm_cis_2_1_3": [
+        "T1190", "T1530",
+    ],
+    "ibm_cis_2_1_4": [
+        "T1530",
+    ],
+    "ibm_cis_2_1_5": [
+        "T1530", "T1190",
+    ],
+    "ibm_cis_2_2_1_1": [
+        "T1530",
+    ],
+    "ibm_cis_2_2_1_2": [
+        "T1530",
+    ],
+    "ibm_cis_2_2_2_1": [
+        "T1530",
+    ],
+    "ibm_cis_2_2_2_2": [
+        "T1530",
+    ],
+    "ibm_cis_2_2_2_3": [
+        "T1530",
+    ],
+    "ibm_cis_2_2_3": [
+        "T1530",
+    ],
+    "ibm_cis_2_2_4": [
+        "T1530",
+    ],
+    "ibm_cis_2_2_5": [
+        "T1530",
+    ],
+    "ibm_cis_3_1": [
+        "T1562.008",
+    ],
+    "ibm_cis_3_2": [
+        "T1562.008",
+    ],
+    "ibm_cis_3_3": [
+        "T1562.008", "T1562.001",
+    ],
+    "ibm_cis_3_4": [
+        "T1562.008", "T1562.001",
+    ],
+    "ibm_cis_3_5": [
+        "T1078.001", "T1190",
+    ],
+    "ibm_cis_3_6": [
+        "T1530", "T1562.008",
+    ],
+    "ibm_cis_4_1": [
+        "T1530", "T1213",
+    ],
+    "ibm_cis_4_2": [
+        "T1190", "T1213",
+    ],
+    "ibm_cis_4_3": [
+        "T1190",
+    ],
+    "ibm_cis_5_1": [
+        "T1530", "T1213",
+    ],
+    "ibm_cis_6_1_1": [
+        "T1557", "T1190",
+    ],
+    "ibm_cis_6_1_2": [
+        "T1190",
+    ],
+    "ibm_cis_6_1_3": [
+        "T1498", "T1190",
+    ],
+    "ibm_cis_6_2_1": [
+        "T1021.004", "T1190",
+    ],
+    "ibm_cis_6_2_2": [
+        "T1190", "T1078.001",
+    ],
+    "ibm_cis_6_2_3": [
+        "T1021.001", "T1190",
+    ],
+    "ibm_cis_6_2_4": [
+        "T1021.004", "T1190",
+    ],
+    "ibm_cis_6_2_5": [
+        "T1021.001", "T1190",
+    ],
+    "ibm_cis_7_1_1": [
+        "T1552", "T1530",
+    ],
+    "ibm_cis_7_1_2": [
+        "T1557", "T1190",
+    ],
+    "ibm_cis_7_1_3": [
+        "T1190", "T1203",
+    ],
+    "ibm_cis_7_1_4": [
+        "T1525",
+    ],
+    "ibm_cis_7_1_5": [
+        "T1562.001",
+    ],
+    "ibm_cis_7_1_6": [
+        "T1562.008",
+    ],
+    "ibm_cis_8_1_1_1": [
+        "T1552", "T1528",
+    ],
+    "ibm_cis_8_1_1_2": [
+        "T1485", "T1489",
+    ],
+    "ibm_cis_8_1_1_3": [
+        "T1530",
+    ],
+    "ibm_cis_8_2_1": [
+        "T1552", "T1528",
+    ],
+    "ibm_cis_8_2_2": [
+        "T1098.003", "T1552",
+    ],
+    "ibm_cis_8_2_3": [
+        "T1562.001",
+    ],
+    "ibm_cis_8_2_4": [
+        "T1552", "T1528",
+    ],
+    "ibm_cis_9_1": [
+        "T1190",
+    ],
+    "ibm_cis_9_2": [
+        "T1021.001", "T1190",
+    ],
+    "ibm_cis_9_3": [
+        "T1021.004", "T1190",
+    ],
+    "ibm_cis_9_4": [
+        "T1190",
+    ],
+    "ibm_cis_9_5": [
+        "T1021.004", "T1021.001", "T1190",
+    ],
+    "ibm_cis_9_6": [
+        "T1190", "T1530",
+    ],
+    "ibm_cis_9_7": [
+        "T1190",
+    ],
+    # -----------------------------------------------------------------------
+    # CIS M365 v6.0.1
+    # -----------------------------------------------------------------------
+    "m365_cis_1_1_1": [
+        "T1078.004", "T1078.001",
+    ],
+    "m365_cis_1_1_2": [
+        "T1531", "T1078.004",
+    ],
+    "m365_cis_1_1_3": [
+        "T1078.004", "T1098.003",
+    ],
+    "m365_cis_1_1_4": [
+        "T1078.004",
+    ],
+    "m365_cis_1_2_1": [
+        "T1136.003",
+    ],
+    "m365_cis_1_2_2": [
+        "T1078.004", "T1114",
+    ],
+    "m365_cis_1_3_1": [
+        "T1110",
+    ],
+    "m365_cis_1_3_2": [
+        "T1550.001",
+    ],
+    "m365_cis_1_3_3": [
+        "T1530",
+    ],
+    "m365_cis_1_3_4": [
+        "T1525",
+    ],
+    "m365_cis_1_3_5": [
+        "T1566",
+    ],
+    "m365_cis_1_3_6": [
+        "T1530",
+    ],
+    "m365_cis_1_3_7": [
+        "T1537",
+    ],
+    "m365_cis_1_3_8": [
+        "T1530",
+    ],
+    "m365_cis_1_3_9": [
+        "T1530",
+    ],
+    "m365_cis_2_1_1": [
+        "T1566.002",
+    ],
+    "m365_cis_2_1_2": [
+        "T1566.001",
+    ],
+    "m365_cis_2_1_3": [
+        "T1566.001",
+    ],
+    "m365_cis_2_1_4": [
+        "T1566.001",
+    ],
+    "m365_cis_2_1_5": [
+        "T1566.001", "T1204",
+    ],
+    "m365_cis_2_1_6": [
+        "T1566",
+    ],
+    "m365_cis_2_1_7": [
+        "T1566.002", "T1534",
+    ],
+    "m365_cis_2_1_8": [
+        "T1566.002",
+    ],
+    "m365_cis_2_1_9": [
+        "T1566.002",
+    ],
+    "m365_cis_2_1_10": [
+        "T1566.002",
+    ],
+    "m365_cis_2_1_11": [
+        "T1566.001",
+    ],
+    "m365_cis_2_1_12": [
+        "T1566",
+    ],
+    "m365_cis_2_1_13": [
+        "T1566",
+    ],
+    "m365_cis_2_1_14": [
+        "T1566",
+    ],
+    "m365_cis_2_1_15": [
+        "T1566",
+    ],
+    "m365_cis_2_2_1": [
+        "T1078.004", "T1562.008",
+    ],
+    "m365_cis_2_4_1": [
+        "T1566.002", "T1534",
+    ],
+    "m365_cis_2_4_2": [
+        "T1566.002",
+    ],
+    "m365_cis_2_4_3": [
+        "T1538", "T1526",
+    ],
+    "m365_cis_2_4_4": [
+        "T1566.001",
+    ],
+    "m365_cis_3_1_1": [
+        "T1562.008",
+    ],
+    "m365_cis_3_2_1": [
+        "T1530", "T1537",
+    ],
+    "m365_cis_3_2_2": [
+        "T1530", "T1537",
+    ],
+    "m365_cis_3_3_1": [
+        "T1530",
+    ],
+    "m365_cis_4_1": [
+        "T1078.004",
+    ],
+    "m365_cis_4_2": [
+        "T1078.004",
+    ],
+    "m365_cis_5_1_2_1": [
+        "T1078.004", "T1110",
+    ],
+    "m365_cis_5_1_2_2": [
+        "T1550.001", "T1528",
+    ],
+    "m365_cis_5_1_2_3": [
+        "T1136.003",
+    ],
+    "m365_cis_5_1_2_4": [
+        "T1538",
+    ],
+    "m365_cis_5_1_2_5": [
+        "T1550.001",
+    ],
+    "m365_cis_5_1_2_6": [
+        "T1589",
+    ],
+    "m365_cis_5_1_3_1": [
+        "T1078.004",
+    ],
+    "m365_cis_5_1_3_2": [
+        "T1136.003",
+    ],
+    "m365_cis_5_1_4_1": [
+        "T1078.004",
+    ],
+    "m365_cis_5_1_4_2": [
+        "T1078.004",
+    ],
+    "m365_cis_5_1_4_3": [
+        "T1078.004", "T1098.003",
+    ],
+    "m365_cis_5_1_4_4": [
+        "T1098.003",
+    ],
+    "m365_cis_5_1_4_5": [
+        "T1552",
+    ],
+    "m365_cis_5_1_4_6": [
+        "T1552",
+    ],
+    "m365_cis_5_1_5_1": [
+        "T1528", "T1550.001",
+    ],
+    "m365_cis_5_1_5_2": [
+        "T1528",
+    ],
+    "m365_cis_5_1_6_1": [
+        "T1199", "T1078.004",
+    ],
+    "m365_cis_5_1_6_2": [
+        "T1078.004",
+    ],
+    "m365_cis_5_1_6_3": [
+        "T1078.004", "T1136.003",
+    ],
+    "m365_cis_5_1_8_1": [
+        "T1110", "T1552",
+    ],
+    "m365_cis_5_2_2_1": [
+        "T1078.004", "T1110",
+    ],
+    "m365_cis_5_2_2_2": [
+        "T1078.004", "T1110",
+    ],
+    "m365_cis_5_2_2_3": [
+        "T1078.004", "T1110",
+    ],
+    "m365_cis_5_2_2_4": [
+        "T1550.001",
+    ],
+    "m365_cis_5_2_2_5": [
+        "T1621", "T1078.004",
+    ],
+    "m365_cis_5_2_2_6": [
+        "T1078.004",
+    ],
+    "m365_cis_5_2_2_7": [
+        "T1078.004",
+    ],
+    "m365_cis_5_2_2_8": [
+        "T1078.004",
+    ],
+    "m365_cis_5_2_2_9": [
+        "T1078.004",
+    ],
+    "m365_cis_5_2_2_10": [
+        "T1078.004", "T1556",
+    ],
+    "m365_cis_5_2_2_11": [
+        "T1078.004",
+    ],
+    "m365_cis_5_2_2_12": [
+        "T1078.004",
+    ],
+    "m365_cis_5_2_3_1": [
+        "T1621",
+    ],
+    "m365_cis_5_2_3_2": [
+        "T1110",
+    ],
+    "m365_cis_5_2_3_3": [
+        "T1110",
+    ],
+    "m365_cis_5_2_3_4": [
+        "T1078.004", "T1110",
+    ],
+    "m365_cis_5_2_3_5": [
+        "T1556", "T1110",
+    ],
+    "m365_cis_5_2_3_6": [
+        "T1621",
+    ],
+    "m365_cis_5_2_3_7": [
+        "T1621", "T1556",
+    ],
+    "m365_cis_5_2_4_1": [
+        "T1110",
+    ],
+    "m365_cis_5_3_1": [
+        "T1078.004", "T1098.003",
+    ],
+    "m365_cis_5_3_2": [
+        "T1078.004",
+    ],
+    "m365_cis_5_3_3": [
+        "T1078.004", "T1098.003",
+    ],
+    "m365_cis_5_3_4": [
+        "T1078.004", "T1098.003",
+    ],
+    "m365_cis_5_3_5": [
+        "T1078.004", "T1098.003",
+    ],
+    "m365_cis_6_1_1": [
+        "T1562.008",
+    ],
+    "m365_cis_6_1_2": [
+        "T1562.008",
+    ],
+    "m365_cis_6_1_3": [
+        "T1562.008",
+    ],
+    "m365_cis_6_2_1": [
+        "T1114.003",
+    ],
+    "m365_cis_6_2_2": [
+        "T1114", "T1566",
+    ],
+    "m365_cis_6_2_3": [
+        "T1566.002",
+    ],
+    "m365_cis_6_3_1": [
+        "T1137",
+    ],
+    "m365_cis_6_5_1": [
+        "T1110", "T1078.004",
+    ],
+    "m365_cis_6_5_2": [
+        "T1566.002",
+    ],
+    "m365_cis_6_5_3": [
+        "T1537",
+    ],
+    "m365_cis_6_5_4": [
+        "T1110", "T1078.004",
+    ],
+    "m365_cis_6_5_5": [
+        "T1566",
+    ],
+    "m365_cis_7_2_1": [
+        "T1110", "T1078.004",
+    ],
+    "m365_cis_7_2_2": [
+        "T1078.004",
+    ],
+    "m365_cis_7_2_3": [
+        "T1530", "T1537",
+    ],
+    "m365_cis_7_2_4": [
+        "T1530",
+    ],
+    "m365_cis_7_2_5": [
+        "T1530",
+    ],
+    "m365_cis_7_2_6": [
+        "T1530", "T1537",
+    ],
+    "m365_cis_7_2_7": [
+        "T1530",
+    ],
+    "m365_cis_7_2_8": [
+        "T1530",
+    ],
+    "m365_cis_7_2_9": [
+        "T1078.004",
+    ],
+    "m365_cis_7_2_10": [
+        "T1078.004",
+    ],
+    "m365_cis_7_2_11": [
+        "T1530",
+    ],
+    "m365_cis_7_3_1": [
+        "T1566.001", "T1204",
+    ],
+    "m365_cis_7_3_2": [
+        "T1530", "T1537",
+    ],
+    "m365_cis_7_3_3": [
+        "T1059.009",
+    ],
+    "m365_cis_7_3_4": [
+        "T1059.009",
+    ],
+    "m365_cis_8_1_1": [
+        "T1537",
+    ],
+    "m365_cis_8_1_2": [
+        "T1566",
+    ],
+    "m365_cis_8_2_1": [
+        "T1199", "T1078.004",
+    ],
+    "m365_cis_8_2_2": [
+        "T1199",
+    ],
+    "m365_cis_8_2_3": [
+        "T1566", "T1199",
+    ],
+    "m365_cis_8_2_4": [
+        "T1199", "T1566",
+    ],
+    "m365_cis_8_4_1": [
+        "T1528", "T1525",
+    ],
+    "m365_cis_8_5_1": [
+        "T1078.004",
+    ],
+    "m365_cis_8_5_2": [
+        "T1078.004",
+    ],
+    "m365_cis_8_5_3": [
+        "T1078.004",
+    ],
+    "m365_cis_8_5_4": [
+        "T1078.004",
+    ],
+    "m365_cis_8_5_5": [
+        "T1530",
+    ],
+    "m365_cis_8_5_6": [
+        "T1530",
+    ],
+    "m365_cis_8_5_7": [
+        "T1530",
+    ],
+    "m365_cis_8_5_8": [
+        "T1530",
+    ],
+    "m365_cis_8_5_9": [
+        "T1530", "T1213",
+    ],
+    "m365_cis_8_6_1": [
+        "T1566",
+    ],
+    "m365_cis_9_1_1": [
+        "T1078.004", "T1530",
+    ],
+    "m365_cis_9_1_2": [
+        "T1078.004",
+    ],
+    "m365_cis_9_1_3": [
+        "T1530",
+    ],
+    "m365_cis_9_1_4": [
+        "T1530", "T1537",
+    ],
+    "m365_cis_9_1_5": [
+        "T1059",
+    ],
+    "m365_cis_9_1_6": [
+        "T1530",
+    ],
+    "m365_cis_9_1_7": [
+        "T1530",
+    ],
+    "m365_cis_9_1_8": [
+        "T1530", "T1537",
+    ],
+    "m365_cis_9_1_9": [
+        "T1078.004",
+    ],
+    "m365_cis_9_1_10": [
+        "T1078.004", "T1528",
+    ],
+    "m365_cis_9_1_11": [
+        "T1136.003",
+    ],
+    "m365_cis_9_1_12": [
+        "T1136.003",
+    ],
+    # -----------------------------------------------------------------------
+    # CIS Google Workspace v1.3.0
+    # -----------------------------------------------------------------------
+    "gws_cis_1_1_1": [
+        "T1078.004", "T1531",
+    ],
+    "gws_cis_1_1_2": [
+        "T1078.004", "T1098.003",
+    ],
+    "gws_cis_1_1_3": [
+        "T1078.004",
+    ],
+    "gws_cis_1_2_1_1": [
+        "T1589",
+    ],
+    "gws_cis_3_1_1_1_1": [
+        "T1530",
+    ],
+    "gws_cis_3_1_1_1_2": [
+        "T1530",
+    ],
+    "gws_cis_3_1_1_1_3": [
+        "T1566",
+    ],
+    "gws_cis_3_1_1_2_1": [
+        "T1530",
+    ],
+    "gws_cis_3_1_1_2_2": [
+        "T1530",
+    ],
+    "gws_cis_3_1_1_3_1": [
+        "T1530",
+    ],
+    "gws_cis_3_1_2_1_1_1": [
+        "T1530", "T1537",
+    ],
+    "gws_cis_3_1_2_1_1_2": [
+        "T1530",
+    ],
+    "gws_cis_3_1_2_1_1_3": [
+        "T1530",
+    ],
+    "gws_cis_3_1_2_1_1_4": [
+        "T1530",
+    ],
+    "gws_cis_3_1_2_1_1_5": [
+        "T1530",
+    ],
+    "gws_cis_3_1_2_1_1_6": [
+        "T1530", "T1537",
+    ],
+    "gws_cis_3_1_2_1_2_1": [
+        "T1530",
+    ],
+    "gws_cis_3_1_2_1_2_2": [
+        "T1098.003",
+    ],
+    "gws_cis_3_1_2_1_2_3": [
+        "T1530",
+    ],
+    "gws_cis_3_1_2_1_2_4": [
+        "T1530", "T1537",
+    ],
+    "gws_cis_3_1_2_2_1": [
+        "T1530",
+    ],
+    "gws_cis_3_1_2_2_2": [
+        "T1530", "T1537",
+    ],
+    "gws_cis_3_1_2_2_3": [
+        "T1525",
+    ],
+    "gws_cis_3_1_3_1_1": [
+        "T1114",
+    ],
+    "gws_cis_3_1_3_1_2": [
+        "T1114",
+    ],
+    "gws_cis_3_1_3_2_1": [
+        "T1566.002",
+    ],
+    "gws_cis_3_1_3_2_2": [
+        "T1566.002",
+    ],
+    "gws_cis_3_1_3_2_3": [
+        "T1566.002",
+    ],
+    "gws_cis_3_1_3_3_1": [
+        "T1566.001",
+    ],
+    "gws_cis_3_1_3_4_1_1": [
+        "T1566.001",
+    ],
+    "gws_cis_3_1_3_4_1_2": [
+        "T1566.001",
+    ],
+    "gws_cis_3_1_3_4_1_3": [
+        "T1566.001",
+    ],
+    "gws_cis_3_1_3_4_2_1": [
+        "T1566.002",
+    ],
+    "gws_cis_3_1_3_4_2_2": [
+        "T1566.002",
+    ],
+    "gws_cis_3_1_3_4_2_3": [
+        "T1566.002",
+    ],
+    "gws_cis_3_1_3_4_3_1": [
+        "T1566.002",
+    ],
+    "gws_cis_3_1_3_4_3_2": [
+        "T1534",
+    ],
+    "gws_cis_3_1_3_4_3_3": [
+        "T1566.002",
+    ],
+    "gws_cis_3_1_3_4_3_4": [
+        "T1566",
+    ],
+    "gws_cis_3_1_3_4_3_5": [
+        "T1566.002",
+    ],
+    "gws_cis_3_1_3_5_1": [
+        "T1110", "T1078.004",
+    ],
+    "gws_cis_3_1_3_5_2": [
+        "T1114.003",
+    ],
+    "gws_cis_3_1_3_5_3": [
+        "T1114.003",
+    ],
+    "gws_cis_3_1_3_5_4": [
+        "T1566",
+    ],
+    "gws_cis_3_1_3_6_1": [
+        "T1566.001",
+    ],
+    "gws_cis_3_1_3_6_2": [
+        "T1566",
+    ],
+    "gws_cis_3_1_3_7_1": [
+        "T1562.008",
+    ],
+    "gws_cis_3_1_3_7_2": [
+        "T1557",
+    ],
+    "gws_cis_3_1_4_1_1": [
+        "T1530", "T1537",
+    ],
+    "gws_cis_3_1_4_1_2": [
+        "T1530",
+    ],
+    "gws_cis_3_1_4_2_1": [
+        "T1199",
+    ],
+    "gws_cis_3_1_4_3_1": [
+        "T1199",
+    ],
+    "gws_cis_3_1_4_4_1": [
+        "T1525",
+    ],
+    "gws_cis_3_1_4_4_2": [
+        "T1525",
+    ],
+    "gws_cis_3_1_6_1": [
+        "T1530",
+    ],
+    "gws_cis_3_1_6_2": [
+        "T1136.003",
+    ],
+    "gws_cis_3_1_6_3": [
+        "T1530",
+    ],
+    "gws_cis_3_1_7_1": [
+        "T1530",
+    ],
+    "gws_cis_3_1_8_1": [
+        "T1530",
+    ],
+    "gws_cis_3_1_9_1_1": [
+        "T1525", "T1528",
+    ],
+    "gws_cis_4_1_1_1": [
+        "T1078.004", "T1110",
+    ],
+    "gws_cis_4_1_1_2": [
+        "T1621", "T1078.004",
+    ],
+    "gws_cis_4_1_1_3": [
+        "T1078.004", "T1110",
+    ],
+    "gws_cis_4_1_2_1": [
+        "T1078.004",
+    ],
+    "gws_cis_4_1_2_2": [
+        "T1078.004",
+    ],
+    "gws_cis_4_1_3_1": [
+        "T1078.004",
+    ],
+    "gws_cis_4_1_4_1": [
+        "T1078.004",
+    ],
+    "gws_cis_4_1_5_1": [
+        "T1110",
+    ],
+    "gws_cis_4_2_1_1": [
+        "T1528",
+    ],
+    "gws_cis_4_2_1_2": [
+        "T1528",
+    ],
+    "gws_cis_4_2_1_3": [
+        "T1528",
+    ],
+    "gws_cis_4_2_1_4": [
+        "T1528", "T1078.004",
+    ],
+    "gws_cis_4_2_2_1": [
+        "T1078.004",
+    ],
+    "gws_cis_4_2_3_1": [
+        "T1530", "T1537",
+    ],
+    "gws_cis_4_2_4_1": [
+        "T1550.001",
+    ],
+    "gws_cis_4_2_5_1": [
+        "T1550.001",
+    ],
+    "gws_cis_4_2_6_1": [
+        "T1110", "T1078.004",
+    ],
+    "gws_cis_4_3_1": [
+        "T1562.008",
+    ],
+    "gws_cis_4_3_2": [
+        "T1562.008",
+    ],
+    "gws_cis_5_1_1_1": [
+        "T1528",
+    ],
+    "gws_cis_5_1_1_2": [
+        "T1562.008",
+    ],
+    "gws_cis_6_1": [
+        "T1078.004",
+    ],
+    "gws_cis_6_2": [
+        "T1078.004",
+    ],
+    "gws_cis_6_3": [
+        "T1078.004",
+    ],
+    "gws_cis_6_4": [
+        "T1098.003",
+    ],
+    "gws_cis_6_5": [
+        "T1078.004",
+    ],
+    "gws_cis_6_6": [
+        "T1078.004", "T1110",
+    ],
+    "gws_cis_6_7": [
+        "T1552",
+    ],
+    "gws_cis_6_8": [
+        "T1534",
+    ],
+    # -----------------------------------------------------------------------
+    # CIS Snowflake v1.0.0
+    # -----------------------------------------------------------------------
+    "sf_cis_1_1": [
+        "T1078", "T1556",
+    ],
+    "sf_cis_1_2": [
+        "T1136", "T1078",
+    ],
+    "sf_cis_1_3": [
+        "T1078.004", "T1110",
+    ],
+    "sf_cis_1_4": [
+        "T1078.004", "T1110", "T1621",
+    ],
+    "sf_cis_1_5": [
+        "T1110", "T1110.001",
+    ],
+    "sf_cis_1_6": [
+        "T1078.004", "T1552",
+    ],
+    "sf_cis_1_7": [
+        "T1552.004", "T1078.004",
+    ],
+    "sf_cis_1_8": [
+        "T1078", "T1078.004",
+    ],
+    "sf_cis_1_9": [
+        "T1563", "T1078",
+    ],
+    "sf_cis_1_10": [
+        "T1078.004", "T1098",
+    ],
+    "sf_cis_1_11": [
+        "T1078.004",
+    ],
+    "sf_cis_1_12": [
+        "T1078.004", "T1548",
+    ],
+    "sf_cis_1_13": [
+        "T1098", "T1548",
+    ],
+    "sf_cis_1_14": [
+        "T1053", "T1548",
+    ],
+    "sf_cis_1_15": [
+        "T1053", "T1548",
+    ],
+    "sf_cis_1_16": [
+        "T1059", "T1548",
+    ],
+    "sf_cis_1_17": [
+        "T1059", "T1548",
+    ],
+    "sf_cis_2_1": [
+        "T1098", "T1078",
+    ],
+    "sf_cis_2_2": [
+        "T1098", "T1222",
+    ],
+    "sf_cis_2_3": [
+        "T1078.004", "T1556",
+    ],
+    "sf_cis_2_4": [
+        "T1078.004", "T1110",
+    ],
+    "sf_cis_2_5": [
+        "T1556", "T1562",
+    ],
+    "sf_cis_2_6": [
+        "T1562.007",
+    ],
+    "sf_cis_2_7": [
+        "T1528", "T1550.001",
+    ],
+    "sf_cis_2_8": [
+        "T1537", "T1567",
+    ],
+    "sf_cis_2_9": [
+        "T1190", "T1203",
+    ],
+    "sf_cis_3_1": [
+        "T1190", "T1078.004",
+    ],
+    "sf_cis_3_2": [
+        "T1078.004", "T1552",
+    ],
+    "sf_cis_4_1": [
+        "T1530", "T1552.004",
+    ],
+    "sf_cis_4_2": [
+        "T1530",
+    ],
+    "sf_cis_4_3": [
+        "T1485", "T1490",
+    ],
+    "sf_cis_4_4": [
+        "T1485", "T1490",
+    ],
+    "sf_cis_4_5": [
+        "T1530", "T1537",
+    ],
+    "sf_cis_4_6": [
+        "T1530", "T1537",
+    ],
+    "sf_cis_4_7": [
+        "T1530", "T1567",
+    ],
+    "sf_cis_4_8": [
+        "T1567", "T1537",
+    ],
+    "sf_cis_4_9": [
+        "T1530", "T1552.004",
+    ],
+    "sf_cis_4_10": [
+        "T1530", "T1213",
+    ],
+    "sf_cis_4_11": [
+        "T1530", "T1213",
     ],
 }
 
