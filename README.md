@@ -13,12 +13,12 @@ D-ARCA is a comprehensive CSPM platform that combines cloud infrastructure secur
 - [Development Setup](#development-setup)
 - [Features](#features)
 - [Cloud Security Scanning](#cloud-security-scanning)
-  - [AWS](#aws-20-services-50-checks)
-  - [Azure](#azure-8-services-20-checks)
-  - [GCP](#gcp-8-services-15-checks)
-  - [Kubernetes](#kubernetes-4-categories-10-checks)
-  - [OCI](#oci--oracle-cloud-infrastructure-18-services-60-checks)
-  - [Alibaba Cloud](#alibaba-cloud-12-services-70-checks)
+  - [AWS](#aws-30-services-95-checks)
+  - [Azure](#azure-17-services-127-checks)
+  - [GCP](#gcp-15-services-121-checks)
+  - [Kubernetes](#kubernetes-8-categories-17-checks)
+  - [OCI](#oci--oracle-cloud-infrastructure-18-services-63-checks)
+  - [Alibaba Cloud](#alibaba-cloud-12-services-57-checks)
 - [SaaS Security Scanning](#saas-security-scanning)
 - [Advanced Security Modules](#advanced-security-modules)
   - [Attack Path Analysis](#attack-path-analysis)
@@ -176,10 +176,10 @@ The API reloads on file changes automatically. The frontend runs on http://local
 - Per-framework pass rate calculation (per-unique-check, not per-resource)
 - Visual progress rings and Check Library with control descriptions
 - Framework descriptions, metadata, and per-cloud check mappings
-- **Custom Framework Builder**: Create your own frameworks by selecting from 1,600+ registry checks and/or defining custom controls
+- **Custom Framework Builder**: Create your own frameworks by selecting from 1,188 registry checks and/or defining custom controls
 
 ### Custom Framework Builder
-- Create user-defined compliance frameworks integrated with the Check Registry (1,600+ CIS and scanner checks)
+- Create user-defined compliance frameworks integrated with the Check Registry (1,188 CIS and scanner checks)
 - **3 ways to build**: select existing checks from the registry, create custom controls, or bulk-import via Excel
 - 3-step creation wizard: metadata (name, description, providers) -> check selection -> review
 - Custom controls with automatic `assessment_type` detection: if mapped `scanner_check_ids` exist in the registry -> automated, otherwise -> manual
@@ -289,75 +289,105 @@ The API reloads on file changes automatically. The frontend runs on http://local
 
 ## Cloud Security Scanning
 
-### AWS (20 services, 50+ checks)
+### AWS (30 services, 95 checks)
 
 | Service          | Checks                                                   |
 |------------------|----------------------------------------------------------|
-| **IAM**          | Root MFA, password policy, user MFA, access key rotation |
-| **S3**           | Public access block, encryption, versioning, logging     |
-| **EC2**          | Security groups (22/3389/all), EBS encryption, IMDSv2    |
-| **RDS**          | Encryption, public access, Multi-AZ, backups             |
-| **CloudTrail**   | Enabled, multi-region, log validation, KMS encryption    |
+| **IAM**          | Root MFA, password policy, user MFA, access key rotation, inline policies, group-only permissions, admin access, Support role, CloudShell, SSL/TLS certs, Access Analyzer |
+| **S3**           | Public access block, encryption, versioning, logging, SSL/TLS, MFA Delete, Object Lock |
+| **EC2**          | EBS encryption, IMDSv2, default SG, wide port ranges, EBS default encryption, public IP |
+| **RDS**          | Encryption, public access, Multi-AZ, backups, auto minor upgrade, deletion protection, IAM auth |
+| **CloudTrail**   | Enabled, multi-region, log validation, KMS encryption, S3 logging, object-level events, CloudWatch integration |
 | **KMS**          | Key rotation for customer-managed keys                   |
-| **VPC**          | Flow logs enabled                                        |
-| **Lambda**       | Runtime deprecation, VPC configuration                   |
+| **VPC**          | Flow logs, default SG restrictions, NACL unrestricted inbound |
+| **Lambda**       | Supported runtime, environment variable secrets, VPC configuration |
 | **ECS**          | Container Insights enabled                               |
 | **GuardDuty**    | Detector enabled per region                              |
 | **Config**       | Configuration recorder enabled                           |
-| **SNS**          | Topic encryption (KMS)                                   |
+| **SNS**          | Topic encryption, public access                          |
 | **SQS**          | Queue encryption (KMS/SSE)                               |
 | **SecretsManager** | Secret rotation enabled                                |
 | **Elasticsearch** | Encryption at rest, node-to-node encryption             |
 | **CloudWatch**   | Log group encryption, retention policy                   |
 | **DynamoDB**     | KMS encryption, PITR enabled                             |
 | **EFS**          | Encryption at rest                                       |
-| **EKS**          | API logging, public endpoint access                      |
+| **EKS**          | API logging, secrets encryption, public endpoint access  |
 | **ElastiCache**  | Encryption in transit, encryption at rest                |
+| **Redshift**     | Encryption at rest, public access, audit logging         |
+| **ECR**          | Image scanning on push, lifecycle policy                 |
+| **CloudFront**   | HTTPS enforcement, WAF enabled                           |
+| **WAF**          | Web ACL exists in region                                 |
+| **SSM**          | EC2 instances managed by SSM                             |
+| **Backup**       | Backup plan exists, vault encryption                     |
+| **ACM**          | Certificate expiration                                   |
+| **API Gateway**  | Stage logging, WAF association                           |
+| **Macie**        | Macie enabled                                            |
+| **Security Hub** | Security Hub enabled                                     |
 
 **Required credentials**: `access_key_id`, `secret_access_key` (+ optional `session_token`)
 
-### Azure (8 services, 20+ checks)
+### Azure (17 services, 127 checks)
 
-| Service         | Checks                                              |
-|-----------------|------------------------------------------------------|
-| **Identity**    | Subscription owner count                             |
-| **Storage**     | HTTPS only, TLS 1.2, public blob access              |
-| **Network**     | NSG open ports (22/3389), Network Watcher            |
-| **Compute**     | VM disk encryption                                   |
-| **Database**    | SQL auditing, TLS 1.2                                |
-| **Key Vault**   | Soft delete, purge protection                        |
-| **Monitor**     | Activity log profile                                 |
-| **App Service** | HTTPS only, TLS 1.2                                  |
+| Service              | Checks                                                   |
+|----------------------|----------------------------------------------------------|
+| **Identity**         | Owner count, custom owner roles, MFA, service principals, guest access, managed identities, resource locks |
+| **Privileged Access**| Classic admin removal, PIM just-in-time access           |
+| **Network**          | NSG default deny, Network Watcher, NSG flow logs, DDoS, private endpoints, WAF, TLS 1.2, Bastion, VPN |
+| **Storage**          | HTTPS only, TLS 1.2, public blob access, infrastructure encryption, CMK, network rules, soft delete, shared key |
+| **Database**         | SQL auditing, TLS 1.2, public access, ATP, vulnerability assessment, TDE, AAD admin, PostgreSQL |
+| **Compute**          | Disk encryption, antimalware, Trusted Launch, managed disks, public IP |
+| **Key Vault**        | Soft delete, purge protection, RBAC, network ACLs, key/secret/cert expiration |
+| **Monitor**          | Activity log profile, retention 365 days, diagnostic settings |
+| **Defender**         | Security contact, email notifications, auto provisioning |
+| **App Service**      | HTTPS, TLS 1.2, managed identity, FTP disabled, remote debugging, client certs, logging |
+| **Container**        | AKS authorized IPs, RBAC, network policy, AAD, Azure Policy |
+| **Backup**           | Recovery Services vault, redundancy                      |
+| **Policy**           | Policy assignments, Security Benchmark, compliance rate  |
+| **DevOps Security**  | Supply chain, container registry scanning, IaC scanning, secret scanning |
+| **Incident Response**| Sentinel automation, alert routing, playbooks, activity log alerts |
+| **Endpoint Security**| Endpoint protection, vulnerability assessment, OS updates, JIT access |
+| **Entra**            | Tenant creation, app consent, guest restrictions, SSPR, conditional access, passwordless, password protection |
 
 **Required credentials**: `subscription_id`, `tenant_id`, `client_id`, `client_secret`
 
-### GCP (8 services, 15+ checks)
+### GCP (15 services, 121 checks)
 
-| Service          | Checks                                              |
-|------------------|------------------------------------------------------|
-| **IAM**          | No public access (allUsers/allAuthenticatedUsers)    |
-| **Compute**      | External IP, OS Login                                |
-| **Storage**      | Uniform bucket access, versioning                    |
-| **Cloud SQL**    | Public IP, SSL required, backups                     |
-| **Logging**      | Log sinks configured                                 |
-| **KMS**          | Key rotation <= 90 days                              |
-| **GKE**          | Private nodes, network policy                        |
-| **Networking**   | Firewall rules (22/3389 open to 0.0.0.0/0)          |
+| Service            | Checks                                              |
+|--------------------|------------------------------------------------------|
+| **IAM**            | Public access, primitive roles, separation of duties, corporate identities, key rotation, API key restrictions |
+| **Compute**        | External IP, OS Login, Shielded VM, CMEK, default SA, serial port, IP forwarding, Confidential Computing |
+| **Storage**        | Uniform bucket access, versioning, public access, logging, retention, CMEK |
+| **Cloud SQL**      | Public IP, SSL, backups, PITR, authorized networks, CMEK, audit logging, auto storage |
+| **Logging**        | Log sinks, Data Access logs, metric filters for critical operations, bucket retention, VPC flow logs, DNS logging |
+| **KMS**            | Key rotation <= 90 days, public access, HSM protection |
+| **GKE**            | Private nodes, network policy, master authorized networks, Pod Security, Shielded Nodes, Workload Identity, Binary Auth |
+| **Networking**     | Default firewall rules, DNSSEC, Private Google Access, VPC flow logs, default network, legacy networks, TLS 1.2 |
+| **BigQuery**       | Public access, CMEK encryption, data classification, audit logging |
+| **Pub/Sub**        | Public access, CMEK encryption                       |
+| **DNS**            | DNSSEC enabled, no RSASHA1                           |
+| **Dataproc**       | CMEK encryption, internal IP only                    |
+| **Cloud Functions** | Ingress restrictions, VPC connector, runtime, service account, secrets |
+| **Cloud Run**      | Unauthenticated access, service account, VPC egress, ingress, Binary Auth, CMEK |
+| **Secret Manager** | CMEK encryption, rotation, ownership labels, public access, version limits |
 
 **Required credentials**: `project_id`, `service_account_key` (JSON)
 
-### Kubernetes (4 categories, 10+ checks)
+### Kubernetes (8 categories, 17 checks)
 
-| Category           | Checks                                             |
-|--------------------|-----------------------------------------------------|
-| **Pods**           | Privileged containers, runAsNonRoot, readOnlyRootFS, resource limits |
-| **RBAC**           | cluster-admin bound to broad groups                 |
-| **Network Policies** | Namespace network policies                        |
-| **Namespaces**     | Workload pods in default namespace                  |
+| Category             | Checks                                             |
+|----------------------|-----------------------------------------------------|
+| **Pods**             | Host network/PID/IPC, privileged, non-root, readOnlyRootFS, resource limits, privilege escalation, capabilities, Seccomp, image pull, probes |
+| **RBAC**             | cluster-admin binding, wildcard verbs, secrets access, default SA token |
+| **Network Policies** | Namespace network policies, default deny-all, ingress source restrictions |
+| **Namespaces**       | Workload pods in default namespace, resource quotas, LimitRange |
+| **Secrets**          | Encryption at rest (etcd), secrets not as env vars  |
+| **Services**         | Public LoadBalancer, NodePort usage                 |
+| **API Server**       | Audit logging, TLS enabled                          |
+| **Admission**        | Pod Security Standards (PSA) enforce labels          |
 
 **Required credentials**: `kubeconfig` (YAML)
 
-### OCI — Oracle Cloud Infrastructure (18 services, 60+ checks)
+### OCI — Oracle Cloud Infrastructure (18 services, 63 checks)
 
 | Service               | Checks                                                    |
 |-----------------------|-----------------------------------------------------------|
@@ -382,7 +412,7 @@ The API reloads on file changes automatically. The frontend runs on http://local
 
 **Required credentials**: `user_ocid`, `tenancy_ocid`, `fingerprint`, `key_content` (PEM), `region`
 
-### Alibaba Cloud (12 services, 70+ checks)
+### Alibaba Cloud (12 services, 57 checks)
 
 | Service               | Checks                                                    |
 |-----------------------|-----------------------------------------------------------|
@@ -541,7 +571,7 @@ D-ARCA discovers multi-step attack paths that chain together individual misconfi
 
 | Component           | Description                                                    |
 |---------------------|----------------------------------------------------------------|
-| **Graph Engine**    | Builds a resource dependency graph and discovers attack chains (2,523 lines) |
+| **Graph Engine**    | Builds a resource dependency graph and discovers attack chains (2,881 lines) |
 | **Path Scoring**    | Risk scoring based on severity, blast radius, and exploitability (174 lines) |
 | **Choke Points**    | Identifies optimal remediation points to break multiple paths  |
 | **Run Comparison**  | Compare analysis runs to track posture improvement over time   |
@@ -615,12 +645,12 @@ Point-in-time configuration drift detection and change tracking (697 lines).
 
 ### Centralized Check Registry
 
-CIS-based centralized security check registry — the single source of truth for all 2,092 checks across 15 providers.
+CIS-based centralized security check registry — the single source of truth for all 1,188 checks across 15 providers.
 
 | Feature                  | Description                                                                  |
 |--------------------------|------------------------------------------------------------------------------|
-| **CIS-based Catalog**    | 1,672 CIS Benchmark controls from 9 benchmarks as primary entries            |
-| **Supplementary Checks** | 420 additional scanner checks not covered by CIS                             |
+| **CIS-based Catalog**    | 904 CIS Benchmark controls from 9 benchmarks as primary entries              |
+| **Supplementary Checks** | 284 additional scanner checks not covered by CIS                             |
 | **Scanner Mapping**      | `scanner_check_ids` bridge links CIS controls to scanner implementations     |
 | **Cross-reference**      | MITRE ATT&CK (233 refs, 100%) and RR (309 refs, 100%) fully resolved        |
 | **Search & Filter**      | By provider, service, severity, category, tags, compliance framework         |
@@ -637,22 +667,22 @@ CIS Control (canonical) ←→ scanner_check_ids ←→ MITRE / Ransomware Readi
 
 | Provider          | Checks | Source      |
 |-------------------|--------|-------------|
-| AWS               | 256    | CIS + scanner |
-| Azure             | 282    | CIS + scanner |
-| GCP               | 240    | CIS + scanner |
-| Kubernetes        | 146    | CIS + scanner |
-| OCI               | 117    | CIS + scanner |
-| Alibaba Cloud     | 142    | CIS + scanner |
-| IBM Cloud         | 81     | CIS + scanner |
-| M365              | 244    | CIS + scanner |
-| Google Workspace  | 197    | CIS + scanner |
+| AWS               | 194    | CIS + scanner |
+| Azure             | 127    | CIS + scanner |
+| GCP               | 156    | CIS + scanner |
+| Kubernetes        | 23     | CIS + scanner |
+| OCI               | 63     | CIS + scanner |
+| Alibaba Cloud     | 57     | CIS + scanner |
+| IBM Cloud         | 8      | CIS + scanner |
+| M365              | 104    | CIS + scanner |
+| Google Workspace  | 108    | CIS + scanner |
 | GitHub            | 64     | scanner     |
 | Salesforce        | 59     | scanner     |
 | ServiceNow        | 55     | scanner     |
-| Snowflake         | 96     | CIS + scanner |
+| Snowflake         | 57     | CIS + scanner |
 | Cloudflare        | 56     | scanner     |
 | OpenStack         | 57     | scanner     |
-| **Total**         | **2,092** |          |
+| **Total**         | **1,188** |          |
 
 ---
 
@@ -1032,14 +1062,14 @@ Query parameters for `/available-checks`: `search`, `provider`, `category`, `sev
 
 ## Custom Framework Builder
 
-D-ARCA allows users to create their own compliance frameworks that integrate directly with the centralized Check Registry (1,600+ CIS and scanner checks). Custom frameworks use the registry as the single source of truth in runtime, with PostgreSQL as the persistence layer.
+D-ARCA allows users to create their own compliance frameworks that integrate directly with the centralized Check Registry (1,188 CIS and scanner checks). Custom frameworks use the registry as the single source of truth in runtime, with PostgreSQL as the persistence layer.
 
 ### Architecture
 
 ```
                     ┌─────────────────────────────────────────┐
                     │          Check Registry (Runtime)        │
-                    │   904 CIS controls + 699 supplementary   │
+                    │   904 CIS controls + 284 supplementary   │
                     │        + N custom controls (synced)       │
                     ├──────────────────┬──────────────────────┤
                     │  get_check()     │  has_scanner_id()     │
@@ -1079,7 +1109,7 @@ D-ARCA allows users to create their own compliance frameworks that integrate dir
 
 | Flow | Description |
 |------|-------------|
-| **Create framework** | Wizard: name/providers -> select checks from 1,600+ registry -> review -> create |
+| **Create framework** | Wizard: name/providers -> select checks from 1,188 registry -> review -> create |
 | **Add custom control** | Form with auto assessment_type detection based on scanner_check_ids mapping |
 | **Excel import** | Download registry-powered template -> fill controls -> upload -> validate -> confirm |
 | **Evaluate compliance** | Query findings for all scanner_check_ids -> calculate pass/fail per check -> pass rate |
@@ -1119,7 +1149,7 @@ D-ARCA maps security checks to compliance frameworks at the **control level** �
 | CIS-K8s-1.8        | CIS Kubernetes Benchmark v1.8                                  | 14       | Kubernetes    |
 | CIS-M365-3.0       | CIS Microsoft 365 Foundations Benchmark v3.0                   | 21       | Microsoft 365 |
 
-### CIS Control Library (1,672 Controls + 420 Supplementary)
+### CIS Control Library (904 Controls + 284 Supplementary)
 
 D-ARCA includes a complete CIS control library with full metadata (descriptions, audit procedures, detection commands, remediation guidance) for each control. Controls are classified as automated or manual, and tagged for DSPM and Ransomware Readiness relevance. The centralized registry resolves all cross-references with 100% coverage for both MITRE ATT&CK (233 references) and Ransomware Readiness (309 references).
 
@@ -1256,17 +1286,17 @@ ARCA/
 │   │   ├── cloud_scanner.py          # Scanner dispatcher
 │   │   ├── base_check.py             # CheckResult dataclass
 │   │   ├── aws/
-│   │   │   └── aws_scanner.py        # AWS checks (20 services, 50+ checks)
+│   │   │   └── aws_scanner.py        # AWS checks (30 services, 95 checks)
 │   │   ├── azure/
-│   │   │   └── azure_scanner.py      # Azure checks (8 services, 20+ checks)
+│   │   │   └── azure_scanner.py      # Azure checks (17 services, 127 checks)
 │   │   ├── gcp/
-│   │   │   └── gcp_scanner.py        # GCP checks (8 services, 15+ checks)
+│   │   │   └── gcp_scanner.py        # GCP checks (15 services, 121 checks)
 │   │   ├── oci/
-│   │   │   └── oci_scanner.py        # OCI checks (18 services, 60+ checks)
+│   │   │   └── oci_scanner.py        # OCI checks (18 services, 63 checks)
 │   │   ├── alibaba/
-│   │   │   └── alibaba_scanner.py    # Alibaba checks (12 services, 70+ checks)
+│   │   │   └── alibaba_scanner.py    # Alibaba checks (12 services, 57 checks)
 │   │   └── kubernetes/
-│   │       └── k8s_scanner.py        # K8s checks (4 categories)
+│   │       └── k8s_scanner.py        # K8s checks (8 categories, 17 checks)
 │   ├── saas/                         # SaaS application scanners (8 platforms)
 │   │   ├── saas_scanner.py           # SaaS scanner factory
 │   │   ├── base_saas_check.py        # SaaSCheckResult dataclass
@@ -1303,26 +1333,26 @@ ARCA/
 │   │   ├── content_sampler.py        # Data content sampling
 │   │   ├── data_classifier.py        # Sensitivity classification
 │   │   └── native_integrations.py    # Cloud-native data connectors
-│   ├── registry/                     # Centralized check registry (CIS-based, 2,092 checks)
+│   ├── registry/                     # Centralized check registry (CIS-based, 1,188 checks)
 │   │   ├── __init__.py               # Public API: CheckRegistry, CheckDefinition, get_default_registry
 │   │   ├── registry.py               # CheckRegistry class: register, lookup, filter, validate, report
 │   │   ├── models.py                 # CheckDefinition, ProviderType, Severity, SCANNER_PROVIDERS
 │   │   ├── cis_loader.py             # Load CIS controls + supplementary scanner checks
 │   │   ├── cross_references.py       # Cross-reference validation (MITRE + RR → registry)
 │   │   └── definitions/              # Per-provider check definitions (15 modules)
-│   │       ├── aws_checks.py         # AWS check definitions (256 checks)
-│   │       ├── azure_checks.py       # Azure check definitions (282 checks)
-│   │       ├── gcp_checks.py         # GCP check definitions (240 checks)
-│   │       ├── kubernetes_checks.py  # Kubernetes check definitions (146 checks)
-│   │       ├── oci_checks.py         # OCI check definitions (117 checks)
-│   │       ├── alibaba_checks.py     # Alibaba check definitions (142 checks)
-│   │       ├── ibm_cloud_checks.py   # IBM Cloud check definitions (81 checks)
-│   │       ├── m365_checks.py        # Microsoft 365 check definitions (244 checks)
-│   │       ├── google_workspace_checks.py  # Google Workspace definitions (197 checks)
+│   │       ├── aws_checks.py         # AWS check definitions (194 checks)
+│   │       ├── azure_checks.py       # Azure check definitions (127 checks)
+│   │       ├── gcp_checks.py         # GCP check definitions (156 checks)
+│   │       ├── kubernetes_checks.py  # Kubernetes check definitions (23 checks)
+│   │       ├── oci_checks.py         # OCI check definitions (63 checks)
+│   │       ├── alibaba_checks.py     # Alibaba check definitions (57 checks)
+│   │       ├── ibm_cloud_checks.py   # IBM Cloud check definitions (8 checks)
+│   │       ├── m365_checks.py        # Microsoft 365 check definitions (104 checks)
+│   │       ├── google_workspace_checks.py  # Google Workspace definitions (108 checks)
 │   │       ├── github_checks.py      # GitHub check definitions (64 checks)
 │   │       ├── salesforce_checks.py  # Salesforce check definitions (59 checks)
 │   │       ├── servicenow_checks.py  # ServiceNow check definitions (55 checks)
-│   │       ├── snowflake_checks.py   # Snowflake check definitions (96 checks)
+│   │       ├── snowflake_checks.py   # Snowflake check definitions (57 checks)
 │   │       ├── cloudflare_checks.py  # Cloudflare check definitions (56 checks)
 │   │       └── openstack_checks.py   # OpenStack check definitions (57 checks)
 │   ├── cis_controls/                 # CIS Benchmark control definitions (9 benchmarks)
