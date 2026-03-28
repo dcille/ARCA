@@ -355,6 +355,19 @@ MITRE_TECHNIQUES: dict[str, dict] = {
         ),
         "url": "https://attack.mitre.org/techniques/T1087/",
     },
+    "T1082": {
+        "name": "System Information Discovery",
+        "tactic": "Discovery",
+        "description": (
+            "Adversaries may attempt to get detailed information about the "
+            "operating system, hardware, and software configuration. In "
+            "Kubernetes, exposed profiling endpoints (pprof) on API server, "
+            "controller manager, or scheduler reveal runtime internals, "
+            "goroutine dumps, and memory allocations that aid reconnaissance "
+            "and exploit development."
+        ),
+        "url": "https://attack.mitre.org/techniques/T1082/",
+    },
     # -- Lateral Movement --
     "T1021": {
         "name": "Remote Services",
@@ -1533,17 +1546,74 @@ CHECK_TO_MITRE: dict[str, list[str]] = {
     # -----------------------------------------------------------------------
     # Kubernetes checks
     # -----------------------------------------------------------------------
+    "k8s_pod_no_privileged": [
+        "T1611", "T1610",
+    ],
+    "k8s_pod_no_host_pid": [
+        "T1611",
+    ],
+    "k8s_pod_no_host_ipc": [
+        "T1611",
+    ],
+    "k8s_pod_no_host_network": [
+        "T1611", "T1046",
+    ],
+    "k8s_pod_run_as_non_root": [
+        "T1611",
+    ],
+    "k8s_pod_readonly_rootfs": [
+        "T1611", "T1565",
+    ],
+    "k8s_pod_resource_limits": [
+        "T1499", "T1496",
+    ],
+    "k8s_pod_no_privilege_escalation": [
+        "T1611", "T1548",
+    ],
+    "k8s_pod_capability_drop_all": [
+        "T1611",
+    ],
+    "k8s_pod_seccomp_profile": [
+        "T1611",
+    ],
+    "k8s_pod_image_pull_policy": [
+        "T1525", "T1195",
+    ],
+    "k8s_pod_liveness_probe": [
+        "T1499",
+    ],
+    "k8s_pod_readiness_probe": [
+        "T1499",
+    ],
     "k8s_rbac_no_wildcard_cluster_admin": [
         "T1078.004", "T1098", "T1548",
     ],
-    "k8s_no_pods_in_default": [
-        "T1525", "T1059", "T1610",
+    "k8s_rbac_no_wildcard_verbs": [
+        "T1078", "T1548",
+    ],
+    "k8s_rbac_limit_secrets_access": [
+        "T1552.001", "T1078",
+    ],
+    "k8s_rbac_no_default_sa_token": [
+        "T1528", "T1078.004",
     ],
     "k8s_namespace_network_policy": [
         "T1021", "T1563", "T1046",
     ],
-    "k8s_admission_pod_security": [
-        "T1611", "T1525",
+    "k8s_network_deny_all_default": [
+        "T1046",
+    ],
+    "k8s_network_ingress_rules": [
+        "T1046", "T1190",
+    ],
+    "k8s_no_pods_in_default": [
+        "T1525", "T1610",
+    ],
+    "k8s_namespace_resource_quotas": [
+        "T1499", "T1496",
+    ],
+    "k8s_namespace_limit_ranges": [
+        "T1499",
     ],
     "k8s_secrets_encrypted_etcd": [
         "T1552", "T1530",
@@ -1551,29 +1621,182 @@ CHECK_TO_MITRE: dict[str, list[str]] = {
     "k8s_secrets_no_env_vars": [
         "T1552", "T1552.001",
     ],
+    "k8s_service_no_loadbalancer_public": [
+        "T1190",
+    ],
+    "k8s_service_no_nodeport": [
+        "T1190",
+    ],
     "k8s_api_audit_logging": [
         "T1562.008", "T1070",
     ],
-    "k8s_rbac_no_default_sa_token": [
-        "T1528", "T1078.004",
+    "k8s_api_tls_enabled": [
+        "T1557", "T1552.004",
     ],
-    "k8s_no_privileged_containers": [
-        "T1611", "T1610",
+    "k8s_admission_pod_security": [
+        "T1611", "T1525",
     ],
-    "k8s_no_host_pid": [
+    "k8s_api_anonymous_auth": [
+        "T1078", "T1190",
+    ],
+    "k8s_api_no_token_auth_file": [
+        "T1078", "T1552.001",
+    ],
+    "k8s_api_kubelet_client_cert": [
+        "T1557", "T1552.004",
+    ],
+    "k8s_api_kubelet_ca": [
+        "T1557",
+    ],
+    "k8s_api_no_always_allow": [
+        "T1078", "T1548",
+    ],
+    "k8s_api_auth_mode_node": [
+        "T1078", "T1548",
+    ],
+    "k8s_api_auth_mode_rbac": [
+        "T1078", "T1548",
+    ],
+    "k8s_api_no_always_admit": [
+        "T1078", "T1548",
+    ],
+    "k8s_api_sa_admission": [
+        "T1078",
+    ],
+    "k8s_api_ns_lifecycle": [
+        "T1610",
+    ],
+    "k8s_api_node_restriction": [
+        "T1548", "T1078",
+    ],
+    "k8s_api_profiling_disabled": [
+        "T1082",
+    ],
+    "k8s_api_audit_log_path": [
+        "T1562.008",
+    ],
+    "k8s_api_audit_maxage": [
+        "T1562.008", "T1070",
+    ],
+    "k8s_api_audit_maxbackup": [
+        "T1562.008",
+    ],
+    "k8s_api_audit_maxsize": [
+        "T1562.008",
+    ],
+    "k8s_api_sa_lookup": [
+        "T1078",
+    ],
+    "k8s_api_sa_key_file": [
+        "T1552.004",
+    ],
+    "k8s_api_etcd_certs": [
+        "T1557", "T1552.004",
+    ],
+    "k8s_api_tls_certs": [
+        "T1557", "T1552.004",
+    ],
+    "k8s_api_client_ca": [
+        "T1557",
+    ],
+    "k8s_api_etcd_ca": [
+        "T1557",
+    ],
+    "k8s_api_encryption_config": [
+        "T1530", "T1552",
+    ],
+    "k8s_api_strong_ciphers": [
+        "T1557",
+    ],
+    "k8s_api_sa_token_no_extend": [
+        "T1528", "T1550.001",
+    ],
+    "k8s_cm_profiling_disabled": [
+        "T1082",
+    ],
+    "k8s_cm_sa_credentials": [
+        "T1078",
+    ],
+    "k8s_cm_sa_private_key": [
+        "T1552.004",
+    ],
+    "k8s_cm_root_ca": [
+        "T1557",
+    ],
+    "k8s_cm_rotate_kubelet_cert": [
+        "T1552.004",
+    ],
+    "k8s_cm_bind_localhost": [
+        "T1190",
+    ],
+    "k8s_sched_profiling_disabled": [
+        "T1082",
+    ],
+    "k8s_sched_bind_localhost": [
+        "T1190",
+    ],
+    "k8s_etcd_cert_key": [
+        "T1557", "T1552.004",
+    ],
+    "k8s_etcd_client_cert_auth": [
+        "T1557",
+    ],
+    "k8s_etcd_no_auto_tls": [
+        "T1557",
+    ],
+    "k8s_etcd_peer_certs": [
+        "T1557", "T1552.004",
+    ],
+    "k8s_etcd_peer_client_auth": [
+        "T1557",
+    ],
+    "k8s_etcd_no_peer_auto_tls": [
+        "T1557",
+    ],
+    "k8s_audit_policy_exists": [
+        "T1562.008",
+    ],
+    "k8s_kubelet_anonymous_auth": [
+        "T1078", "T1190",
+    ],
+    "k8s_kubelet_auth_mode": [
+        "T1078", "T1548",
+    ],
+    "k8s_kubelet_iptables_chains": [
+        "T1562.004",
+    ],
+    "k8s_kubelet_rotate_certs": [
+        "T1552.004",
+    ],
+    "k8s_kubelet_seccomp_default": [
         "T1611",
     ],
-    "k8s_no_host_network": [
-        "T1611", "T1046",
+    "k8s_kube_proxy_metrics_localhost": [
+        "T1082", "T1190",
     ],
-    "k8s_image_pull_policy_always": [
-        "T1525", "T1195",
+    "k8s_rbac_pod_create_limited": [
+        "T1610", "T1078",
     ],
-    "k8s_resource_limits_set": [
-        "T1499", "T1496",
+    "k8s_sa_token_mount_needed": [
+        "T1528", "T1078",
     ],
-    "k8s_no_automount_sa_token": [
-        "T1528", "T1552.001",
+    "k8s_rbac_no_system_masters": [
+        "T1078", "T1548",
+    ],
+    "k8s_rbac_no_escalate_perms": [
+        "T1548", "T1134",
+    ],
+    "k8s_pod_no_windows_host_process": [
+        "T1611",
+    ],
+    "k8s_pod_no_host_path": [
+        "T1611", "T1530",
+    ],
+    "k8s_pod_no_host_ports": [
+        "T1190", "T1046",
+    ],
+    "k8s_image_policy_webhook": [
+        "T1525", "T1610",
     ],
     # -----------------------------------------------------------------------
     # SaaS checks
@@ -4719,17 +4942,96 @@ CHECK_DESCRIPTIONS: dict[str, str] = {
         "traffic cannot be detected or investigated."
     ),
     # ── Kubernetes checks ──
+    "k8s_pod_no_privileged": (
+        "Kubernetes allows privileged containers. Privileged containers have "
+        "unrestricted access to the host OS, enabling attackers to escape the "
+        "container boundary and compromise the underlying node."
+    ),
+    "k8s_pod_no_host_pid": (
+        "Kubernetes pods can access the host PID namespace. This allows "
+        "attackers to see and signal host processes, enabling process "
+        "injection, credential harvesting, and container escape."
+    ),
+    "k8s_pod_no_host_ipc": (
+        "Kubernetes pods share the host IPC namespace. Attackers can access "
+        "host shared memory segments to read sensitive data or interfere with "
+        "host processes, facilitating container escape."
+    ),
+    "k8s_pod_no_host_network": (
+        "Kubernetes pods use the host network namespace. This bypasses "
+        "network policies and allows attackers to sniff traffic, access "
+        "services bound to localhost, and perform network-level attacks."
+    ),
+    "k8s_pod_run_as_non_root": (
+        "Kubernetes pods run as root user. Running as root grants unnecessary "
+        "privileges inside the container, increasing the impact of any "
+        "application vulnerability and enabling container escape through "
+        "kernel exploits."
+    ),
+    "k8s_pod_readonly_rootfs": (
+        "Kubernetes containers have a writable root filesystem. Attackers can "
+        "write malicious binaries, modify system files, or plant persistence "
+        "mechanisms. A read-only rootfs forces use of explicit volume mounts "
+        "for writable data."
+    ),
+    "k8s_pod_resource_limits": (
+        "Kubernetes pods do not have resource limits configured. Without "
+        "limits, a compromised pod can consume all node resources, causing "
+        "denial of service to co-located workloads and enabling cryptomining."
+    ),
+    "k8s_pod_no_privilege_escalation": (
+        "Kubernetes containers allow privilege escalation via setuid/setgid. "
+        "An attacker who gains code execution can escalate to root inside the "
+        "container, then leverage additional misconfigurations to escape to "
+        "the host."
+    ),
+    "k8s_pod_capability_drop_all": (
+        "Kubernetes containers retain default Linux capabilities. "
+        "Capabilities like CAP_NET_RAW, CAP_SYS_ADMIN enable network attacks, "
+        "filesystem access, and kernel exploits. Dropping all and adding only "
+        "required capabilities minimizes attack surface."
+    ),
+    "k8s_pod_seccomp_profile": (
+        "Kubernetes pods lack seccomp profiles. Without syscall filtering, "
+        "containers can invoke any kernel syscall, increasing the risk of "
+        "kernel exploit-based container escape."
+    ),
+    "k8s_pod_image_pull_policy": (
+        "Kubernetes image pull policy is not set to Always. Cached images may "
+        "contain known vulnerabilities or be tampered with. Attackers can "
+        "exploit stale images to deploy containers with known exploits."
+    ),
+    "k8s_pod_liveness_probe": (
+        "Kubernetes pods lack liveness probes. Without health checks, "
+        "compromised or deadlocked containers continue running, potentially "
+        "serving malicious content or consuming resources indefinitely."
+    ),
+    "k8s_pod_readiness_probe": (
+        "Kubernetes pods lack readiness probes. Without readiness checks, "
+        "unhealthy pods continue receiving traffic, enabling attackers to "
+        "exploit partially compromised services."
+    ),
     "k8s_rbac_no_wildcard_cluster_admin": (
         "Kubernetes RBAC roles grant wildcard cluster-admin permissions. An "
         "attacker who compromises any pod bound to these roles gains full "
         "control over the cluster, including ability to deploy malicious "
         "containers, read all secrets, and escape to underlying nodes."
     ),
-    "k8s_no_pods_in_default": (
-        "Workloads running in the Kubernetes default namespace bypass "
-        "namespace-level security policies. Attackers who compromise these "
-        "pods may inherit overly permissive default service accounts and "
-        "network access, facilitating lateral movement."
+    "k8s_rbac_no_wildcard_verbs": (
+        "Kubernetes RBAC roles use wildcard verbs or resources. Overly broad "
+        "permissions allow attackers who compromise any identity bound to "
+        "these roles to perform any action on any resource."
+    ),
+    "k8s_rbac_limit_secrets_access": (
+        "Kubernetes RBAC grants broad access to secrets. Attackers who "
+        "compromise a pod with secrets access can read database passwords, "
+        "API keys, TLS certificates, and cloud credentials stored as "
+        "Kubernetes secrets."
+    ),
+    "k8s_rbac_no_default_sa_token": (
+        "Kubernetes default service account tokens are auto-mounted to pods. "
+        "Attackers who compromise a pod can use the service account token to "
+        "authenticate to the Kubernetes API and enumerate cluster resources."
     ),
     "k8s_namespace_network_policy": (
         "Kubernetes namespaces lack network policies. Without network "
@@ -4737,10 +5039,31 @@ CHECK_DESCRIPTIONS: dict[str, str] = {
         "other pods and services in the cluster, enabling unrestricted "
         "lateral movement and service discovery."
     ),
-    "k8s_admission_pod_security": (
-        "Kubernetes does not enforce Pod Security Standards via admission "
-        "control. Without these controls, attackers can deploy privileged "
-        "containers that mount host filesystems and escape to the node."
+    "k8s_network_deny_all_default": (
+        "Kubernetes namespaces lack a default-deny network policy. Without a "
+        "deny-all baseline, any new pod automatically gets full network "
+        "access to all other pods, enabling lateral movement."
+    ),
+    "k8s_network_ingress_rules": (
+        "Kubernetes ingress resources lack restrictive rules. Overly "
+        "permissive ingress exposes internal services to external traffic, "
+        "enabling attackers to reach services not intended for public access."
+    ),
+    "k8s_no_pods_in_default": (
+        "Workloads running in the Kubernetes default namespace bypass "
+        "namespace-level security policies. Attackers who compromise these "
+        "pods may inherit overly permissive default service accounts and "
+        "network access, facilitating lateral movement."
+    ),
+    "k8s_namespace_resource_quotas": (
+        "Kubernetes namespaces lack resource quotas. Without quotas, a "
+        "compromised namespace can consume all cluster resources through pod "
+        "proliferation, causing denial of service."
+    ),
+    "k8s_namespace_limit_ranges": (
+        "Kubernetes namespaces lack limit ranges. Without default limits, "
+        "pods deployed without explicit resource requests can starve other "
+        "workloads or be exploited for cryptomining."
     ),
     "k8s_secrets_encrypted_etcd": (
         "Kubernetes secrets are not encrypted at rest in etcd. An attacker "
@@ -4750,49 +5073,301 @@ CHECK_DESCRIPTIONS: dict[str, str] = {
     "k8s_secrets_no_env_vars": (
         "Kubernetes secrets are exposed as environment variables in pods. "
         "Environment variables are visible in process listings and crash "
-        "dumps, making credential extraction trivial for attackers who gain "
-        "any level of pod access."
+        "dumps, making credential extraction trivial for attackers."
+    ),
+    "k8s_service_no_loadbalancer_public": (
+        "Kubernetes services use LoadBalancer type exposing internal services "
+        "to the internet. Attackers can directly reach cluster services that "
+        "should only be internally accessible."
+    ),
+    "k8s_service_no_nodeport": (
+        "Kubernetes services use NodePort, exposing services on all cluster "
+        "nodes. This widens the attack surface as any node IP becomes an "
+        "entry point to the service."
     ),
     "k8s_api_audit_logging": (
         "Kubernetes API audit logging is not enabled. Without audit logs, "
         "attacker actions such as secret reads, role binding changes, and "
-        "container deployments go unrecorded, preventing incident detection "
-        "and forensic investigation."
+        "container deployments go unrecorded."
     ),
-    "k8s_rbac_no_default_sa_token": (
-        "Kubernetes default service account tokens are auto-mounted to pods. "
-        "Attackers who compromise a pod can use the service account token to "
-        "authenticate to the Kubernetes API and enumerate cluster resources."
+    "k8s_api_tls_enabled": (
+        "Kubernetes API server does not have TLS certificates configured. "
+        "Without TLS, API traffic including bearer tokens and secrets is "
+        "transmitted in plaintext, vulnerable to interception."
     ),
-    "k8s_no_privileged_containers": (
-        "Kubernetes allows privileged containers. Privileged containers have "
-        "unrestricted access to the host OS, enabling attackers to escape "
-        "the container boundary and compromise the underlying node."
+    "k8s_admission_pod_security": (
+        "Kubernetes does not enforce Pod Security Standards via admission "
+        "control. Without these controls, attackers can deploy privileged "
+        "containers that mount host filesystems and escape to the node."
     ),
-    "k8s_no_host_pid": (
-        "Kubernetes pods can access the host PID namespace. This allows "
-        "attackers to see and signal host processes, enabling process "
-        "injection, credential harvesting, and container escape."
+    "k8s_api_anonymous_auth": (
+        "Kubernetes API server allows anonymous authentication. "
+        "Unauthenticated users can query the API, discovering cluster "
+        "configuration, endpoints, and potentially accessing unprotected "
+        "resources."
     ),
-    "k8s_no_host_network": (
-        "Kubernetes pods can use the host network namespace. This bypasses "
-        "network policies and allows attackers to sniff traffic, access "
-        "services bound to localhost, and perform network-level attacks."
+    "k8s_api_no_token_auth_file": (
+        "Kubernetes API server uses static token file authentication. Static "
+        "tokens stored in files cannot be rotated without restarting the API "
+        "server and are easily stolen from the filesystem."
     ),
-    "k8s_image_pull_policy_always": (
-        "Kubernetes image pull policy is not set to Always. Cached images "
-        "may contain known vulnerabilities or be tampered with. Attackers "
-        "can exploit stale images to deploy containers with known exploits."
+    "k8s_api_kubelet_client_cert": (
+        "Kubernetes API server lacks kubelet client certificate. Without "
+        "mutual TLS to kubelets, API-to-kubelet communication can be "
+        "intercepted or spoofed by attackers with network access."
     ),
-    "k8s_resource_limits_set": (
-        "Kubernetes pods do not have resource limits configured. Without "
-        "limits, a compromised pod can consume all node resources, causing "
-        "denial of service to co-located workloads and enabling cryptomining."
+    "k8s_api_kubelet_ca": (
+        "Kubernetes API server lacks kubelet certificate authority. Without "
+        "CA verification, the API server cannot validate kubelet identity, "
+        "enabling MITM attacks on the control plane."
     ),
-    "k8s_no_automount_sa_token": (
+    "k8s_api_no_always_allow": (
+        "Kubernetes API server uses AlwaysAllow authorization mode. Every "
+        "request is authorized regardless of identity, effectively disabling "
+        "all access controls in the cluster."
+    ),
+    "k8s_api_auth_mode_node": (
+        "Kubernetes API server does not use Node authorization. Without Node "
+        "authorizer, kubelets can access secrets and configmaps for pods not "
+        "scheduled to their node."
+    ),
+    "k8s_api_auth_mode_rbac": (
+        "Kubernetes API server does not use RBAC authorization. Without RBAC, "
+        "fine-grained access control is impossible, and legacy ABAC policies "
+        "are harder to audit and manage."
+    ),
+    "k8s_api_no_always_admit": (
+        "Kubernetes API server uses AlwaysAdmit admission plugin. All pod and "
+        "resource creation requests are admitted without validation, "
+        "bypassing security admission controllers."
+    ),
+    "k8s_api_sa_admission": (
+        "Kubernetes API server lacks ServiceAccount admission plugin. Without "
+        "this plugin, pods can reference non-existent service accounts, "
+        "complicating RBAC enforcement."
+    ),
+    "k8s_api_ns_lifecycle": (
+        "Kubernetes API server lacks NamespaceLifecycle admission plugin. "
+        "Without this plugin, resources can be created in non-existent or "
+        "terminating namespaces, leading to orphaned resources."
+    ),
+    "k8s_api_node_restriction": (
+        "Kubernetes API server lacks NodeRestriction admission plugin. "
+        "Compromised kubelets can modify any node's labels and taints, "
+        "enabling pod scheduling manipulation and privilege escalation."
+    ),
+    "k8s_api_profiling_disabled": (
+        "Kubernetes API server has profiling enabled. Profiling endpoints "
+        "expose runtime internals including goroutine stacks and memory "
+        "allocations, aiding attackers in reconnaissance."
+    ),
+    "k8s_api_audit_log_path": (
+        "Kubernetes API server audit log path is not configured. Without a "
+        "log path, audit events are discarded and attacker actions cannot be "
+        "reviewed during incident response."
+    ),
+    "k8s_api_audit_maxage": (
+        "Kubernetes API server audit log max age is insufficient. Old audit "
+        "logs are deleted before incidents with long dwell times are "
+        "discovered, destroying forensic evidence."
+    ),
+    "k8s_api_audit_maxbackup": (
+        "Kubernetes API server audit log max backup count is insufficient. "
+        "Too few backup files means audit history is lost during rotation."
+    ),
+    "k8s_api_audit_maxsize": (
+        "Kubernetes API server audit log max size is insufficient. Small log "
+        "files rotate too quickly, potentially losing audit events during "
+        "high-activity periods."
+    ),
+    "k8s_api_sa_lookup": (
+        "Kubernetes API server does not validate service account tokens. "
+        "Without lookup, revoked or deleted service account tokens may still "
+        "be accepted for authentication."
+    ),
+    "k8s_api_sa_key_file": (
+        "Kubernetes API server lacks service account signing key. Without "
+        "explicit key configuration, service account tokens cannot be "
+        "properly validated."
+    ),
+    "k8s_api_etcd_certs": (
+        "Kubernetes API server does not use TLS certificates for etcd "
+        "communication. API-to-etcd traffic containing all cluster state "
+        "including secrets flows in plaintext."
+    ),
+    "k8s_api_tls_certs": (
+        "Kubernetes API server TLS serving certificates are not configured. "
+        "Without TLS, all API traffic including bearer tokens and secrets can "
+        "be intercepted by network adversaries."
+    ),
+    "k8s_api_client_ca": (
+        "Kubernetes API server does not have a client CA file configured. "
+        "Without client CA, the API server cannot authenticate client "
+        "certificates, weakening mutual TLS."
+    ),
+    "k8s_api_etcd_ca": (
+        "Kubernetes API server does not verify etcd server certificate. "
+        "Without CA verification, a MITM attacker can impersonate etcd and "
+        "intercept or modify all cluster state."
+    ),
+    "k8s_api_encryption_config": (
+        "Kubernetes API server lacks encryption provider configuration. "
+        "Secrets stored in etcd without encryption are readable by anyone "
+        "with access to etcd data files or backups."
+    ),
+    "k8s_api_strong_ciphers": (
+        "Kubernetes API server allows weak TLS cipher suites. Weak ciphers "
+        "enable protocol downgrade attacks and traffic decryption by network "
+        "adversaries."
+    ),
+    "k8s_api_sa_token_no_extend": (
+        "Kubernetes API server extends service account token expiration. "
+        "Extended token lifetime increases the window for stolen token replay "
+        "attacks."
+    ),
+    "k8s_cm_profiling_disabled": (
+        "Kubernetes controller manager has profiling enabled. Exposed "
+        "profiling data reveals internal runtime state useful for "
+        "reconnaissance and exploit development."
+    ),
+    "k8s_cm_sa_credentials": (
+        "Kubernetes controller manager does not use individual service "
+        "account credentials. Without per-controller credentials, all "
+        "controllers share the same identity, violating least privilege."
+    ),
+    "k8s_cm_sa_private_key": (
+        "Kubernetes controller manager lacks service account signing key. "
+        "Without explicit key configuration, service account tokens cannot be "
+        "properly signed."
+    ),
+    "k8s_cm_root_ca": (
+        "Kubernetes controller manager lacks root CA file. Without CA "
+        "configuration, the controller cannot verify TLS certificates for "
+        "cluster components."
+    ),
+    "k8s_cm_rotate_kubelet_cert": (
+        "Kubernetes controller manager does not rotate kubelet server "
+        "certificates. Long-lived certificates increase risk of compromise "
+        "and impersonation."
+    ),
+    "k8s_cm_bind_localhost": (
+        "Kubernetes controller manager binds to a non-localhost address. "
+        "Exposed controller manager endpoints can be accessed from the "
+        "network, revealing cluster management interfaces."
+    ),
+    "k8s_sched_profiling_disabled": (
+        "Kubernetes scheduler has profiling enabled. Profiling endpoints "
+        "reveal internal scheduling state useful for reconnaissance."
+    ),
+    "k8s_sched_bind_localhost": (
+        "Kubernetes scheduler binds to a non-localhost address. Exposed "
+        "scheduler endpoints reveal scheduling decisions and can be "
+        "manipulated by network adversaries."
+    ),
+    "k8s_etcd_cert_key": (
+        "etcd does not use TLS certificates. All cluster state including "
+        "secrets flows in plaintext between etcd peers and clients, "
+        "vulnerable to interception."
+    ),
+    "k8s_etcd_client_cert_auth": (
+        "etcd does not require client certificate authentication. Without "
+        "client certs, any network-accessible client can read and write all "
+        "cluster state in etcd."
+    ),
+    "k8s_etcd_no_auto_tls": (
+        "etcd uses auto-generated self-signed TLS certificates. Auto-TLS "
+        "provides no identity verification, making MITM attacks trivial for "
+        "network adversaries."
+    ),
+    "k8s_etcd_peer_certs": (
+        "etcd peer communication does not use TLS certificates. Inter-node "
+        "etcd replication traffic containing all cluster state flows in "
+        "plaintext."
+    ),
+    "k8s_etcd_peer_client_auth": (
+        "etcd does not require peer client certificate authentication. A "
+        "rogue node can join the etcd cluster and access or modify all "
+        "cluster state."
+    ),
+    "k8s_etcd_no_peer_auto_tls": (
+        "etcd uses auto-generated TLS for peer communication. Auto-TLS "
+        "provides no peer identity verification, enabling cluster "
+        "infiltration by rogue nodes."
+    ),
+    "k8s_audit_policy_exists": (
+        "Kubernetes audit policy file is not configured. Without an audit "
+        "policy, no API events are logged regardless of audit log path "
+        "configuration."
+    ),
+    "k8s_kubelet_anonymous_auth": (
+        "Kubelet allows anonymous authentication. Unauthenticated users can "
+        "query kubelet APIs to list running pods, exec into containers, and "
+        "access logs."
+    ),
+    "k8s_kubelet_auth_mode": (
+        "Kubelet does not use Webhook authorization. Without delegating "
+        "authorization to the API server, kubelet cannot enforce RBAC "
+        "policies on API requests."
+    ),
+    "k8s_kubelet_iptables_chains": (
+        "Kubelet does not manage iptables chains. Without kubelet-managed "
+        "chains, network rules may not be properly enforced, allowing traffic "
+        "to bypass kube-proxy rules."
+    ),
+    "k8s_kubelet_rotate_certs": (
+        "Kubelet does not rotate client certificates. Long-lived kubelet "
+        "certificates increase the window for credential theft and node "
+        "impersonation."
+    ),
+    "k8s_kubelet_seccomp_default": (
+        "Kubelet does not enable seccomp by default. Without default seccomp "
+        "profiles, containers can invoke any kernel syscall, increasing "
+        "container escape risk."
+    ),
+    "k8s_kube_proxy_metrics_localhost": (
+        "kube-proxy metrics endpoint is not bound to localhost. Exposed "
+        "metrics reveal network topology, service endpoints, and connection "
+        "state useful for reconnaissance."
+    ),
+    "k8s_rbac_pod_create_limited": (
+        "Kubernetes RBAC grants broad pod creation permissions. Attackers who "
+        "can create pods in any namespace can deploy privileged containers, "
+        "mount host filesystems, and escape to nodes."
+    ),
+    "k8s_sa_token_mount_needed": (
         "Kubernetes service account tokens are auto-mounted to pods that "
         "don't need API access. Unnecessary token exposure increases the "
         "attack surface for credential theft and API abuse."
+    ),
+    "k8s_rbac_no_system_masters": (
+        "Users or service accounts are bound to the system:masters group. "
+        "system:masters bypasses all RBAC checks, granting unrestricted "
+        "cluster access that cannot be audited or constrained."
+    ),
+    "k8s_rbac_no_escalate_perms": (
+        "Kubernetes RBAC grants bind, impersonate, or escalate permissions. "
+        "These meta-permissions allow attackers to grant themselves any role, "
+        "impersonate any user, or escalate to cluster-admin."
+    ),
+    "k8s_pod_no_windows_host_process": (
+        "Kubernetes allows Windows HostProcess containers. HostProcess "
+        "containers run directly on the host with full SYSTEM privileges, "
+        "equivalent to privileged containers on Linux."
+    ),
+    "k8s_pod_no_host_path": (
+        "Kubernetes pods mount host filesystem paths. HostPath volumes give "
+        "containers direct access to host files, enabling credential theft, "
+        "data exfiltration, and persistence via host filesystem."
+    ),
+    "k8s_pod_no_host_ports": (
+        "Kubernetes pods bind to host ports. Host port bindings expose "
+        "container services directly on node IPs, bypassing service "
+        "abstractions and widening the network attack surface."
+    ),
+    "k8s_image_policy_webhook": (
+        "Kubernetes does not enforce image admission via webhook. Without "
+        "image policy enforcement, attackers can deploy containers from "
+        "untrusted registries containing malware or backdoors."
     ),
     # ── SaaS checks ──
     "servicenow_users_mfa_enabled": (
@@ -5506,65 +6081,348 @@ CHECK_EVIDENCE: dict[str, str] = {
         "logs per VPC. Fails if VPC has no flow log configured."
     ),
     # ── Kubernetes checks ──
+    "k8s_pod_no_privileged": (
+        "Kubernetes Core API list Pods. Checks "
+        "containers[].securityContext.privileged. Fails if any container runs "
+        "in privileged mode."
+    ),
+    "k8s_pod_no_host_pid": (
+        "Kubernetes Core API list Pods. Checks spec.hostPID field. Fails if "
+        "any pod has hostPID set to true."
+    ),
+    "k8s_pod_no_host_ipc": (
+        "Kubernetes Core API list Pods. Checks spec.hostIPC field. Fails if "
+        "any pod has hostIPC set to true."
+    ),
+    "k8s_pod_no_host_network": (
+        "Kubernetes Core API list Pods. Checks spec.hostNetwork field. Fails "
+        "if any pod has hostNetwork set to true."
+    ),
+    "k8s_pod_run_as_non_root": (
+        "Kubernetes Core API list Pods. Checks "
+        "containers[].securityContext.runAsNonRoot and runAsUser. Fails if "
+        "any container can run as root."
+    ),
+    "k8s_pod_readonly_rootfs": (
+        "Kubernetes Core API list Pods. Checks "
+        "containers[].securityContext.readOnlyRootFilesystem. Fails if not "
+        "set to true."
+    ),
+    "k8s_pod_resource_limits": (
+        "Kubernetes Core API list Pods. Checks containers[].resources.limits "
+        "for cpu and memory. Fails if any container lacks resource limits."
+    ),
+    "k8s_pod_no_privilege_escalation": (
+        "Kubernetes Core API list Pods. Checks "
+        "containers[].securityContext.allowPrivilegeEscalation. Fails if set "
+        "to true or not explicitly false."
+    ),
+    "k8s_pod_capability_drop_all": (
+        "Kubernetes Core API list Pods. Checks "
+        "containers[].securityContext.capabilities.drop for ALL. Fails if "
+        "capabilities not dropped."
+    ),
+    "k8s_pod_seccomp_profile": (
+        "Kubernetes Core API list Pods. Checks "
+        "spec.securityContext.seccompProfile or annotation. Fails if no "
+        "seccomp profile configured."
+    ),
+    "k8s_pod_image_pull_policy": (
+        "Kubernetes Core API list Pods. Checks containers[].imagePullPolicy. "
+        "Fails if policy is not Always for non-pinned image tags."
+    ),
+    "k8s_pod_liveness_probe": (
+        "Kubernetes Core API list Pods. Checks containers[].livenessProbe. "
+        "Fails if liveness probe not configured."
+    ),
+    "k8s_pod_readiness_probe": (
+        "Kubernetes Core API list Pods. Checks containers[].readinessProbe. "
+        "Fails if readiness probe not configured."
+    ),
     "k8s_rbac_no_wildcard_cluster_admin": (
         "Kubernetes RBAC API list ClusterRoleBindings and ClusterRoles. "
-        "Checks rules[].resources and rules[].verbs for wildcard '*'. "
-        "Fails if non-system ClusterRole has wildcard permissions."
+        "Checks rules[].resources and rules[].verbs for wildcard '*'. Fails "
+        "if non-system ClusterRole has wildcard permissions."
     ),
-    "k8s_no_pods_in_default": (
-        "Kubernetes Core API list pods in default namespace. Fails if any "
-        "non-system pods are running in the default namespace."
+    "k8s_rbac_no_wildcard_verbs": (
+        "Kubernetes RBAC API list ClusterRoles. Checks for rules with verbs: "
+        "['*'] or resources: ['*']. Fails if broad wildcards found outside "
+        "system roles."
     ),
-    "k8s_namespace_network_policy": (
-        "Kubernetes Networking API list NetworkPolicies per namespace. "
-        "Fails if any active namespace has zero network policies defined."
-    ),
-    "k8s_admission_pod_security": (
-        "Kubernetes API check namespace labels for pod-security.kubernetes.io "
-        "enforcement. Fails if Pod Security Standards not enforced."
-    ),
-    "k8s_secrets_encrypted_etcd": (
-        "Kubernetes API server --encryption-provider-config flag. Checks "
-        "EncryptionConfiguration for aescbc or secretbox providers. Fails "
-        "if secrets stored in identity (plaintext) provider."
-    ),
-    "k8s_secrets_no_env_vars": (
-        "Kubernetes Core API list Pods. Checks containers[].env and "
-        "containers[].envFrom for secretKeyRef. Fails if secrets exposed "
-        "as environment variables instead of volume mounts."
-    ),
-    "k8s_api_audit_logging": (
-        "Kubernetes API server --audit-policy-file flag. Checks if audit "
-        "policy is configured and active. Fails if no audit policy defined."
+    "k8s_rbac_limit_secrets_access": (
+        "Kubernetes RBAC API list ClusterRoles. Checks for rules granting "
+        "get/list/watch on secrets resource. Fails if broad secrets access "
+        "found."
     ),
     "k8s_rbac_no_default_sa_token": (
         "Kubernetes Core API get ServiceAccount 'default' per namespace. "
         "Checks automountServiceAccountToken field. Fails if set to true."
     ),
-    "k8s_no_privileged_containers": (
-        "Kubernetes Core API list Pods. Checks containers[].securityContext."
-        "privileged. Fails if any container runs in privileged mode."
+    "k8s_namespace_network_policy": (
+        "Kubernetes Networking API list NetworkPolicies per namespace. Fails "
+        "if any active namespace has zero network policies defined."
     ),
-    "k8s_no_host_pid": (
-        "Kubernetes Core API list Pods. Checks spec.hostPID field. "
-        "Fails if any pod has hostPID set to true."
+    "k8s_network_deny_all_default": (
+        "Kubernetes Networking API list NetworkPolicies per namespace. Checks "
+        "for a default-deny policy (empty podSelector, empty ingress). Fails "
+        "if missing."
     ),
-    "k8s_no_host_network": (
-        "Kubernetes Core API list Pods. Checks spec.hostNetwork field. "
-        "Fails if any pod has hostNetwork set to true."
+    "k8s_network_ingress_rules": (
+        "Kubernetes Networking API list Ingress resources. Checks for overly "
+        "permissive rules without host or path restrictions."
     ),
-    "k8s_image_pull_policy_always": (
-        "Kubernetes Core API list Pods. Checks containers[].imagePullPolicy. "
-        "Fails if policy is not Always for non-pinned image tags."
+    "k8s_no_pods_in_default": (
+        "Kubernetes Core API list pods in default namespace. Fails if any "
+        "non-system pods are running in the default namespace."
     ),
-    "k8s_resource_limits_set": (
-        "Kubernetes Core API list Pods. Checks containers[].resources.limits "
-        "for cpu and memory. Fails if any container lacks resource limits."
+    "k8s_namespace_resource_quotas": (
+        "Kubernetes Core API list ResourceQuotas per namespace. Fails if any "
+        "non-system namespace has no ResourceQuota."
     ),
-    "k8s_no_automount_sa_token": (
-        "Kubernetes Core API list Pods. Checks spec."
-        "automountServiceAccountToken. Fails if token auto-mounted on pods "
-        "that don't need API access."
+    "k8s_namespace_limit_ranges": (
+        "Kubernetes Core API list LimitRanges per namespace. Fails if any "
+        "non-system namespace has no LimitRange."
+    ),
+    "k8s_secrets_encrypted_etcd": (
+        "Kubernetes API server --encryption-provider-config flag. Checks "
+        "EncryptionConfiguration for aescbc or secretbox providers."
+    ),
+    "k8s_secrets_no_env_vars": (
+        "Kubernetes Core API list Pods. Checks containers[].env and "
+        "containers[].envFrom for secretKeyRef. Fails if secrets exposed as "
+        "environment variables."
+    ),
+    "k8s_service_no_loadbalancer_public": (
+        "Kubernetes Core API list Services. Checks for type LoadBalancer "
+        "without cloud-specific annotations restricting to internal. Fails if "
+        "public LB found."
+    ),
+    "k8s_service_no_nodeport": (
+        "Kubernetes Core API list Services. Checks for type NodePort. Fails "
+        "if NodePort services found in non-system namespaces."
+    ),
+    "k8s_api_audit_logging": (
+        "Kubernetes API server --audit-policy-file flag. Checks if audit "
+        "policy is configured and active."
+    ),
+    "k8s_api_tls_enabled": (
+        "Kubernetes API server --tls-cert-file and --tls-private-key-file "
+        "flags. Checks both are set."
+    ),
+    "k8s_admission_pod_security": (
+        "Kubernetes API check namespace labels for pod-security.kubernetes.io "
+        "enforcement. Fails if Pod Security Standards not enforced."
+    ),
+    "k8s_api_anonymous_auth": (
+        "Reads kube-apiserver pod spec in kube-system. Checks --anonymous- "
+        "auth flag is set to false."
+    ),
+    "k8s_api_no_token_auth_file": (
+        "Reads kube-apiserver pod spec. Checks --token-auth-file flag is NOT "
+        "present in args."
+    ),
+    "k8s_api_kubelet_client_cert": (
+        "Reads kube-apiserver pod spec. Checks --kubelet-client-certificate "
+        "flag is set."
+    ),
+    "k8s_api_kubelet_ca": (
+        "Reads kube-apiserver pod spec. Checks --kubelet-certificate- "
+        "authority flag is set."
+    ),
+    "k8s_api_no_always_allow": (
+        "Reads kube-apiserver pod spec. Checks --authorization-mode does not "
+        "contain AlwaysAllow."
+    ),
+    "k8s_api_auth_mode_node": (
+        "Reads kube-apiserver pod spec. Checks --authorization-mode contains "
+        "Node."
+    ),
+    "k8s_api_auth_mode_rbac": (
+        "Reads kube-apiserver pod spec. Checks --authorization-mode contains "
+        "RBAC."
+    ),
+    "k8s_api_no_always_admit": (
+        "Reads kube-apiserver pod spec. Checks --enable-admission-plugins "
+        "does not contain AlwaysAdmit."
+    ),
+    "k8s_api_sa_admission": (
+        "Reads kube-apiserver pod spec. Checks --enable-admission-plugins "
+        "contains ServiceAccount."
+    ),
+    "k8s_api_ns_lifecycle": (
+        "Reads kube-apiserver pod spec. Checks --enable-admission-plugins "
+        "contains NamespaceLifecycle."
+    ),
+    "k8s_api_node_restriction": (
+        "Reads kube-apiserver pod spec. Checks --enable-admission-plugins "
+        "contains NodeRestriction."
+    ),
+    "k8s_api_profiling_disabled": (
+        "Reads kube-apiserver pod spec. Checks --profiling flag is set to "
+        "false."
+    ),
+    "k8s_api_audit_log_path": (
+        "Reads kube-apiserver pod spec. Checks --audit-log-path flag is set."
+    ),
+    "k8s_api_audit_maxage": (
+        "Reads kube-apiserver pod spec. Checks --audit-log-maxage is set and "
+        ">= 30."
+    ),
+    "k8s_api_audit_maxbackup": (
+        "Reads kube-apiserver pod spec. Checks --audit-log-maxbackup is set "
+        "and >= 10."
+    ),
+    "k8s_api_audit_maxsize": (
+        "Reads kube-apiserver pod spec. Checks --audit-log-maxsize is set and "
+        ">= 100."
+    ),
+    "k8s_api_sa_lookup": (
+        "Reads kube-apiserver pod spec. Checks --service-account-lookup is "
+        "not set to false."
+    ),
+    "k8s_api_sa_key_file": (
+        "Reads kube-apiserver pod spec. Checks --service-account-key-file "
+        "flag is set."
+    ),
+    "k8s_api_etcd_certs": (
+        "Reads kube-apiserver pod spec. Checks --etcd-certfile and --etcd- "
+        "keyfile flags are set."
+    ),
+    "k8s_api_tls_certs": (
+        "Reads kube-apiserver pod spec. Checks --tls-cert-file and --tls- "
+        "private-key-file flags are set."
+    ),
+    "k8s_api_client_ca": (
+        "Reads kube-apiserver pod spec. Checks --client-ca-file flag is set."
+    ),
+    "k8s_api_etcd_ca": (
+        "Reads kube-apiserver pod spec. Checks --etcd-cafile flag is set."
+    ),
+    "k8s_api_encryption_config": (
+        "Reads kube-apiserver pod spec. Checks --encryption-provider-config "
+        "flag is set."
+    ),
+    "k8s_api_strong_ciphers": (
+        "Reads kube-apiserver pod spec. Checks --tls-cipher-suites contains "
+        "only strong ciphers (TLS_ECDHE_*)."
+    ),
+    "k8s_api_sa_token_no_extend": (
+        "Reads kube-apiserver pod spec. Checks --service-account-extend- "
+        "token-expiration is set to false."
+    ),
+    "k8s_cm_profiling_disabled": (
+        "Reads kube-controller-manager pod spec. Checks --profiling flag is "
+        "set to false."
+    ),
+    "k8s_cm_sa_credentials": (
+        "Reads kube-controller-manager pod spec. Checks --use-service- "
+        "account-credentials is set to true."
+    ),
+    "k8s_cm_sa_private_key": (
+        "Reads kube-controller-manager pod spec. Checks --service-account- "
+        "private-key-file flag is set."
+    ),
+    "k8s_cm_root_ca": (
+        "Reads kube-controller-manager pod spec. Checks --root-ca-file flag "
+        "is set."
+    ),
+    "k8s_cm_rotate_kubelet_cert": (
+        "Reads kube-controller-manager pod spec. Checks --feature-gates "
+        "contains RotateKubeletServerCertificate=true."
+    ),
+    "k8s_cm_bind_localhost": (
+        "Reads kube-controller-manager pod spec. Checks --bind-address is "
+        "127.0.0.1."
+    ),
+    "k8s_sched_profiling_disabled": (
+        "Reads kube-scheduler pod spec. Checks --profiling flag is set to "
+        "false."
+    ),
+    "k8s_sched_bind_localhost": (
+        "Reads kube-scheduler pod spec. Checks --bind-address is 127.0.0.1."
+    ),
+    "k8s_etcd_cert_key": (
+        "Reads etcd pod spec in kube-system. Checks --cert-file and --key- "
+        "file flags are set."
+    ),
+    "k8s_etcd_client_cert_auth": (
+        "Reads etcd pod spec. Checks --client-cert-auth is set to true."
+    ),
+    "k8s_etcd_no_auto_tls": (
+        "Reads etcd pod spec. Checks --auto-tls is NOT set to true."
+    ),
+    "k8s_etcd_peer_certs": (
+        "Reads etcd pod spec. Checks --peer-cert-file and --peer-key-file "
+        "flags are set."
+    ),
+    "k8s_etcd_peer_client_auth": (
+        "Reads etcd pod spec. Checks --peer-client-cert-auth is set to true."
+    ),
+    "k8s_etcd_no_peer_auto_tls": (
+        "Reads etcd pod spec. Checks --peer-auto-tls is NOT set to true."
+    ),
+    "k8s_audit_policy_exists": (
+        "Reads kube-apiserver pod spec. Checks --audit-policy-file flag is "
+        "set and points to an existing file."
+    ),
+    "k8s_kubelet_anonymous_auth": (
+        "Reads kubelet config via node proxy endpoint /configz. Checks "
+        "authentication.anonymous.enabled is false."
+    ),
+    "k8s_kubelet_auth_mode": (
+        "Reads kubelet config via node proxy endpoint /configz. Checks "
+        "authorization.mode is Webhook."
+    ),
+    "k8s_kubelet_iptables_chains": (
+        "Reads kubelet config via node proxy endpoint /configz. Checks "
+        "makeIPTablesUtilChains is true."
+    ),
+    "k8s_kubelet_rotate_certs": (
+        "Reads kubelet config via node proxy endpoint /configz. Checks "
+        "rotateCertificates is true."
+    ),
+    "k8s_kubelet_seccomp_default": (
+        "Reads kubelet config via node proxy endpoint /configz. Checks "
+        "seccompDefault is true."
+    ),
+    "k8s_kube_proxy_metrics_localhost": (
+        "Reads kube-proxy ConfigMap in kube-system. Checks metricsBindAddress "
+        "is 127.0.0.1."
+    ),
+    "k8s_rbac_pod_create_limited": (
+        "Kubernetes RBAC API list ClusterRoles. Checks for rules granting "
+        "create on pods resource. Flags non-system roles with broad pod "
+        "creation."
+    ),
+    "k8s_sa_token_mount_needed": (
+        "Kubernetes Core API list Pods. Checks "
+        "spec.automountServiceAccountToken. Flags pods with auto-mounted "
+        "tokens that don't need API access."
+    ),
+    "k8s_rbac_no_system_masters": (
+        "Kubernetes RBAC API list ClusterRoleBindings. Checks for subjects "
+        "bound to system:masters group. Flags non-system bindings."
+    ),
+    "k8s_rbac_no_escalate_perms": (
+        "Kubernetes RBAC API list ClusterRoles. Checks for rules with verbs: "
+        "bind, impersonate, or escalate. Flags roles with meta-permissions."
+    ),
+    "k8s_pod_no_windows_host_process": (
+        "Kubernetes Core API list Pods. Checks "
+        "spec.securityContext.windowsOptions.hostProcess. Fails if any pod "
+        "uses HostProcess."
+    ),
+    "k8s_pod_no_host_path": (
+        "Kubernetes Core API list Pods. Checks spec.volumes[].hostPath. Fails "
+        "if any pod mounts host filesystem paths."
+    ),
+    "k8s_pod_no_host_ports": (
+        "Kubernetes Core API list Pods. Checks containers[].ports[].hostPort. "
+        "Fails if any container binds to host ports."
+    ),
+    "k8s_image_policy_webhook": (
+        "Reads kube-apiserver pod spec. Checks --enable-admission-plugins "
+        "contains ImagePolicyWebhook."
     ),
     # ── SaaS checks ──
     "servicenow_users_mfa_enabled": (

@@ -1,8 +1,8 @@
 """Kubernetes Security Scanner — comprehensive CIS K8s Benchmark-aligned checks.
 
-Implements 30+ security checks following CIS Kubernetes Benchmark v1.8, NIST 800-53, and CCM v4.1.
-Provides complete CIS Kubernetes Benchmark v1.9.0 coverage by emitting MANUAL results for any
-controls not covered by automated checks.
+Implements 30+ security checks following CIS Kubernetes Benchmark v1.12.0, NIST 800-53, and CCM v4.1.
+Provides complete CIS Kubernetes Benchmark v1.12.0 coverage via the K8sCISEvaluatorEngine
+(54 automated evaluators) plus 30 scanner checks, with MANUAL results for uncovered controls.
 """
 import logging
 
@@ -11,7 +11,7 @@ from scanner.providers.base_check import CheckResult
 
 logger = logging.getLogger(__name__)
 
-COMPLIANCE = ["CIS-K8s-1.8", "NIST-800-53", "CCM-4.1"]
+COMPLIANCE = ["CIS-K8s-1.12", "NIST-800-53", "CCM-4.1"]
 
 
 class K8sScanner:
@@ -678,7 +678,7 @@ class K8sScanner:
     def _emit_cis_coverage(self, automated_results: list[dict]) -> list[dict]:
         """Emit MANUAL results for CIS controls not covered by automated checks.
 
-        Ensures complete CIS Kubernetes Benchmark v1.9.0 reporting by scanning
+        Ensures complete CIS Kubernetes Benchmark v1.12.0 reporting by scanning
         all controls and marking uncovered ones with MANUAL status.
         """
         # Build set of CIS control IDs already covered by automated results
@@ -688,38 +688,27 @@ class K8sScanner:
             if cis_id:
                 covered_cis_ids.add(cis_id)
 
-        # Map existing check_ids to CIS control IDs
+        # Map existing scanner check_ids to CIS control IDs (v1.12.0)
         check_to_cis = {
-            "k8s_pod_no_host_network": "5.2.4",
-            "k8s_pod_no_host_pid": "5.2.2",
-            "k8s_pod_no_host_ipc": "5.2.3",
-            "k8s_pod_no_privileged": "5.2.5",
-            "k8s_pod_run_as_non_root": "5.2.7",
-            "k8s_pod_readonly_rootfs": "5.2.10",
-            "k8s_pod_resource_limits": "5.4.1",
+            "k8s_pod_no_privileged": "5.2.2",
+            "k8s_pod_no_host_pid": "5.2.3",
+            "k8s_pod_no_host_ipc": "5.2.4",
+            "k8s_pod_no_host_network": "5.2.5",
             "k8s_pod_no_privilege_escalation": "5.2.6",
+            "k8s_pod_run_as_non_root": "5.2.7",
             "k8s_pod_capability_drop_all": "5.2.8",
-            "k8s_pod_seccomp_profile": "5.7.2",
-            "k8s_pod_image_pull_policy": "5.5.1",
-            "k8s_pod_liveness_probe": "5.5.2",
-            "k8s_pod_readiness_probe": "5.5.3",
+            "k8s_pod_seccomp_profile": "5.6.2",
             "k8s_rbac_no_wildcard_cluster_admin": "5.1.1",
-            "k8s_rbac_no_wildcard_verbs": "5.1.3",
             "k8s_rbac_limit_secrets_access": "5.1.2",
+            "k8s_rbac_no_wildcard_verbs": "5.1.3",
             "k8s_rbac_no_default_sa_token": "5.1.5",
             "k8s_namespace_network_policy": "5.3.2",
-            "k8s_network_deny_all_default": "5.3.1",
-            "k8s_network_ingress_rules": "5.3.3",
-            "k8s_no_pods_in_default": "5.7.4",
-            "k8s_namespace_resource_quotas": "5.4.2",
-            "k8s_namespace_limit_ranges": "5.4.3",
-            "k8s_secrets_encrypted_etcd": "1.2.29",
-            "k8s_secrets_no_env_vars": "5.4.4",
-            "k8s_service_no_loadbalancer_public": "5.5.4",
-            "k8s_service_no_nodeport": "5.5.5",
-            "k8s_api_audit_logging": "1.2.18",
-            "k8s_api_tls_enabled": "1.2.25",
+            "k8s_secrets_no_env_vars": "5.4.1",
+            "k8s_secrets_encrypted_etcd": "1.2.27",
+            "k8s_no_pods_in_default": "5.6.4",
             "k8s_admission_pod_security": "5.2.1",
+            "k8s_api_audit_logging": "1.2.16",
+            "k8s_api_tls_enabled": "1.2.24",
         }
 
         for result in automated_results:
@@ -743,7 +732,7 @@ class K8sScanner:
                 resource_id="cluster",
                 resource_name="kubernetes-cluster",
                 status_extended=f"CIS {cis_id}: Requires manual verification — {title}",
-                remediation=f"Review CIS Kubernetes Benchmark v1.9.0 control {cis_id}: {title}",
+                remediation=f"Review CIS Kubernetes Benchmark v1.12.0 control {cis_id}: {title}",
                 compliance_frameworks=COMPLIANCE,
                 assessment_type=assessment_type,
                 cis_control_id=cis_id,
@@ -753,10 +742,21 @@ class K8sScanner:
         return manual_results
 
     def run_all_checks(self) -> list[dict]:
-        """Run all Kubernetes security checks including complete CIS benchmark coverage."""
+        """Run all Kubernetes security checks including CIS v1.12.0 evaluators."""
+        # Existing scanner checks (pods, RBAC, network, namespaces, etc.)
         results = self.scan()
 
-        # Add MANUAL results for any CIS controls not covered by automated checks
-        results.extend(self._emit_cis_coverage(results))
+        # Run CIS v1.12.0 evaluators (54 automated + MANUAL for uncovered)
+        try:
+            from scanner.providers.kubernetes.k8s_cis_evaluator_engine import K8sCISEvaluatorEngine
+            engine = K8sCISEvaluatorEngine(self.credentials)
+            if hasattr(self, "_scan_logger") and self._scan_logger:
+                engine._scan_logger = self._scan_logger
+            evaluator_results = engine.run_all()
+            results.extend(evaluator_results)
+        except Exception as e:
+            logger.error(f"CIS evaluator engine failed: {e}")
+            # Fallback to legacy CIS coverage
+            results.extend(self._emit_cis_coverage(results))
 
         return results

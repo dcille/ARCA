@@ -26,6 +26,7 @@ class K8sCISEvaluatorEngine:
 
     def __init__(self, credentials: dict):
         self.cache = K8sClientCache(credentials)
+        self._scan_logger = None
 
     def run_all(self) -> list[dict]:
         """Execute all registered evaluators + emit MANUAL for uncovered controls.
@@ -34,16 +35,27 @@ class K8sCISEvaluatorEngine:
         """
         results = []
         covered_cis_ids = set()
+        slog = self._scan_logger
 
         # ── Run all registered evaluators ──
         for cis_id, evaluator_fn in sorted(EVALUATOR_REGISTRY.items()):
+            module_name = f"evaluator::k8s_cis_{cis_id}"
+            if slog:
+                slog.log_module_start(module_name, f"Evaluating CIS {cis_id}")
             try:
                 eval_results = evaluator_fn(self.cache)
                 results.extend(eval_results)
                 covered_cis_ids.add(cis_id)
                 logger.debug("Evaluated CIS %s: %d results", cis_id, len(eval_results))
+                if slog:
+                    has_error = any(r.get("status") == "ERROR" for r in eval_results)
+                    slog.log_module_end(module_name, result_count=len(eval_results),
+                                        status="error" if has_error else "success")
             except Exception as e:
                 logger.error("Evaluator for CIS %s failed: %s", cis_id, e)
+                if slog:
+                    slog.log_error(module_name, f"Evaluator failed: {e}")
+                    slog.log_module_end(module_name, result_count=0, status="error")
                 results.append(build_result(
                     check_id=f"k8s_cis_{cis_id.replace('.', '_')}",
                     title=f"CIS {cis_id} evaluation error",
